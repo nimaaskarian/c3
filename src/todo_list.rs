@@ -143,7 +143,6 @@ impl TodoList {
                 undone
             }
         }
-        println!("{}",filename.to_str().unwrap());
         for line in read_to_string(filename).unwrap().lines() {
             let todo = match Todo::try_from(line) {
                 Ok(value) => value,

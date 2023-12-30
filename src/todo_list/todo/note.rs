@@ -42,12 +42,12 @@ impl Note {
     }
 
     pub fn from_hash(hash:&String) -> io::Result<Self> {
-        let content = file_content(&note_path(&hash))?;
+        let content = file_content(&note_path(&hash).expect("Unable to get the note's path."))?;
         Ok(Note::new(content))
     }
 
     fn path(&self) -> PathBuf {
-        note_path(&self.hash)
+        note_path(&self.hash).expect("Unable to get the note's path.")
     }
 
     pub fn new(content:String)-> Self {
@@ -60,7 +60,7 @@ impl Note {
     }
 
     pub fn save(&self) -> io::Result<()> {
-        let mut file = File::create(self.path())?;
+        let mut file = File::create(self.path().as_os_str())?;
         file.write_all(self.content.as_bytes())?;
 
         Ok(())

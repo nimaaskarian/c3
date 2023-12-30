@@ -1,13 +1,11 @@
 mod todo_list;
 use todo_list::TodoList;
 use scanf::scanf;
-use home::home_dir;
 pub mod fileio;
 
-// use path::{append_home_dir, note_path};
+use fileio::append_home_dir;
 
-const TODO_DIR:&str = ".local/share/calcurse/";
-const TODO_FILE:&str = "todo";
+const TODO_PATH:&str = ".local/share/calcurse/todo";
 
 fn get_message() -> String {
     print!("Message: ");
@@ -24,9 +22,10 @@ fn get_priority() -> i8 {
 }
 
 fn main() -> std::io::Result<()>{
-    let mut todo_file = home_dir().unwrap().join(TODO_DIR).join(TODO_FILE);
-    if let Some(parent) = todo_file.parent() {
-        std::fs::create_dir_all(parent.join("note"))?;
+    let todo_path = append_home_dir(TODO_PATH);
+    println!("{:?}", todo_path.as_os_str());
+    if let Some(parent) = todo_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
     }
 
     // todo_list.undone.sort();
@@ -35,7 +34,7 @@ fn main() -> std::io::Result<()>{
     // todo_list.undone.reorder(2);
 
     // Ok(())
-    let mut todo_list = TodoList::read(&todo_file);
+    let mut todo_list = TodoList::read(&todo_path);
     todo_list.undone.sort();
     let mut resume_char = '\0';
     while resume_char != 'n' {
@@ -109,7 +108,7 @@ fn main() -> std::io::Result<()>{
     scanf!("{}", save_char);
 
     if save_char.to_ascii_lowercase() == 'y' {
-        todo_list.write(todo_file.to_str().unwrap()).expect("file write error");
+        todo_list.write(todo_path.to_str().unwrap()).expect("file write error");
         print!("Saved. ");
     }
     println!("Goodbye!");
