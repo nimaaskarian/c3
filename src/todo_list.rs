@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::ops::{Index, IndexMut};
 use std::io::{BufWriter, Write};
 use std::io;
-use std::fs::{read_to_string};
+use std::fs::read_to_string;
 mod todo;
 use todo::Todo;
 
@@ -34,6 +34,10 @@ impl TodoArray {
         TodoArray {
             todos: Vec::new()
         }
+    }
+
+    pub fn len(&mut self) -> usize{
+        self.todos.len()
     }
     fn push(&mut self,item:Todo) {
         self.todos.push(item)
@@ -109,8 +113,10 @@ impl TodoArray {
     }
 
     pub fn print (&self) {
+        let mut i = 1;
         for todo in &self.todos {
-            println!("{}", todo.as_string());
+            println!("{} - {}", i,todo.as_string());
+            i+=1;
         }
     }
 
@@ -131,12 +137,13 @@ impl TodoList {
     pub fn read (filename: &PathBuf) -> Self{
         let mut undone = TodoArray::new();
         let mut done = TodoArray::new();
-        if !filename.exists() {
+        if !filename.is_file() {
             return TodoList {
                 done,
                 undone
             }
         }
+        println!("{}",filename.to_str().unwrap());
         for line in read_to_string(filename).unwrap().lines() {
             let todo = match Todo::try_from(line) {
                 Ok(value) => value,
@@ -154,10 +161,14 @@ impl TodoList {
         }
     }
 
+    pub fn add(&mut self, message:String, priority:i8) {
+        self.undone.push(Todo::new(message, priority));
+    }
+
     pub fn write (&self, filename: &str) -> io::Result<()> {
         let file = File::create(filename)?;
         let mut writer = BufWriter::new(file);
-        let todos = [&self.done.todos, &self.undone.todos];
+        let todos = [&self.undone.todos, &self.done.todos];
 
         for todo in todos.iter().flat_map(|v| v.iter()) {
             writeln!(writer, "{}", todo.as_string())?;

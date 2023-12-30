@@ -1,9 +1,10 @@
-use sha1::{Sha1, Digest};
 use std::fs::{File, remove_file};
+use std::io::{self, Write};
+use sha1::{Sha1, Digest};
 use std::process::Command;
-use std::path::{Path, PathBuf};
-use std::io::{prelude::*, self};
+use std::path::{PathBuf};
 use std::env;
+use crate::fileio::{note_path, temp_note_path, file_content};
 
 pub struct Note {
     content: String,
@@ -11,54 +12,42 @@ pub struct Note {
 }
 
 #[inline(always)]
-pub fn hash_path(hash:&String) -> PathBuf {
-    let home = env::var("HOME").unwrap();
-    Path::new(&home).join(".local/share/calcurse/notes").join(hash)
-}
-pub enum NoteError {
-    FileNotExists,
-    UnableToRead,
-}
-
-#[inline(always)]
-pub fn file_content(path:&PathBuf) -> Result<String, NoteError> {
-    let mut content = String::new();
-    let mut file = match File::open(path){
-        Err(_) => return Err(NoteError::FileNotExists),
-        Ok(file) => file,
-    };
-    if file.read_to_string(&mut content).is_ok() {
-        Ok(content)
+pub fn open_temp_editor(content:String, path:&PathBuf) -> io::Result<String>{
+    let mut file = File::create(path)?;
+    write!(file, "{content}")?;
+    let editor = if cfg!(windows) {
+        String::from("notepad")
     } else {
-        Err(NoteError::UnableToRead)
-    }
+         match env::var("EDITOR") {
+            Ok(editor) => editor,
+            Err(_) => String::from("vi")
+        }
+    };
+    Command::new(editor).arg(path.clone()).status().expect("Couldn't open the editor.");
+    let content = file_content(path)?;
+    remove_file(path).unwrap();
+    Ok(content)
 }
 
 impl Note {
-    pub fn from_editor()-> Result<Self, NoteError> {
-        let editor = match env::var("EDITOR") {
-            Ok(editor) => editor,
-            Err(_) => String::from("vi")
-        };
-        let home = env::var("HOME").unwrap();
-        let filename = format!("potato-note.{}", rand::random::<u16>());
+    pub fn from_editor()-> io::Result<Self> {
 
-        let path = Path::new(&home).join(filename);
-
-        Command::new(editor).arg(path.clone()).status().expect("Couldn't open the editor.");
-        let content = file_content(&path)?;
-        remove_file(path).unwrap();
+        let content = open_temp_editor(String::new(), &temp_note_path())?;
 
         Ok(Note::new(content))
     }
 
-    pub fn from_hash(hash:String) -> Result<Self, NoteError> {
-        let content = file_content(&hash_path(&hash))?;
+    pub fn content(&self) -> String {
+        self.content.clone()
+    }
+
+    pub fn from_hash(hash:&String) -> io::Result<Self> {
+        let content = file_content(&note_path(&hash))?;
         Ok(Note::new(content))
     }
 
     fn path(&self) -> PathBuf {
-        hash_path(&self.hash)
+        note_path(&self.hash)
     }
 
     pub fn new(content:String)-> Self {
@@ -69,12 +58,25 @@ impl Note {
             hash,
         }
     }
+
     pub fn save(&self) -> io::Result<()> {
         let mut file = File::create(self.path())?;
         file.write_all(self.content.as_bytes())?;
 
         Ok(())
     }
+
+    pub fn remove_file(&self) {
+        remove_file(self.path()).unwrap();
+    }
+
+    pub fn edit_with_editor(&mut self) -> io::Result<()> {
+        self.content = open_temp_editor(self.content.clone(), &temp_note_path())?;
+        self.remove_file();
+        self.hash = sha1(&self.content);
+        Ok(())
+    }
+
     pub fn hash(&self) -> String {
         self.hash.clone()
     }

@@ -1,8 +1,8 @@
 use scanf::sscanf;
 mod note;
+use std::io;
 use note::{Note, sha1};
 
-use self::note::NoteError;
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Todo {
     message: String,
@@ -74,12 +74,31 @@ impl Todo {
         }
     }
 
-    pub fn add_note(&mut self)-> Result<(), NoteError>{
+    pub fn add_note(&mut self)-> io::Result<()>{
         let note = Note::from_editor()?;
 
         self.note = note.hash();
         note.save().expect("Note saving failed");
         Ok(())
+    }
+
+    pub fn edit_note(&mut self)-> io::Result<()>{
+        let mut note = Note::from_hash(&self.note)?;
+        note.edit_with_editor()?;
+        self.note = note.hash();
+        note.save().expect("Note saving failed");
+        Ok(())
+    }
+
+    pub fn note(&mut self) -> String {
+        match Note::from_hash(&self.note) {
+            Err(_) => return String::new(),
+            Ok(note) => note.content()
+        }
+    }
+
+    pub fn set_message(&mut self, message:String) {
+        self.message = message;
     }
 
     pub fn hash(&self) -> String{
