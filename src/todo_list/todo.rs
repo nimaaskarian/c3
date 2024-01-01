@@ -1,23 +1,33 @@
 use scanf::sscanf;
 mod note;
-use std::io;
+use std::{io, path::PathBuf, ops::Add, fs::File};
 use note::{Note, sha1};
 
-#[derive(Debug, PartialEq, Clone, Default)]
+use crate::fileio::{note_path};
+
+use super::TodoList;
+
+#[derive(Debug, Clone, Default)]
 pub struct Todo {
-    message: String,
+    pub message: String,
     note: String,
     priority: i8,
-    pub(crate) done:bool,
+    pub dependencies: TodoList,
+    dependency_path: PathBuf,
+    done:bool,
 }
 
 impl Into<String> for &Todo {
     fn into(self) -> String{
-        let done_str = if self.done {"-"} else {""};
-        let note_str = match self.note.as_str() {
+        let done_str = if self.done() {"-"} else {""};
+        self.hash();
+        let mut note_str = match self.note.as_str() {
             "" => String::new(),
             _ => format!(">{}", self.note),
         };
+        if self.has_dependency() {
+            note_str = format!(">{}", self.dependency_name());
+        }
         format!("[{done_str}{}]{note_str} {}", self.priority, self.message)
     }
 }
@@ -25,7 +35,9 @@ impl Into<String> for &Todo {
 #[derive(Debug, PartialEq)]
 pub enum TodoError {
     ReadFailed,
-    NoteEmpty
+    NoteEmpty,
+    AlreadyExists,
+    DependencyCreationFailed,
 }
 
 impl TryFrom<String> for Todo {
@@ -42,13 +54,23 @@ impl TryFrom<&str> for Todo {
     fn try_from(s:&str) -> Result<Todo, TodoError>{
         let mut message = String::new();
         let mut note = String::new();
+        let mut todo = String::new();
         let mut priority_string:String = String::new();
 
-        if sscanf!(s,"[{}]>{} {}", priority_string, note, message).is_err() {
-            if sscanf!(s,"[{}] {}", priority_string, message).is_err() {
-                return Err(TodoError::ReadFailed);
+        if sscanf!(s,"[{}]>{}.todo {}", priority_string, todo, message).is_err() {
+            if sscanf!(s,"[{}]>{} {}", priority_string, note, message).is_err() {
+                if sscanf!(s,"[{}] {}", priority_string, message).is_err() {
+                    return Err(TodoError::ReadFailed);
+                }
             }
         }
+        let mut dependency_path = PathBuf::new();
+        let mut dependencies = TodoList::new();
+        if todo != "" {
+            dependency_path = Self::static_dependency_path(todo);
+            dependencies = TodoList::read(&dependency_path);
+        }
+
         let done = priority_string.chars().nth(0).unwrap() == '-';
         let mut priority:i8 = priority_string.parse().unwrap();
 
@@ -56,6 +78,8 @@ impl TryFrom<&str> for Todo {
             priority*=-1;
         }
         Ok(Todo {
+            dependency_path,
+            dependencies,
             message,
             note,
             priority,
@@ -67,14 +91,85 @@ impl TryFrom<&str> for Todo {
 impl Todo {
     pub fn new(message:String, priority:i8) -> Self {
         Todo {
+            dependency_path: PathBuf::new(),
             note: String::new(),
+            dependencies: TodoList::new(),
             message,
             priority: Todo::fixed_priority(priority),
             done: false,
         }
     }
 
+    fn static_dependency_name(name:String) -> String {
+        format!("{name}.todo")
+    }
+
+    fn static_dependency_path(name:String) -> PathBuf {
+        return note_path(&Self::static_dependency_name(name)).unwrap();
+    }
+
+    fn dependency_name(&self) -> String {
+        format!("{}.todo", self.hash())
+        // Self::static_dependency_name(self.hash())
+    }
+
+    pub fn dependency_path(&self) -> PathBuf {
+        return Self::static_dependency_path(self.hash())
+    }
+
+    pub fn add_dependency(&mut self) -> Result<(), TodoError>{
+        if self.has_dependency() {
+            return Err(TodoError::AlreadyExists)
+        }
+
+        self.dependency_path = self.dependency_path();
+        if File::create(&self.dependency_path).is_err() {
+            return Err(TodoError::DependencyCreationFailed)
+        }
+
+        self.note = String::new();
+
+        self.dependencies = TodoList::read(&self.dependency_path);
+        // self.dependencies.add(String::from("Sub to-do"), 0);
+        Ok(())
+
+    }
+
+    pub fn has_dependency(&self) -> bool {
+        match self.dependency_path.to_str() {
+            Some(value) => value != "",
+            None => false,
+        }
+        // self.dependencies.undone.len() != 0
+    }
+
+    pub fn done(&self) -> bool {
+        if self.has_dependency() {
+            return self.dependencies.undone.len() == 0;
+        }
+        return self.done
+    }
+
+    pub fn display(&self) -> String {
+        let done_string = if self.done() {
+            "x"
+        } else {
+            " "
+        };
+        let note_string = if self.note != "" {
+            ">"
+        } else if self.has_dependency() {
+            "-"
+        }
+        else {
+            " "
+        };
+        format!("[{done_string}] [{}]{note_string}{}", self.priority, self.message)
+    }
+
     pub fn add_note(&mut self)-> io::Result<()>{
+        self.dependency_path = PathBuf::new();
+        self.dependencies = TodoList::new();
         let note = Note::from_editor()?;
 
         self.note = note.hash();
@@ -90,7 +185,7 @@ impl Todo {
         Ok(())
     }
 
-    pub fn note(&mut self) -> String {
+    pub fn note(&self) -> String {
         match Note::from_hash(&self.note) {
             Err(_) => return String::new(),
             Ok(note) => note.content()
@@ -102,16 +197,27 @@ impl Todo {
     }
 
     pub fn hash(&self) -> String{
-        sha1(&self.as_string())
+        sha1(&format!("{} {}", self.priority, self.message))
     }
 
     pub fn toggle_done(&mut self) {
         self.done = !self.done;
     }
 
-    pub fn add_priority(&mut self, add:i8) {
-        self.priority += add;
-        self.fix_priority();
+    pub fn decrease_priority(&mut self) {
+        if self.comparison_priority() < 9 {
+            self.priority+=1
+        } else {
+            self.priority=0
+        }
+    }
+
+    pub fn increase_priority(&mut self) {
+        if self.comparison_priority() > 1 {
+            self.priority=self.comparison_priority()-1
+        } else {
+            self.priority=1
+        }
     }
 
     pub fn set_priority(&mut self, add:i8) {
@@ -130,14 +236,11 @@ impl Todo {
 
     fn fixed_priority(priority: i8) -> i8 {
         match priority {
-            ..=0 => 0,
-            9.. => 9,
+            10.. => 0,
+            0 => 0,
+            ..=0 => 1,
             _ => priority
         }
-    }
-
-    pub fn to_display_string(&self) -> String {
-        unimplemented!()
     }
 
     pub fn as_string(&self) -> String{
@@ -167,24 +270,6 @@ mod tests {
 
         todo.toggle_done();
         assert_eq!(todo.done, false);
-    }
-
-    #[test]
-    fn test_add_priority() {
-        let mut todo = Todo::new("Buy groceries".to_string(), 5);
-        assert_eq!(todo.priority, 5);
-
-        todo.add_priority(3);
-        assert_eq!(todo.priority, 8);
-
-        todo.add_priority(-2);
-        assert_eq!(todo.priority, 6);
-
-        todo.add_priority(-10);
-        assert_eq!(todo.priority, 0);
-
-        todo.add_priority(10);
-        assert_eq!(todo.priority, 9);
     }
 
     #[test]

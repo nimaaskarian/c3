@@ -1,4 +1,4 @@
-use std::fs::{File, remove_file};
+use std::fs::{File, remove_file, remove_dir};
 use std::io::{prelude::*, self};
 use std::path::{PathBuf};
 use home::home_dir;
@@ -14,10 +14,19 @@ pub fn note_path(hash:&String) -> io::Result<PathBuf> {
     if dir.is_file() {
         remove_file(dir.clone())?;
     }
-    if ! dir.exists() {
-        std::fs::create_dir_all(dir.clone())?;
-    }
+    let _ = std::fs::create_dir_all(dir.clone());
     Ok(dir.join(hash))
+}
+
+#[inline(always)]
+pub fn todo_path() -> io::Result<PathBuf> {
+    let file = append_home_dir( ".local/share/calcurse/todo");
+    if file.is_dir() {
+        remove_dir(file.clone())?;
+    }
+    let parentdir = file.parent().unwrap();
+    let _ = std::fs::create_dir_all(parentdir)?;
+    Ok(file)
 }
 
 #[inline(always)]
