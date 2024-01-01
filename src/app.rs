@@ -18,7 +18,7 @@ pub struct App {
     pub index: usize,
     todo_path: PathBuf,
     pub changed:bool,
-    pub show_note:bool,
+    pub show_right:bool,
     prior_indexes: Vec<usize>,
     pub text_mode: bool,
     pub on_submit: Option<fn(String, &mut App)->()>,
@@ -35,9 +35,13 @@ impl App {
             index: 0,
             todo_path,
             changed: false,
-            show_note: true,
+            show_right: true,
             text_mode: false,
         }
+    }
+    pub fn read(&mut self) {
+        self.changed = false;
+        self.todo_list = TodoList::read(&self.todo_path);
     }
 
     pub fn title(&self) -> String {
@@ -57,7 +61,12 @@ impl App {
     }
 
     pub fn increment(&mut self) {
-        if self.index != self.current_list().undone.len() - 1 {
+        let undone_len = self.current_list().undone.len();
+        if undone_len == 0 {
+            self.index = 0;
+            return;
+        };
+        if self.index != undone_len - 1 {
             self.index += 1
         } else {
             self.go_top()
@@ -133,7 +142,6 @@ impl App {
 
         Some(&mut self.mut_current_list().undone[index])
     }
-
 
     pub fn todo(&self) -> Option<&Todo> {
         if self.current_undone_empty() {

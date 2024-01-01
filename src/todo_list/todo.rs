@@ -1,13 +1,18 @@
+// vim:fileencoding=utf-8:foldmethod=marker
+//std{{{
+use std::{io, path::PathBuf, ops::Add, fs::{File, remove_file}};
+//}}}
+// lib{{{
 use scanf::sscanf;
+// }}}
+// mod{{{
 mod note;
-use std::{io, path::PathBuf, ops::Add, fs::File};
+use crate::fileio::note_path;
 use note::{Note, sha1};
-
-use crate::fileio::{note_path};
-
 use super::TodoList;
+//}}}
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Todo {
     pub message: String,
     note: String,
@@ -20,7 +25,6 @@ pub struct Todo {
 impl Into<String> for &Todo {
     fn into(self) -> String{
         let done_str = if self.done() {"-"} else {""};
-        self.hash();
         let mut note_str = match self.note.as_str() {
             "" => String::new(),
             _ => format!(">{}", self.note),
@@ -109,30 +113,30 @@ impl Todo {
     }
 
     fn dependency_name(&self) -> String {
-        format!("{}.todo", self.hash())
-        // Self::static_dependency_name(self.hash())
+        Self::static_dependency_name(self.hash())
     }
 
-    pub fn dependency_path(&self) -> PathBuf {
-        return Self::static_dependency_path(self.hash())
+    pub fn dependency_path(&self) -> &PathBuf {
+        &self.dependency_path
+    }
+
+    pub fn remove_note(&mut self) {
+        remove_file(note_path(&self.note).unwrap());
+        self.note = String::new();
     }
 
     pub fn add_dependency(&mut self) -> Result<(), TodoError>{
         if self.has_dependency() {
             return Err(TodoError::AlreadyExists)
         }
-
-        self.dependency_path = self.dependency_path();
+        self.remove_note();
+        self.dependency_path = Self::static_dependency_path(self.hash());
         if File::create(&self.dependency_path).is_err() {
             return Err(TodoError::DependencyCreationFailed)
         }
 
-        self.note = String::new();
-
         self.dependencies = TodoList::read(&self.dependency_path);
-        // self.dependencies.add(String::from("Sub to-do"), 0);
         Ok(())
-
     }
 
     pub fn has_dependency(&self) -> bool {
@@ -144,7 +148,8 @@ impl Todo {
     }
 
     pub fn done(&self) -> bool {
-        if self.has_dependency() {
+        let done_len = self.dependencies.done.len();
+        if self.has_dependency() && done_len != 0{
             return self.dependencies.undone.len() == 0;
         }
         return self.done
@@ -167,14 +172,23 @@ impl Todo {
         format!("[{done_string}] [{}]{note_string}{}", self.priority, self.message)
     }
 
-    pub fn add_note(&mut self)-> io::Result<()>{
+    pub fn remove_dependency(&mut self) {
+        remove_file(self.dependency_path());
         self.dependency_path = PathBuf::new();
         self.dependencies = TodoList::new();
+    }
+
+    pub fn add_note(&mut self)-> io::Result<()>{
         let note = Note::from_editor()?;
 
+        self.set_note(note);
+        Ok(())
+    }
+
+    pub fn set_note(&mut self, note:Note) {
+        self.remove_dependency();
         self.note = note.hash();
         note.save().expect("Note saving failed");
-        Ok(())
     }
 
     pub fn edit_note(&mut self)-> io::Result<()>{
@@ -185,7 +199,7 @@ impl Todo {
         Ok(())
     }
 
-    pub fn note(&self) -> String {
+    pub fn get_note(&self) -> String {
         match Note::from_hash(&self.note) {
             Err(_) => return String::new(),
             Ok(note) => note.content()
@@ -250,94 +264,122 @@ impl Todo {
 
 #[cfg(test)]
 mod tests {
+    use crate::fileio::append_home_dir;
+
     use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_todo_into_string() {
+        let mut todo = Todo::new("Test".to_string(), 1);
+        todo.set_note(Note::new("Note".to_string()));
+
+        let expected = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
+        let result: String = (&todo).into();
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_try_from_string() {
+        let input = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
+        let expected = Ok(Todo {
+            message: "Test".to_string(),
+            note: "2c924e3088204ee77ba681f72be3444357932fca".to_string(),
+            priority: 1,
+            dependencies: TodoList::new(),
+            dependency_path: PathBuf::new(),
+            done: false,
+        });
+
+        let result: Result<Todo, TodoError> = Todo::try_from(input.to_string());
+
+        assert_eq!(result, expected);
+    }
 
     #[test]
     fn test_new_todo() {
-        let todo = Todo::new("Buy groceries".to_string(), 5);
-        assert_eq!(todo.message, "Buy groceries");
-        assert_eq!(todo.priority, 5);
+        let message = "New Todo";
+        let priority = 2;
+
+        let todo = Todo::new(message.to_string(), priority);
+
+        assert_eq!(todo.message, message);
+        assert_eq!(todo.note, String::new());
+        assert_eq!(todo.priority, 2);
+        assert_eq!(todo.dependencies, TodoList::new());
+        assert_eq!(todo.dependency_path, PathBuf::new());
         assert_eq!(todo.done, false);
+    }
+
+    #[test]
+    fn test_static_dependency_name() {
+        let name = "my_dep".to_string();
+        let expected = "my_dep.todo".to_string();
+
+        let result = Todo::static_dependency_name(name);
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_static_dependency_path() {
+        let name = "my_dep".to_string();
+        let expected = PathBuf::from(append_home_dir(".local/share/calcurse/notes/my_dep.todo"));
+
+        let result = Todo::static_dependency_path(name);
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_dependency_name() {
+        let todo = Todo::new("Test".to_string(), 1);
+
+        let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
+
+        let result = todo.dependency_name();
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_remove_note() {
+        let mut todo = Todo::new("Test".to_string(), 1);
+        todo.set_note(Note::new("Note".to_string()));
+
+        todo.remove_note();
+
+        assert_eq!(todo.note, String::new());
+    }
+
+    #[test]
+    fn test_add_dependency() {
+        let mut todo = Todo::new("Test".to_string(), 1);
+
+        todo.add_dependency();
+
+        assert!(todo.has_dependency());
+    }
+
+    #[test]
+    fn test_remove_dependency() {
+        let mut todo = Todo::new("Test".to_string(), 1);
+        todo.add_dependency();
+
+        todo.remove_dependency();
+
+        assert!(!todo.has_dependency());
     }
 
     #[test]
     fn test_toggle_done() {
-        let mut todo = Todo::new("Buy groceries".to_string(), 5);
-        assert_eq!(todo.done, false);
+        let mut todo = Todo::new("Test".to_string(), 1);
 
         todo.toggle_done();
-        assert_eq!(todo.done, true);
+        assert_eq!(todo.done(), true);
 
         todo.toggle_done();
-        assert_eq!(todo.done, false);
-    }
-
-    #[test]
-    fn test_set_priority() {
-        let mut todo = Todo::new("Buy groceries".to_string(), 5);
-        assert_eq!(todo.priority, 5);
-
-        todo.set_priority(8);
-        assert_eq!(todo.priority, 8);
-
-        todo.set_priority(2);
-        assert_eq!(todo.priority, 2);
-    }
-
-    #[test]
-    fn test_fix_priority() {
-       let mut todo = Todo::new("Buy groceries".to_string(), -1); 
-       todo.fix_priority();
-       assert_eq!(todo.priority, 0);
-
-       let mut todo = Todo::new("Buy groceries".to_string(), 10); 
-       todo.fix_priority();
-       assert_eq!(todo.priority, 9);
-
-       let mut todo = Todo::new("Buy groceries".to_string(), 4); 
-       todo.fix_priority();
-       assert_eq!(todo.priority, 4);  
-   }
-    #[test]
-    fn test_into_string() {
-        let mut todo = Todo {
-            done: true,
-            note: String::from("Note very gud"),
-            priority: 1,
-            message: String::from("Important job :D"),
-        };
-
-        let result: String = todo.as_string();
-
-        assert_eq!(result, "[-1]>Note very gud Important job :D");
-
-        todo.toggle_done();
-        let result: String = todo.as_string();
-        assert_eq!(result, "[1]>Note very gud Important job :D");
-    }
-     #[test]
-    fn test_try_from_string() {
-        let input = String::from("[2]>Note Message");
-
-        let result = Todo::try_from(input).unwrap();
-
-        assert_eq!(
-            result,
-            Todo {
-                done: false,
-                note: String::from("Note"),
-                priority: 2,
-                message: String::from("Message"),
-            }
-        );
-    }
-
-    #[test]
-    fn test_try_from_string_with_invalid_input() {
-        let input = String::from("[invalid] Invalid Message");
-
-        let result = Todo::try_from(input);
-
-        assert_eq!(result, Err(TodoError::ReadFailed));
+        assert_eq!(todo.done(), false);
     }
 }

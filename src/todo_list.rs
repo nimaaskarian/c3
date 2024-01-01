@@ -7,7 +7,7 @@ use std::fs::read_to_string;
 pub mod todo;
 use todo::Todo;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug,PartialEq, Clone, Default)]
 pub struct TodoArray {
     pub todos: Vec<Todo>
 }
@@ -20,7 +20,6 @@ impl Index<usize> for TodoArray {
 }
 
 impl IndexMut<usize> for TodoArray {
-    // type Output = Todo;
     fn index_mut(&mut self, index:usize) -> &mut Todo {
         &mut self.todos[index]
     }
@@ -160,7 +159,7 @@ impl TodoArray {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct TodoList {
     pub undone: TodoArray,
     pub done: TodoArray,
@@ -168,8 +167,8 @@ pub struct TodoList {
 
 impl TodoList {
     pub fn new () -> Self {
-        let mut undone = TodoArray::new();
-        let mut done = TodoArray::new();
+        let undone = TodoArray::new();
+        let done = TodoArray::new();
 
         TodoList {
             done,
@@ -195,8 +194,12 @@ impl TodoList {
         return todo_list
     }
 
-    pub fn add(&mut self, message:String, priority:i8) {
-        self.undone.push(Todo::new(message, priority));
+    // pub fn add(&mut self, message:String, priority:i8) {
+    //     self.undone.push(Todo::new(message, priority));
+    // }
+
+    pub fn add(&mut self, todo:Todo) {
+        self.undone.push(todo);
     }
 
     pub fn fix_undone(&mut self) {
@@ -216,7 +219,7 @@ impl TodoList {
         let todos = [&self.undone.todos, &self.done.todos];
 
         for todo in todos.iter().flat_map(|v| v.iter()) {
-            todo.dependencies.write(&todo.dependency_path());
+            let _ = todo.dependencies.write(&todo.dependency_path());
             writeln!(writer, "{}", todo.as_string())?;
         }
         writer.flush()?;
