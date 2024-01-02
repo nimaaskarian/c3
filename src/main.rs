@@ -3,13 +3,14 @@
 use std::{io::{self, stdout, Write}};
 //}}}
 // lib {{{
+use arboard::{Clipboard, SetExtLinux, LinuxClipboardKind};
 use ratatui::{prelude::*, widgets::*};
 use crossterm::{
     event::{self, Event::Key, KeyCode::Char, KeyCode},
     ExecutableCommand,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
-use tui_textarea::{Input, TextArea};
+use tui_textarea::{Input, TextArea, CursorMove};
 use tui_textarea;
 //}}}
 //mod{{{
@@ -35,6 +36,7 @@ fn run() -> io::Result<()> {
     let mut list_state = ListState::default();
     let mut app = App::new();
 
+
     let mut textarea = TextArea::default();
     textarea.set_cursor_line_style(Style::default());
 
@@ -57,6 +59,7 @@ fn run() -> io::Result<()> {
                         app.on_submit.unwrap()(todo_message, &mut app);
                     }
                     textarea.delete_line_by_head();
+                    textarea.delete_line_by_end();
                     app.text_mode = false;
                 }
             }
@@ -103,6 +106,25 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
     if let Key(key) = event::read()? {
         if key.kind == event::KeyEventKind::Press {
             match key.code {
+                Char('d') | Char('x') => {
+                    let index = app.index;
+                    let todo = app.mut_current_list().undone.remove(index);
+                    let todo_string:String = (&todo).into();
+                    app.clipboard.set_text(todo_string);
+                }
+                Char('y') => {
+                    let todo_string:String = app.todo().unwrap().into();
+                    app.clipboard.set_text(todo_string);
+                }
+                Char('p') => {
+                    match Todo::try_from(app.clipboard.get_text().unwrap()) {
+                        Ok(todo) => {
+                            app.mut_current_list().add(todo);
+                            app.mut_current_list().undone.sort();
+                        },
+                        _ => {},
+                    };
+                }
                 Char('j') => app.increment(),
                 Char('k') => app.decrement(),
                 Char('g') => app.go_top(),
@@ -144,7 +166,7 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
                 Char('R') => {
                     app.read()
                 },
-                Char('d') => {
+                Char('T') => {
                     app.mut_todo().unwrap().remove_dependency();
                     app.mut_todo().unwrap().remove_note();
                 }
@@ -166,7 +188,7 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
                             .title("Add todo"),
                     );
                 }
-                Char('e') => {
+                Char('E') | Char('e') => {
                     app.set_text_mode(edit_todo);
                     let todo_message = app.todo().unwrap().message.as_str();
                     textarea.insert_str(todo_message);
@@ -176,6 +198,9 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
                             .title("Edit todo"),
                     );
                     textarea.set_placeholder_text(todo_message);
+                    if key.code == Char('E') {
+                        textarea.move_cursor(CursorMove::Head);
+                    }
                 }
                 Char('q') => app.should_quit = true,
                 KeyCode::Char(c) if c.is_digit(10) => {

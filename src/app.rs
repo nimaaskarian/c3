@@ -3,6 +3,7 @@
 use std::{io::{self, stdout, Write}, path::PathBuf, fs::File};
 //}}}
 // lib{{{
+use arboard::{Clipboard, SetExtLinux, LinuxClipboardKind};
 use ratatui::{prelude::*, widgets::*};
 // }}}
 // mod{{{
@@ -16,18 +17,20 @@ pub struct App {
     pub todo_list: TodoList,
     pub should_quit: bool,
     pub index: usize,
-    todo_path: PathBuf,
-    pub changed:bool,
+    todo_path: PathBuf, pub changed:bool,
     pub show_right:bool,
     prior_indexes: Vec<usize>,
     pub text_mode: bool,
     pub on_submit: Option<fn(String, &mut App)->()>,
+    pub clipboard: Clipboard,
 }
 
 impl App {
     pub fn new() -> Self {
+        let clipboard = Clipboard::new().unwrap();
         let todo_path = todo_path().unwrap();
         App {
+            clipboard,
             on_submit: None,
             todo_list: TodoList::read(&todo_path),
             should_quit: false,
@@ -90,9 +93,12 @@ impl App {
     }
 
     pub fn traverse_down(&mut self) {
-        if self.todo().unwrap().has_dependency() {
-            self.prior_indexes.push(self.index);
-            self.index = 0;
+        match self.todo() {
+            Some(todo) if todo.has_dependency() => {
+                self.prior_indexes.push(self.index);
+                self.index = 0;
+            }
+            _ => {},
         }
     }
 

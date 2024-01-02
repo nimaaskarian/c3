@@ -11,6 +11,7 @@ home = "0.5.9"
 ratatui = "0.25.0"
 crossterm = "0.27.0"
 tui-textarea = "0.4.0"
+arboard = "3.3.0"
 
 [profile.release]
 codegen-units = 1
