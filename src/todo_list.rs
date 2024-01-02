@@ -194,10 +194,6 @@ impl TodoList {
         return todo_list
     }
 
-    // pub fn add(&mut self, message:String, priority:i8) {
-    //     self.undone.push(Todo::new(message, priority));
-    // }
-
     pub fn add(&mut self, todo:Todo) {
         self.undone.push(todo);
     }

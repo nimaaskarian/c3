@@ -134,7 +134,7 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
                 Char('h') => {
                     app.traverse_up()
                 },
-                Char('d') => {
+                Char('D') => {
                     let index = app.index;
                     app.mut_current_list().undone.remove(index);
                 },
@@ -144,7 +144,7 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
                 Char('R') => {
                     app.read()
                 },
-                KeyCode::Delete => {
+                Char('d') => {
                     app.mut_todo().unwrap().remove_dependency();
                     app.mut_todo().unwrap().remove_note();
                 }
