@@ -1,9 +1,8 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // standard {{{
-use std::{io::{self, stdout, Write}};
+use std::{io::{self, stdout, Write}, process::Command};
 //}}}
 // lib {{{
-use arboard::{Clipboard, SetExtLinux, LinuxClipboardKind};
 use ratatui::{prelude::*, widgets::*};
 use crossterm::{
     event::{self, Event::Key, KeyCode::Char, KeyCode},
@@ -95,14 +94,7 @@ fn editor(textarea: &mut TextArea) -> io::Result<Option<bool>> {
         }
     }
 }
-
-fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::Result<bool> {
-    let size = app.current_list().undone.len();
-    app.index = match size {
-        0 => 0,
-        _ => app.index.min(size-1),
-    };
-
+fn read_keys(app: &mut App, list_state: &ListState, textarea:&mut TextArea)  -> io::Result<bool> {
     if let Key(key) = event::read()? {
         if key.kind == event::KeyEventKind::Press {
             match key.code {
@@ -117,19 +109,20 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
                     app.clipboard.set_text(todo_string);
                 }
                 Char('p') => {
-                    match Todo::try_from(app.clipboard.get_text().unwrap()) {
-                        Ok(todo) => {
-                            app.mut_current_list().add(todo);
-                            app.mut_current_list().undone.sort();
-                        },
-                        _ => {},
-                    };
+                    if let Ok(clipboard) = app.clipboard.get_text() {
+                        match Todo::try_from(clipboard) {
+                            Ok(todo) => {
+                                app.mut_current_list().add(todo);
+                                app.mut_current_list().undone.sort();
+                            },
+                            _ => {},
+                        };
+                    }
                 }
                 Char('j') => app.increment(),
                 Char('k') => app.decrement(),
                 Char('g') => app.go_top(),
                 Char('G') => app.go_bottom(),
-                Char('H') => app.page_up(&list_state),
                 Char('w') => app.write()?,
                 Char('J') => {
                     app.mut_todo().unwrap().decrease_priority();
@@ -143,6 +136,9 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
                 },
                 Char('n') => {
                     app.show_right = !app.show_right
+                },
+                Char('P') => {
+                    app.potato = !app.potato
                 },
                 Char('N') => {
                     if app.mut_todo().unwrap().edit_note().is_err() {
@@ -188,6 +184,27 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
                             .title("Add todo"),
                     );
                 }
+                Char(' ') => {
+                    Command::new("potctl").args(["-t0"]).status();
+                }
+                Char('s') => {
+                    Command::new("potctl").args(["-s0"]).status();
+                }
+                Char('H') => {
+                    Command::new("potctl").args(["-i0"]).status();
+                }
+                Char('L') => {
+                    Command::new("potctl").args(["-d0"]).status();
+                }
+                Char('r') => {
+                    Command::new("potctl").args(["-r0"]).status();
+                }
+                Char('+') | Char('=') => {
+                    Command::new("potctl").args(["-I0"]).status();
+                }
+                Char('-') => {
+                    Command::new("potctl").args(["-D0"]).status();
+                }
                 Char('E') | Char('e') => {
                     app.set_text_mode(edit_todo);
                     let todo_message = app.todo().unwrap().message.as_str();
@@ -215,9 +232,26 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
     Ok(false)
 }
 
+fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::Result<bool> {
+    let size = app.current_list().undone.len();
+    app.index = match size {
+        0 => 0,
+        _ => app.index.min(size-1),
+    };
+
+    if app.potato {
+        if event::poll(std::time::Duration::from_millis(500))? {
+            return read_keys(app, list_state, textarea);
+        }
+    } else {
+        return read_keys(app, list_state, textarea);
+    }
+    Ok(false)
+}
+
 fn add_todo(str:String, app:&mut App) {
     app.mut_current_list().add(Todo::new(str, 0));
-    app.mut_current_list().undone.sort();
+    app.index = app.current_list().undone.len()-1;
 }
 
 fn edit_todo(str:String, app:&mut App) {
@@ -243,6 +277,13 @@ fn create_todo_widget(todo_array:&TodoArray, title:String) ->  TodoWidget {
 
 }
 
+fn get_potato_widget<'a>() -> Paragraph<'a> {
+    let time_str = Command::new("potctl").args(["+%m\n%t\n%p", "-10"]).output().unwrap();
+    let time_str = String::from_utf8(time_str.stdout).unwrap();
+
+    Paragraph::new(time_str).block(Block::default().title("Potato").borders(Borders::ALL))
+}
+
 fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
     let todo = app.todo();
 
@@ -261,12 +302,21 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
     };
 
     let main_layout = Layout::new(
+        Direction::Vertical,
+        [
+            Constraint::Length(5* app.potato as u16),
+            Constraint::Min(0),
+        ]
+    ).split(frame.size());
+    frame.render_widget(get_potato_widget(), main_layout[0]);
+
+    let todos_layout = Layout::new(
         Direction::Horizontal,
         [
             Constraint::Percentage(100 - dependency_width),
             Constraint::Percentage(dependency_width),
         ]
-    ).split(frame.size());
+    ).split(main_layout[1]);
 
     let todo_layout = Layout::new(
         Direction::Vertical,
@@ -274,7 +324,7 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
             Constraint::Length(3 * app.text_mode as u16),
             Constraint::Min(0),
         ]
-    ).split(main_layout[0]);
+    ).split(todos_layout[0]);
 
 
     match create_todo_widget(&app.current_list().undone, app.title()) {
@@ -288,30 +338,14 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
         let todo = todo.unwrap();
         if !todo.get_note().is_empty(){
             let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(Block::new().title("Todo note").borders(Borders::ALL));
-            frame.render_widget(note_widget, main_layout[1]);
+            frame.render_widget(note_widget, todos_layout[1]);
         } else
         if todo.has_dependency() {
             match create_todo_widget(&todo.dependencies.undone, String::from("Todo dependencies")) {
-                TodoWidget::List(widget) =>frame.render_widget(widget, main_layout[1]),
-                TodoWidget::Paragraph(widget) =>frame.render_widget(widget, main_layout[1]),
+                TodoWidget::List(widget) =>frame.render_widget(widget, todos_layout[1]),
+                TodoWidget::Paragraph(widget) =>frame.render_widget(widget, todos_layout[1]),
             }
         } 
-    }
-}
-
-fn validate(textarea: &mut TextArea) -> bool {
-    if let Err(err) = textarea.lines()[0].parse::<f64>() {
-        textarea.set_style(Style::default().fg(Color::LightRed));
-        textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!("ERROR: {}", err)),
-        );
-        false
-    } else {
-        textarea.set_style(Style::default().fg(Color::LightGreen));
-        textarea.set_block(Block::default().borders(Borders::ALL).title("OK"));
-        true
     }
 }
 

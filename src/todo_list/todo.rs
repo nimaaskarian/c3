@@ -1,6 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
-use std::{io::{self,Write}, path::PathBuf, ops::Add, fs::{File, remove_file}};
+use std::{io::{self}, path::PathBuf, fs::{File, remove_file}};
 //}}}
 // lib{{{
 use scanf::sscanf;

@@ -175,6 +175,7 @@ impl TodoList {
             undone
         }
     }
+
     pub fn read (filename: &PathBuf) -> Self{
         let mut todo_list = Self::new();
         if !filename.is_file() {
