@@ -131,7 +131,7 @@ impl Todo {
         if self.has_dependency() {
             return Err(TodoError::AlreadyExists)
         }
-        self.remove_note();
+        let _ = self.remove_note();
         self.dependency_name = Self::static_dependency_name(&self.hash());
         if File::create(self.dependency_path()).is_err() {
             return Err(TodoError::DependencyCreationFailed)
@@ -171,23 +171,25 @@ impl Todo {
         format!("[{done_string}] [{}]{note_string}{}", self.priority, self.message)
     }
 
-    pub fn remove_dependency(&mut self) {
-        remove_file(self.dependency_path());
+    pub fn remove_dependency(&mut self) -> io::Result<()>{
+        remove_file(self.dependency_path())?;
         self.dependency_name = String::new();
         self.dependencies = TodoList::new();
+        Ok(())
     }
 
     pub fn add_note(&mut self)-> io::Result<()>{
         let note = Note::from_editor()?;
 
-        self.set_note(note);
+        self.set_note(note)?;
         Ok(())
     }
 
-    pub fn set_note(&mut self, note:Note) {
-        self.remove_dependency();
+    pub fn set_note(&mut self, note:Note) -> io::Result<()>{
+        let _ = self.remove_dependency();
         self.note = note.hash();
         note.save().expect("Note saving failed");
+        Ok(())
     }
 
     pub fn edit_note(&mut self)-> io::Result<()>{
@@ -266,7 +268,6 @@ mod tests {
     use crate::fileio::append_home_dir;
 
     use super::*;
-    use std::fs;
 
     #[test]
     fn test_todo_into_string() {

@@ -29,6 +29,24 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+#[inline]
+fn enable_text_editor(app:&mut App , textarea: &mut TextArea) -> io::Result<()>{
+    match editor(textarea)? {
+        None => {},
+        Some(should_add) => {
+            if should_add {
+                let todo_message = textarea.lines()[0].clone();
+                app.on_submit.unwrap()(todo_message, app);
+            }
+            textarea.delete_line_by_head();
+            textarea.delete_line_by_end();
+            app.text_mode = false;
+        }
+    }
+    Ok(())
+}
+
+#[inline]
 fn run() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
 
@@ -45,22 +63,17 @@ fn run() -> io::Result<()> {
         })?;
 
         if !app.text_mode {
-            if update(&mut app, &list_state, &mut textarea)? {
+            if update(&mut app, &mut textarea)? {
                 terminal.clear()?;
                 startup()?;
             }
         } else {
-            match editor(&mut textarea)? {
-                None => {},
-                Some(should_add) => {
-                    if should_add {
-                        let todo_message = textarea.lines()[0].clone();
-                        app.on_submit.unwrap()(todo_message, &mut app);
-                    }
-                    textarea.delete_line_by_head();
-                    textarea.delete_line_by_end();
-                    app.text_mode = false;
+            if app.potato {
+                if event::poll(std::time::Duration::from_millis(500))? {
+                    enable_text_editor(&mut app, &mut textarea)?;
                 }
+            } else {
+                enable_text_editor(&mut app, &mut textarea)?;
             }
         }
 
@@ -94,7 +107,9 @@ fn editor(textarea: &mut TextArea) -> io::Result<Option<bool>> {
         }
     }
 }
-fn read_keys(app: &mut App, list_state: &ListState, textarea:&mut TextArea)  -> io::Result<bool> {
+
+#[inline]
+fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
     if let Key(key) = event::read()? {
         if key.kind == event::KeyEventKind::Press {
             match key.code {
@@ -102,21 +117,27 @@ fn read_keys(app: &mut App, list_state: &ListState, textarea:&mut TextArea)  -> 
                     let index = app.index;
                     let todo = app.mut_current_list().undone.remove(index);
                     let todo_string:String = (&todo).into();
-                    app.clipboard.set_text(todo_string);
+                    if let Some(clipboard) = &mut app.clipboard {
+                        let _ = clipboard.set_text(todo_string);
+                    }
                 }
                 Char('y') => {
                     let todo_string:String = app.todo().unwrap().into();
-                    app.clipboard.set_text(todo_string);
+                    if let Some(clipboard) = &mut app.clipboard {
+                        let _ = clipboard.set_text(todo_string);
+                    }
                 }
                 Char('p') => {
-                    if let Ok(clipboard) = app.clipboard.get_text() {
-                        match Todo::try_from(clipboard) {
-                            Ok(todo) => {
-                                app.mut_current_list().add(todo);
-                                app.mut_current_list().undone.sort();
-                            },
-                            _ => {},
-                        };
+                    if let Some(clipboard) = &mut app.clipboard {
+                        if let Ok(text) = clipboard.get_text() {
+                            match Todo::try_from(text) {
+                                Ok(todo) => {
+                                    app.mut_current_list().add(todo);
+                                    app.mut_current_list().undone.sort();
+                                },
+                                _ => {},
+                            };
+                        }
                     }
                 }
                 Char('j') => app.increment(),
@@ -179,9 +200,14 @@ fn read_keys(app: &mut App, list_state: &ListState, textarea:&mut TextArea)  -> 
                     app.set_text_mode(add_todo);
                     textarea.set_placeholder_text("Enter the todo message");
                     textarea.set_block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title("Add todo"),
+                        default_block("Add todo")
+                    );
+                }
+                Char('a') | Char('A') => {
+                    app.set_text_mode(add_todo_priority_one);
+                    textarea.set_placeholder_text("Enter the todo message");
+                    textarea.set_block(
+                        default_block("Add todo at first")
                     );
                 }
                 Char(' ') => {
@@ -210,9 +236,7 @@ fn read_keys(app: &mut App, list_state: &ListState, textarea:&mut TextArea)  -> 
                     let todo_message = app.todo().unwrap().message.as_str();
                     textarea.insert_str(todo_message);
                     textarea.set_block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title("Edit todo"),
+                        default_block("Edit todo")
                     );
                     textarea.set_placeholder_text(todo_message);
                     if key.code == Char('E') {
@@ -232,7 +256,7 @@ fn read_keys(app: &mut App, list_state: &ListState, textarea:&mut TextArea)  -> 
     Ok(false)
 }
 
-fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::Result<bool> {
+fn update(app: &mut App, textarea:&mut TextArea) -> io::Result<bool> {
     let size = app.current_list().undone.len();
     app.index = match size {
         0 => 0,
@@ -241,10 +265,10 @@ fn update(app: &mut App, list_state: &ListState, textarea:&mut TextArea) -> io::
 
     if app.potato {
         if event::poll(std::time::Duration::from_millis(500))? {
-            return read_keys(app, list_state, textarea);
+            return read_keys(app, textarea);
         }
     } else {
-        return read_keys(app, list_state, textarea);
+        return read_keys(app, textarea);
     }
     Ok(false)
 }
@@ -253,6 +277,12 @@ fn add_todo(str:String, app:&mut App) {
     app.mut_current_list().add(Todo::new(str, 0));
     app.index = app.current_list().undone.len()-1;
 }
+
+fn add_todo_priority_one(str:String, app:&mut App) {
+    app.mut_current_list().prepend(Todo::new(str, 1));
+    app.index = 0;
+}
+
 
 fn edit_todo(str:String, app:&mut App) {
     if !str.is_empty() {
@@ -265,12 +295,19 @@ enum TodoWidget<'a> {
     Paragraph(ratatui::widgets::Paragraph<'a>),
 }
 
+fn default_block<'a, T>(title: T) -> Block<'a> 
+where
+    T: Into<Line<'a>>,
+{
+    Block::default().title(title).borders(Borders::ALL)
+}
+
 fn create_todo_widget(todo_array:&TodoArray, title:String) ->  TodoWidget {
     if todo_array.len() == 0 {
-        return TodoWidget::Paragraph(Paragraph::new("No todo.").block(Block::default().title(title).borders(Borders::ALL)))
+        return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
     }
     return TodoWidget::List(List::new(todo_array.display())
-        .block(Block::default().title(title).borders(Borders::ALL))
+        .block(default_block(title))
         .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
         .highlight_symbol(">>")
         .repeat_highlight_symbol(true));
@@ -281,7 +318,7 @@ fn get_potato_widget<'a>() -> Paragraph<'a> {
     let time_str = Command::new("potctl").args(["+%m\n%t\n%p", "-10"]).output().unwrap();
     let time_str = String::from_utf8(time_str.stdout).unwrap();
 
-    Paragraph::new(time_str).block(Block::default().title("Potato").borders(Borders::ALL))
+    Paragraph::new(time_str).block(default_block("Potato"))
 }
 
 fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
@@ -337,7 +374,7 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
     if todo.is_some() && app.show_right{
         let todo = todo.unwrap();
         if !todo.get_note().is_empty(){
-            let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(Block::new().title("Todo note").borders(Borders::ALL));
+            let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
             frame.render_widget(note_widget, todos_layout[1]);
         } else
         if todo.has_dependency() {

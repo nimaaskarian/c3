@@ -22,7 +22,7 @@ pub struct App {
     prior_indexes: Vec<usize>,
     pub text_mode: bool,
     pub on_submit: Option<fn(String, &mut App)->()>,
-    pub clipboard: Clipboard,
+    pub clipboard: Option<Clipboard>,
     pub potato: bool,
 }
 
@@ -30,7 +30,10 @@ impl App {
 
     #[inline]
     pub fn new() -> Self {
-        let clipboard = Clipboard::new().unwrap();
+        let clipboard = match Clipboard::new() {
+            Ok(some) => Some(some),
+            Err(_) => None,
+        };
         let todo_path = todo_path().unwrap();
         App {
             clipboard,

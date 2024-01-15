@@ -52,6 +52,10 @@ impl TodoArray {
         self.todos.push(item)
     }
 
+    fn insert(&mut self,index:usize, item:Todo) {
+        self.todos.insert(index,item)
+    }
+
     #[inline(always)]
     fn reorder_low_high(&self, index:usize) -> (usize, usize){
         let priority = self.todos[index].comparison_priority();
@@ -197,6 +201,10 @@ impl TodoList {
 
     pub fn add(&mut self, todo:Todo) {
         self.undone.push(todo);
+    }
+
+    pub fn prepend(&mut self, todo:Todo) {
+        self.undone.insert(0,todo);
     }
 
     pub fn fix_undone(&mut self) {
