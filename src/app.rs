@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::Write;
 // vim:fileencoding=utf-8:foldmethod=marker
 // std{{{
 use std::{io, path::PathBuf};
@@ -24,6 +26,8 @@ pub struct App {
     pub on_submit: Option<fn(String, &mut App)->()>,
     pub clipboard: Option<Clipboard>,
     pub potato: bool,
+    pub include_done: bool,
+    search_indexes: Vec<usize>,
 }
 
 impl App {
@@ -35,12 +39,15 @@ impl App {
             Err(_) => None,
         };
         let todo_path = todo_path().unwrap();
+        let mut todo_list = TodoList::read(&todo_path);
         App {
+            include_done: false,
             clipboard,
             on_submit: None,
-            todo_list: TodoList::read(&todo_path),
+            todo_list,
             should_quit: false,
             prior_indexes: Vec::new(),
+            search_indexes: Vec::new(),
             index: 0,
             todo_path,
             changed: false,
@@ -48,6 +55,49 @@ impl App {
             text_mode: false,
             potato: false,
         }
+    }
+
+    pub fn fix_done_undone(&mut self) {
+        self.mut_todo().unwrap().dependencies.fix_undone();
+        self.mut_current_list().fix_undone();
+
+        if self.include_done {
+            self.mut_todo().unwrap().dependencies.fix_done();
+            self.mut_current_list().fix_done();
+        }
+
+        if self.is_undone_empty() {
+            self.traverse_up();
+            match self.mut_todo() {
+                Some(todo) => {
+                    todo.toggle_done()
+                }
+                _ => {}
+            }
+            self.mut_current_list().fix_undone();
+            if self.include_done {
+                self.mut_current_list().fix_done();
+            }
+        }
+    }
+    
+    // pub fn search(&mut self, query:String) {
+    //     for item in self.current_list() {
+
+    //     }
+    //     self.search_indexes
+    // }
+
+    pub fn toggle_current_done(&mut self) {
+        let was_done = self.todo().unwrap().done();
+        self.mut_todo().unwrap().toggle_done();
+        self.fix_done_undone();
+        let index = if was_done {
+            self.current_list().undone.len()-1
+        } else {
+            self.current_list().len()-1
+        };
+        self.index = self.mut_current_list().reorder(index);
     }
 
     #[inline]
@@ -62,7 +112,7 @@ impl App {
         } else {
             ""
         };
-        let todo_string = format!("Todos ({}){changed_str}", self.current_list().undone.len());
+        let todo_string = format!("Todos ({}){changed_str}", self.current_list().len());
         let depth = self.prior_indexes.len();
         
         if depth == 0 {
@@ -77,20 +127,20 @@ impl App {
         let mut list = &self.todo_list;
         let mut parent = None;
         for index in self.prior_indexes.iter() {
-            parent = Some(&list.undone[*index]);
-            list = &list.undone[*index].dependencies
+            parent = Some(&list[*index]);
+            list = &list[*index].dependencies
         };
         parent
     }
 
     #[inline]
     pub fn increment(&mut self) {
-        let undone_len = self.current_list().undone.len();
-        if undone_len == 0 {
+        let size = self.len();
+        if size == 0 {
             self.index = 0;
             return;
         };
-        if self.index != undone_len - 1 {
+        if self.index != size - 1 {
             self.index += 1
         } else {
             self.go_top()
@@ -141,15 +191,19 @@ impl App {
 
     #[inline]
     pub fn bottom(&mut self) -> usize {
-        match self.current_list().undone.len() {
+        match self.len() {
             0=>0,
             length=>length-1,
         }
     }
 
     #[inline]
-    pub fn current_undone_empty(&self) -> bool{
-        self.current_list().undone.len() == 0
+    pub fn is_todos_empty(&self) -> bool{
+        self.current_list().is_empty()
+    }
+
+    pub fn is_undone_empty(&self) -> bool{
+        self.current_list().undone.is_empty()
     }
 
     #[inline]
@@ -160,36 +214,36 @@ impl App {
 
     #[inline]
     pub fn mut_todo(&mut self) -> Option<&mut Todo> {
-        if self.current_undone_empty() {
+        if self.is_todos_empty() {
             return None
         }
 
-        let current_list = self.current_list();
-        let index = self.index.min(current_list.undone.len() - 1);
-        let undone_len = current_list.undone.len();
+        // let current_list = self.current_list();
+        let index = self.index.min(self.len() - 1);
+        let size = self.len();
 
-        if undone_len <= index {
-            return Some(&mut self.mut_current_list().undone[undone_len - 1]);
+        if size <= index {
+            return Some(&mut self.mut_current_list()[size - 1]);
         }
 
-        Some(&mut self.mut_current_list().undone[index])
+        Some(&mut self.mut_current_list()[index])
     }
 
     #[inline]
     pub fn todo(&self) -> Option<&Todo> {
-        if self.current_undone_empty() {
+        if self.is_todos_empty() {
             return None
         }
 
         let current_list = self.current_list();
-        let index = self.index.min(current_list.undone.len() - 1);
-        let undone_len = current_list.undone.len();
+        let index = self.index.min(self.len() - 1);
+        let size = self.len();
 
-        if undone_len <= index {
-            return Some(&current_list.undone[undone_len - 1]);
+        if size <= index {
+            return Some(&current_list[size - 1]);
         }
 
-        Some(&self.current_list().undone[index])
+        Some(&self.current_list()[index])
     }
 
 
@@ -200,9 +254,21 @@ impl App {
             return list;
         }
         for index in self.prior_indexes.iter() {
-            list = &list.undone[*index].dependencies
+            list = &list[*index].dependencies
         };
         list
+    }
+
+    pub fn display(&self) -> Vec<String> {
+        self.current_list().display(self.include_done)
+    }
+
+    pub fn len(&self) -> usize {
+        if self.include_done {
+            self.current_list().len()
+        } else {
+            self.current_list().undone.len()
+        }
     }
 
     #[inline]
@@ -213,7 +279,7 @@ impl App {
             return list;
         }
         for index in self.prior_indexes.iter() {
-            list = &mut list.undone[*index].dependencies
+            list = &mut list[*index].dependencies
         };
         list
     }

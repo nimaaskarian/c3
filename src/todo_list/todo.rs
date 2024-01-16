@@ -147,10 +147,10 @@ impl Todo {
     }
 
     pub fn done(&self) -> bool {
-        let done_len = self.dependencies.done.len();
-        if self.has_dependency() && done_len != 0{
-            return self.dependencies.undone.len() == 0;
-        }
+        // let done_len = self.dependencies.done.len();
+        // if self.has_dependency() && done_len != 0{
+        //     return self.dependencies.undone.len() == 0;
+        // }
         return self.done
     }
 

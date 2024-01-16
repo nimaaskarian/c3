@@ -29,8 +29,31 @@ pub enum TodoArrayError {
     IndexNotFound
 }
 
+impl Index<usize> for TodoList {
+    type Output = Todo;
+    fn index(&self, index:usize) -> &Self::Output {
+        let size = self.undone.len();
+        if index < size {
+            &self.undone[index]
+        } else {
+            &self.done[index-size]
+        }
+    }
+}
+
+impl IndexMut<usize> for TodoList {
+    fn index_mut(&mut self, index:usize) -> &mut Todo {
+        let size = self.undone.len();
+        if index < size {
+            &mut self.undone[index]
+        } else {
+            &mut self.done[index-size]
+        }
+    }
+}
+
 impl TodoArray {
-    fn new() -> Self{
+    pub fn new() -> Self{
         TodoArray {
             todos: Vec::new()
         }
@@ -40,8 +63,12 @@ impl TodoArray {
         self.todos.iter().map(|todo| todo.display()).collect()
     }
 
-    pub fn len(&self) -> usize{
+    pub fn len(&self) -> usize {
         self.todos.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.todos.is_empty()
     }
 
     pub fn remove(&mut self, index:usize) -> Todo{
@@ -180,6 +207,32 @@ impl TodoList {
         }
     }
 
+    pub fn reorder(&mut self, index: usize) -> usize {
+        let size = self.undone.len();
+
+        if index < size {
+            self.undone.reorder(index)
+        } else {
+            self.done.reorder(index - size) + size
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.undone.is_empty() && self.done.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.undone.len() + self.done.len()
+    }
+
+    pub fn display(&self, include_done: bool) -> Vec<String> {
+        let mut display_list = self.undone.display();
+        if include_done {
+            display_list.extend(self.done.display());
+        }
+        display_list
+    }
+
     pub fn read (filename: &PathBuf) -> Self{
         let mut todo_list = Self::new();
         if !filename.is_file() {
@@ -196,6 +249,8 @@ impl TodoList {
                 todo_list.undone.push(todo);
             }
         }
+        todo_list.undone.sort();
+        todo_list.done.sort();
         return todo_list
     }
 
@@ -216,6 +271,18 @@ impl TodoList {
                 break;
             }
         }
+    }
+    
+    pub fn fix_done(&mut self) {
+        for index in 0..self.done.todos.len() {
+            if !self.done.todos[index].done() {
+                self.undone.push(self.done.todos.remove(index));
+            }
+            if index+1 >= self.done.todos.len() {
+                break;
+            }
+        }
+
     }
 
     pub fn write (&self, filename: &PathBuf) -> io::Result<()> {

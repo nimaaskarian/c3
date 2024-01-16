@@ -17,7 +17,7 @@ pub mod todo_list;
 pub mod fileio;
 mod app;
 use app::App;
-use todo_list::todo::Todo;
+use todo_list::{todo::Todo, TodoList};
 use crate::todo_list::TodoArray;
 //}}}
 
@@ -121,6 +121,9 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                         let _ = clipboard.set_text(todo_string);
                     }
                 }
+                Char('!') => {
+                    app.include_done = !app.include_done;
+                }
                 Char('y') => {
                     let todo_string:String = app.todo().unwrap().into();
                     if let Some(clipboard) = &mut app.clipboard {
@@ -148,12 +151,12 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                 Char('J') => {
                     app.mut_todo().unwrap().decrease_priority();
                     let index = app.index;
-                    app.index = app.mut_current_list().undone.reorder(index);
+                    app.index = app.mut_current_list().reorder(index);
                 },
                 Char('K') => {
                     app.mut_todo().unwrap().increase_priority();
                     let index = app.index;
-                    app.index = app.mut_current_list().undone.reorder(index);
+                    app.index = app.mut_current_list().reorder(index);
                 },
                 Char('n') => {
                     app.show_right = !app.show_right
@@ -188,13 +191,7 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                     app.mut_todo().unwrap().remove_note();
                 }
                 KeyCode::Enter => {
-                    app.mut_todo().unwrap().toggle_done();
-                    app.mut_todo().unwrap().dependencies.fix_undone();
-                    app.mut_current_list().fix_undone();
-                    if app.current_undone_empty() {
-                        app.traverse_up();
-                        app.mut_current_list().fix_undone();
-                    }
+                    app.toggle_current_done();
                 }
                 Char('a') => {
                     app.set_text_mode(add_todo);
@@ -203,7 +200,14 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                         default_block("Add todo")
                     );
                 }
-                Char('a') | Char('A') => {
+                // Char('/') => {
+                //     app.set_text_mode(search_todo);
+                //     textarea.set_placeholder_text("Enter query");
+                //     textarea.set_block(
+                //         default_block("Search todo")
+                //     );
+                // }
+                Char('A') => {
                     app.set_text_mode(add_todo_priority_one);
                     textarea.set_placeholder_text("Enter the todo message");
                     textarea.set_block(
@@ -247,7 +251,7 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                 KeyCode::Char(c) if c.is_digit(10) => {
                     app.mut_todo().unwrap().set_priority(c.to_digit(10).unwrap() as i8);
                     let index = app.index;
-                    app.index = app.mut_current_list().undone.reorder(index);
+                    app.index = app.mut_current_list().reorder(index);
                 }
                 _ => {},
             }
@@ -257,7 +261,7 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
 }
 
 fn update(app: &mut App, textarea:&mut TextArea) -> io::Result<bool> {
-    let size = app.current_list().undone.len();
+    let size = app.len();
     app.index = match size {
         0 => 0,
         _ => app.index.min(size-1),
@@ -277,6 +281,10 @@ fn add_todo(str:String, app:&mut App) {
     app.mut_current_list().add(Todo::new(str, 0));
     app.index = app.current_list().undone.len()-1;
 }
+
+// fn search_todo(str:String, app:&mut App) {
+//     app.search(str);
+// }
 
 fn add_todo_priority_one(str:String, app:&mut App) {
     app.mut_current_list().prepend(Todo::new(str, 1));
@@ -302,11 +310,11 @@ where
     Block::default().title(title).borders(Borders::ALL)
 }
 
-fn create_todo_widget(todo_array:&TodoArray, title:String) ->  TodoWidget {
-    if todo_array.len() == 0 {
+fn create_todo_widget(display_list:&Vec<String>, title:String) ->  TodoWidget {
+    if display_list.len() == 0 {
         return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
     }
-    return TodoWidget::List(List::new(todo_array.display())
+    return TodoWidget::List(List::new((*display_list).clone())
         .block(default_block(title))
         .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
         .highlight_symbol(">>")
@@ -364,7 +372,7 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
     ).split(todos_layout[0]);
 
 
-    match create_todo_widget(&app.current_list().undone, app.title()) {
+    match create_todo_widget(&app.display(), app.title()) {
         TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout[1]),
         TodoWidget::List(widget) => frame.render_stateful_widget(widget, todo_layout[1], state),
     };
@@ -378,7 +386,7 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
             frame.render_widget(note_widget, todos_layout[1]);
         } else
         if todo.has_dependency() {
-            match create_todo_widget(&todo.dependencies.undone, String::from("Todo dependencies")) {
+            match create_todo_widget(&todo.dependencies.display(app.include_done), String::from("Todo dependencies")) {
                 TodoWidget::List(widget) =>frame.render_widget(widget, todos_layout[1]),
                 TodoWidget::Paragraph(widget) =>frame.render_widget(widget, todos_layout[1]),
             }
