@@ -122,7 +122,7 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                     }
                 }
                 Char('!') => {
-                    app.include_done = !app.include_done;
+                    app.toggle_include_done();
                 }
                 Char('y') => {
                     let todo_string:String = app.todo().unwrap().into();
@@ -158,13 +158,13 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                     let index = app.index;
                     app.index = app.mut_current_list().reorder(index);
                 },
-                Char('n') => {
+                Char(']') => {
                     app.show_right = !app.show_right
                 },
                 Char('P') => {
                     app.potato = !app.potato
                 },
-                Char('N') => {
+                Char('>') => {
                     if app.mut_todo().unwrap().edit_note().is_err() {
                         let _ = app.mut_todo().unwrap().add_note();
                     }
@@ -200,13 +200,19 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                         default_block("Add todo")
                     );
                 }
-                // Char('/') => {
-                //     app.set_text_mode(search_todo);
-                //     textarea.set_placeholder_text("Enter query");
-                //     textarea.set_block(
-                //         default_block("Search todo")
-                //     );
-                // }
+                Char('/') => {
+                    app.set_text_mode(search_todo);
+                    textarea.set_placeholder_text("Enter query");
+                    textarea.set_block(
+                        default_block("Search todo")
+                    );
+                }
+                Char('n') => {
+                    app.search_next();
+                }
+                Char('N') => {
+                    app.search_prev();
+                }
                 Char('A') => {
                     app.set_text_mode(add_todo_priority_one);
                     textarea.set_placeholder_text("Enter the todo message");
@@ -282,9 +288,9 @@ fn add_todo(str:String, app:&mut App) {
     app.index = app.current_list().undone.len()-1;
 }
 
-// fn search_todo(str:String, app:&mut App) {
-//     app.search(str);
-// }
+fn search_todo(str:String, app:&mut App) {
+    app.search(Some(str));
+}
 
 fn add_todo_priority_one(str:String, app:&mut App) {
     app.mut_current_list().prepend(Todo::new(str, 1));

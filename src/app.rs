@@ -28,6 +28,8 @@ pub struct App {
     pub potato: bool,
     pub include_done: bool,
     search_indexes: Vec<usize>,
+    search_index: usize,
+    last_query: String,
 }
 
 impl App {
@@ -39,8 +41,10 @@ impl App {
             Err(_) => None,
         };
         let todo_path = todo_path().unwrap();
-        let mut todo_list = TodoList::read(&todo_path);
+        let todo_list = TodoList::read(&todo_path);
         App {
+            last_query: String::new(),
+            search_index: 0,
             include_done: false,
             clipboard,
             on_submit: None,
@@ -81,12 +85,53 @@ impl App {
         }
     }
     
-    // pub fn search(&mut self, query:String) {
-    //     for item in self.current_list() {
+    pub fn search(&mut self, query:Option<String>) {
+        if let Some(query) = query {
+            self.last_query = query;
+        }
+        let mut todo_messages = self.current_list().undone.messages();
+        if self.include_done {
+            todo_messages.extend(self.current_list().done.messages());
+        }
+        self.search_indexes = Vec::new();
 
-    //     }
-    //     self.search_indexes
-    // }
+        let mut index = 0;
+        for message in todo_messages {
+            if message.to_lowercase().contains(self.last_query.to_lowercase().as_str()) {
+                self.search_indexes.push(index);
+            }
+            index+=1;
+        }
+    }
+
+    pub fn toggle_include_done(&mut self) {
+        self.include_done = !self.include_done;
+        self.search(None);
+    }
+
+    pub fn search_next(&mut self) {
+        if self.search_indexes.is_empty() {
+            return;
+        }
+        if self.search_index+1 < self.search_indexes.len() {
+            self.search_index+=1
+        } else {
+            self.search_index=0
+        }
+        self.index = self.search_indexes[self.search_index]
+    }
+
+    pub fn search_prev(&mut self) {
+        if self.search_indexes.is_empty() {
+            return;
+        }
+        if self.search_index != 0 {
+            self.search_index-=1
+        } else {
+            self.search_index=self.search_indexes.len()-1
+        }
+        self.index = self.search_indexes[self.search_index]
+    }
 
     pub fn toggle_current_done(&mut self) {
         let was_done = self.todo().unwrap().done();

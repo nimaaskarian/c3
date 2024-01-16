@@ -59,6 +59,10 @@ impl TodoArray {
         }
     }
 
+    pub fn messages(&self) -> Vec<String> {
+        self.todos.iter().map(|todo| todo.message.clone()).collect()
+    }
+
     pub fn display(&self) -> Vec<String> {
         self.todos.iter().map(|todo| todo.display()).collect()
     }
