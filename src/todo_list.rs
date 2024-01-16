@@ -211,6 +211,17 @@ impl TodoList {
         }
     }
 
+    pub fn remove(&mut self, index: usize) -> Todo {
+        let size = self.undone.len();
+
+        if index < size {
+            self.undone.remove(index)
+        } else {
+            self.done.remove(index - size)
+        }
+        
+    }
+
     pub fn reorder(&mut self, index: usize) -> usize {
         let size = self.undone.len();
 

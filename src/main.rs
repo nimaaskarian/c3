@@ -1,13 +1,13 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // standard {{{
-use std::{io::{self, stdout, Write}, process::Command};
+use std::{io::{self, stdout}, process::Command};
 //}}}
 // lib {{{
 use ratatui::{prelude::*, widgets::*};
 use crossterm::{
     event::{self, Event::Key, KeyCode::Char, KeyCode},
     ExecutableCommand,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
+    terminal::{enable_raw_mode, EnterAlternateScreen}
 };
 use tui_textarea::{Input, TextArea, CursorMove};
 use tui_textarea;
@@ -17,15 +17,12 @@ pub mod todo_list;
 pub mod fileio;
 mod app;
 use app::App;
-use todo_list::{todo::Todo, TodoList};
-use crate::todo_list::TodoArray;
+use todo_list::todo::Todo;
 //}}}
 
 fn main() -> io::Result<()> {
     startup()?;
-    let status = run();
-    shutdown()?;
-    status?;
+    run()?;
     Ok(())
 }
 
@@ -76,13 +73,7 @@ fn run() -> io::Result<()> {
                 enable_text_editor(&mut app, &mut textarea)?;
             }
         }
-
-        if app.should_quit {
-            break;
-        }
     }
-
-    Ok(())
 }
 
 fn editor(textarea: &mut TextArea) -> io::Result<Option<bool>> {
@@ -115,7 +106,7 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
             match key.code {
                 Char('d') | Char('x') => {
                     let index = app.index;
-                    let todo = app.mut_current_list().undone.remove(index);
+                    let todo = app.mut_current_list().remove(index);
                     let todo_string:String = (&todo).into();
                     if let Some(clipboard) = &mut app.clipboard {
                         let _ = clipboard.set_text(todo_string);
@@ -253,7 +244,17 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                         textarea.move_cursor(CursorMove::Head);
                     }
                 }
-                Char('q') => app.should_quit = true,
+                Char('q') => {
+                    if app.changed {
+                        app.set_text_mode(save_prompt);
+                        textarea.set_placeholder_text("N/y/c");
+                        textarea.set_block(
+                            default_block("You have done changes. You wanna save em? [n: no, y: yes, c: cancel]")
+                        );
+                    } else {
+                        app.quit();
+                    }
+                }
                 KeyCode::Char(c) if c.is_digit(10) => {
                     app.mut_todo().unwrap().set_priority(c.to_digit(10).unwrap() as i8);
                     let index = app.index;
@@ -290,6 +291,7 @@ fn add_todo(str:String, app:&mut App) {
 
 fn search_todo(str:String, app:&mut App) {
     app.search(Some(str));
+    app.search_next_index();
 }
 
 fn add_todo_priority_one(str:String, app:&mut App) {
@@ -302,6 +304,16 @@ fn edit_todo(str:String, app:&mut App) {
     if !str.is_empty() {
         app.mut_todo().unwrap().set_message(str);
     }
+}
+
+fn save_prompt(str:String, app:&mut App) {
+    let lower = str.to_lowercase();
+    if lower.starts_with("y") {
+        app.write();
+    } else if lower.starts_with("c") {
+        return;
+    }
+    app.quit();
 }
 
 enum TodoWidget<'a> {
@@ -406,8 +418,3 @@ fn startup() -> io::Result<()> {
     Ok(())
 }
 
-fn shutdown() -> io::Result<()> {
-    disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
-    Ok(())
-}

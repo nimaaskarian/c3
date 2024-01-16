@@ -1,23 +1,28 @@
-use std::fs::File;
-use std::io::Write;
 // vim:fileencoding=utf-8:foldmethod=marker
 // std{{{
-use std::{io, path::PathBuf};
+use std::{io::{self, stdout}, path::PathBuf};
 //}}}
 // lib{{{
 use arboard::Clipboard;
-use ratatui::widgets::*;
+use crossterm::{
+    ExecutableCommand,
+    terminal::{disable_raw_mode, LeaveAlternateScreen}
+};
 // }}}
-// mod{{{
+// mod {{{
 use crate::fileio::todo_path;
-use crate::todo_list::{TodoList};
+use crate::todo_list::TodoList;
 use crate::todo_list::todo::Todo;
 //}}}
 
+fn shutdown() -> io::Result<()> {
+    disable_raw_mode()?;
+    stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
+}
 
 pub struct App {
     pub todo_list: TodoList,
-    pub should_quit: bool,
     pub index: usize,
     todo_path: PathBuf, pub changed:bool,
     pub show_right:bool,
@@ -49,7 +54,6 @@ impl App {
             clipboard,
             on_submit: None,
             todo_list,
-            should_quit: false,
             prior_indexes: Vec::new(),
             search_indexes: Vec::new(),
             index: 0,
@@ -61,6 +65,13 @@ impl App {
         }
     }
 
+    #[inline]
+    pub fn quit(&self) -> io::Result<()>{
+        shutdown()?;
+        std::process::exit(0);
+    }
+
+    #[inline]
     pub fn fix_done_undone(&mut self) {
         self.mut_todo().unwrap().dependencies.fix_undone();
         self.mut_current_list().fix_undone();
@@ -85,9 +96,13 @@ impl App {
         }
     }
     
+    #[inline]
     pub fn search(&mut self, query:Option<String>) {
         if let Some(query) = query {
             self.last_query = query;
+        }
+        if self.last_query.is_empty() {
+            return;
         }
         let mut todo_messages = self.current_list().undone.messages();
         if self.include_done {
@@ -95,17 +110,33 @@ impl App {
         }
         self.search_indexes = Vec::new();
 
-        let mut index = 0;
-        for message in todo_messages {
-            if message.to_lowercase().contains(self.last_query.to_lowercase().as_str()) {
-                self.search_indexes.push(index);
+        for i in 0..todo_messages.len() {
+            if todo_messages[i].to_lowercase().contains(self.last_query.to_lowercase().as_str()) {
+                self.search_indexes.push(i);
             }
-            index+=1;
         }
+    }
+
+    #[inline]
+    pub fn search_next_index(&mut self) {
+        if self.search_indexes.is_empty() {
+            return;
+        }
+        for index in &self.search_indexes {
+            if *index > self.index{
+                self.index = *index;
+                return;
+            }
+        }
+
+        self.index = self.search_indexes[0];
     }
 
     pub fn toggle_include_done(&mut self) {
         self.include_done = !self.include_done;
+        while self.is_todos_empty() && !self.prior_indexes.is_empty() {
+            self.traverse_up()
+        }
         self.search(None);
     }
 
@@ -157,7 +188,12 @@ impl App {
         } else {
             ""
         };
-        let todo_string = format!("Todos ({}){changed_str}", self.current_list().len());
+        let size = if self.include_done {
+            self.current_list().len()
+        } else {
+            self.current_list().undone.len()
+        };
+        let todo_string = format!("Todos ({size}){changed_str}");
         let depth = self.prior_indexes.len();
         
         if depth == 0 {
@@ -244,9 +280,14 @@ impl App {
 
     #[inline]
     pub fn is_todos_empty(&self) -> bool{
-        self.current_list().is_empty()
+        if self.include_done {
+            self.current_list().is_empty()
+        } else {
+            self.is_undone_empty()
+        }
     }
 
+    #[inline]
     pub fn is_undone_empty(&self) -> bool{
         self.current_list().undone.is_empty()
     }
@@ -304,10 +345,12 @@ impl App {
         list
     }
 
+    #[inline]
     pub fn display(&self) -> Vec<String> {
         self.current_list().display(self.include_done)
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         if self.include_done {
             self.current_list().len()
