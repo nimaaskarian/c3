@@ -17,6 +17,7 @@ use crate::todo_list::todo::Todo;
 
 fn shutdown() -> io::Result<()> {
     disable_raw_mode()?;
+    stdout().execute(crossterm::cursor::Show)?;
     stdout().execute(LeaveAlternateScreen)?;
     Ok(())
 }
@@ -70,6 +71,11 @@ impl App {
         shutdown()?;
         std::process::exit(0);
     }
+    
+    #[inline]
+    pub fn only_undone_empty(&self) -> bool {
+        self.is_undone_empty() && !self.is_done_empty()
+    }
 
     #[inline]
     pub fn fix_done_undone(&mut self) {
@@ -81,11 +87,11 @@ impl App {
             self.mut_current_list().fix_done();
         }
 
-        if self.is_undone_empty() {
+        while self.only_undone_empty() && !self.prior_indexes.is_empty() {
             self.traverse_up();
             match self.mut_todo() {
                 Some(todo) => {
-                    todo.toggle_done()
+                    todo.set_done(true)
                 }
                 _ => {}
             }
@@ -134,7 +140,7 @@ impl App {
 
     pub fn toggle_include_done(&mut self) {
         self.include_done = !self.include_done;
-        while self.is_todos_empty() && !self.prior_indexes.is_empty() {
+        while self.only_undone_empty() && !self.prior_indexes.is_empty() {
             self.traverse_up()
         }
         self.search(None);
@@ -260,7 +266,7 @@ impl App {
 
     #[inline]
     pub fn traverse_up(&mut self) {
-        if self.prior_indexes.len() != 0 {
+        if !self.prior_indexes.is_empty() {
             self.index = self.prior_indexes.remove(self.prior_indexes.len()-1);
         }
     }
@@ -290,6 +296,11 @@ impl App {
     #[inline]
     pub fn is_undone_empty(&self) -> bool{
         self.current_list().undone.is_empty()
+    }
+
+    #[inline]
+    pub fn is_done_empty(&self) -> bool{
+        self.current_list().done.is_empty()
     }
 
     #[inline]

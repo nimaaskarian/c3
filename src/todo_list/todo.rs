@@ -219,6 +219,11 @@ impl Todo {
         self.done = !self.done;
     }
 
+    pub fn set_done(&mut self, done:bool) {
+        self.done = done;
+    }
+
+
     pub fn decrease_priority(&mut self) {
         if self.comparison_priority() < 9 {
             self.priority+=1
