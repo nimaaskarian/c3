@@ -414,7 +414,6 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
 
 fn startup() -> io::Result<()> {
     enable_raw_mode()?;
-    stdout().execute(crossterm::cursor::Hide)?;
     stdout().execute(EnterAlternateScreen)?;
     Ok(())
 }
