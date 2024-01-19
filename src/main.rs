@@ -16,6 +16,10 @@ use tui_textarea;
 pub mod todo_list;
 pub mod fileio;
 mod app;
+mod modules;
+use modules::potato::Potato;
+mod tui;
+use tui::{default_block, create_todo_widget, TodoWidget};
 use app::App;
 use todo_list::todo::Todo;
 //}}}
@@ -48,8 +52,8 @@ fn run() -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
 
     let mut list_state = ListState::default();
-    let mut app = App::new();
-
+    let mut potato_module = Potato::new(None);
+    let mut app = App::new(&mut potato_module);
 
     let mut textarea = TextArea::default();
     textarea.set_cursor_line_style(Style::default());
@@ -65,7 +69,7 @@ fn run() -> io::Result<()> {
                 startup()?;
             }
         } else {
-            if app.potato {
+            if app.module_enabled {
                 if event::poll(std::time::Duration::from_millis(500))? {
                     enable_text_editor(&mut app, &mut textarea)?;
                 }
@@ -105,11 +109,13 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
         if key.kind == event::KeyEventKind::Press {
             match key.code {
                 Char('d') | Char('x') => {
-                    let index = app.index;
-                    let todo = app.mut_current_list().remove(index);
-                    let todo_string:String = (&todo).into();
-                    if let Some(clipboard) = &mut app.clipboard {
-                        let _ = clipboard.set_text(todo_string);
+                    if !app.is_todos_empty() {
+                        let index = app.index;
+                        let todo = app.mut_current_list().remove(index);
+                        let todo_string:String = (&todo).into();
+                        if let Some(clipboard) = &mut app.clipboard {
+                            let _ = clipboard.set_text(todo_string);
+                        }
                     }
                 }
                 Char('!') => {
@@ -140,46 +146,62 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                 Char('G') => app.go_bottom(),
                 Char('w') => app.write()?,
                 Char('J') => {
-                    app.mut_todo().unwrap().decrease_priority();
-                    let index = app.index;
-                    app.index = app.mut_current_list().reorder(index);
+                    if let Some(todo) = app.mut_todo() {
+                        todo.decrease_priority();
+                        let index = app.index;
+                        app.index = app.mut_current_list().reorder(index);
+                    }
                 },
                 Char('K') => {
-                    app.mut_todo().unwrap().increase_priority();
-                    let index = app.index;
-                    app.index = app.mut_current_list().reorder(index);
+                    if let Some(todo) = app.mut_todo() {
+                        todo.increase_priority();
+                        let index = app.index;
+                        app.index = app.mut_current_list().reorder(index);
+                    }
                 },
                 Char(']') => {
                     app.show_right = !app.show_right
                 },
                 Char('P') => {
-                    app.potato = !app.potato
+                    app.module_enabled = !app.module_enabled
                 },
                 Char('>') => {
-                    if app.mut_todo().unwrap().edit_note().is_err() {
-                        let _ = app.mut_todo().unwrap().add_note();
+                    if let Some(todo) = app.mut_todo() {
+                        if todo.edit_note().is_err() {
+                            todo.add_note();
+                        }
                     }
-                    return Ok(true)
                 },
                 Char('t') => {
-                    let _ = app.mut_todo().unwrap().add_dependency();
+                    if let Some(todo) = app.mut_todo() {
+                        todo.add_dependency();
+                    }
                 },
                 Char('h') => {
                     app.traverse_up()
                 },
                 Char('D') => {
-                    let index = app.index;
-                    app.mut_current_list().undone.remove(index);
+                    if !app.is_todos_empty() {
+                        let index = app.index;
+                        app.mut_current_list().undone.remove(index);
+                    }
                 },
                 Char('l') => {
+                    if let Some(todo) = app.todo() {
+                        if !todo.has_dependency() && todo.note_empty() {
+                            app.mut_todo().unwrap().add_dependency();
+                        }
+                    }
                     app.traverse_down()
                 },
                 Char('R') => {
                     app.read()
                 },
                 Char('T') => {
-                    app.mut_todo().unwrap().remove_dependency();
-                    app.mut_todo().unwrap().remove_note();
+                    if let Some(todo) = app.mut_todo() {
+                        todo.remove_note();
+                        todo.remove_dependency();
+                    }
                 }
                 KeyCode::Enter => {
                     app.toggle_current_done();
@@ -212,25 +234,31 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                     );
                 }
                 Char(' ') => {
-                    Command::new("potctl").args(["-t0"]).status();
+                    app.module.on_space()
                 }
                 Char('s') => {
-                    Command::new("potctl").args(["-s0"]).status();
+                    app.module.on_s()
                 }
                 Char('H') => {
-                    Command::new("potctl").args(["-i0"]).status();
+                    app.module.on_capital_h()
                 }
                 Char('L') => {
-                    Command::new("potctl").args(["-d0"]).status();
+                    app.module.on_capital_l()
                 }
                 Char('r') => {
-                    Command::new("potctl").args(["-r0"]).status();
+                    app.module.on_r()
                 }
                 Char('+') | Char('=') => {
-                    Command::new("potctl").args(["-I0"]).status();
+                    app.module.on_plus()
                 }
                 Char('-') => {
-                    Command::new("potctl").args(["-D0"]).status();
+                    app.module.on_minus()
+                }
+                Char('.') => {
+                    app.module.on_dot()
+                }
+                Char(',') => {
+                    app.module.on_comma()
                 }
                 Char('E') | Char('e') => {
                     app.set_text_mode(edit_todo);
@@ -255,7 +283,7 @@ fn read_keys(app: &mut App, textarea:&mut TextArea)  -> io::Result<bool> {
                         app.quit();
                     }
                 }
-                KeyCode::Char(c) if c.is_digit(10) => {
+                Char(c) if c.is_digit(10) => {
                     app.mut_todo().unwrap().set_priority(c.to_digit(10).unwrap() as i8);
                     let index = app.index;
                     app.index = app.mut_current_list().reorder(index);
@@ -274,7 +302,7 @@ fn update(app: &mut App, textarea:&mut TextArea) -> io::Result<bool> {
         _ => app.index.min(size-1),
     };
 
-    if app.potato {
+    if app.module_enabled {
         if event::poll(std::time::Duration::from_millis(500))? {
             return read_keys(app, textarea);
         }
@@ -316,37 +344,6 @@ fn save_prompt(str:String, app:&mut App) {
     app.quit();
 }
 
-enum TodoWidget<'a> {
-    List(ratatui::widgets::List<'a>),
-    Paragraph(ratatui::widgets::Paragraph<'a>),
-}
-
-fn default_block<'a, T>(title: T) -> Block<'a> 
-where
-    T: Into<Line<'a>>,
-{
-    Block::default().title(title).borders(Borders::ALL)
-}
-
-fn create_todo_widget(display_list:&Vec<String>, title:String) ->  TodoWidget {
-    if display_list.len() == 0 {
-        return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
-    }
-    return TodoWidget::List(List::new((*display_list).clone())
-        .block(default_block(title))
-        .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-        .highlight_symbol(">>")
-        .repeat_highlight_symbol(true));
-
-}
-
-fn get_potato_widget<'a>() -> Paragraph<'a> {
-    let time_str = Command::new("potctl").args(["+%m\n%t\n%p", "-10"]).output().unwrap();
-    let time_str = String::from_utf8(time_str.stdout).unwrap();
-
-    Paragraph::new(time_str).block(default_block("Potato"))
-}
-
 fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
     let todo = app.todo();
 
@@ -363,15 +360,24 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
     } else {
         0
     };
-
-    let main_layout = Layout::new(
-        Direction::Vertical,
-        [
-            Constraint::Length(5* app.potato as u16),
-            Constraint::Min(0),
-        ]
-    ).split(frame.size());
-    frame.render_widget(get_potato_widget(), main_layout[0]);
+    let main_layout = if app.module_enabled {
+         let main_layout = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Length(5),
+                Constraint::Min(0),
+            ]
+        ).split(frame.size());
+        frame.render_widget(app.module.get_widget(), main_layout[0]);
+        main_layout
+    } else {
+         Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Min(0),
+            ]
+        ).split(frame.size())
+    };
 
     let todos_layout = Layout::new(
         Direction::Horizontal,
@@ -379,7 +385,7 @@ fn ui(frame: &mut Frame, app: &App, state:&mut ListState, textarea:&TextArea) {
             Constraint::Percentage(100 - dependency_width),
             Constraint::Percentage(dependency_width),
         ]
-    ).split(main_layout[1]);
+    ).split(main_layout[app.module_enabled as usize]);
 
     let todo_layout = Layout::new(
         Direction::Vertical,

@@ -300,14 +300,15 @@ impl TodoList {
 
     }
 
-    pub fn write (&self, filename: &PathBuf) -> io::Result<()> {
+    pub fn write (&mut self, filename: &PathBuf) -> io::Result<()> {
         let file = File::create(filename)?;
         let mut writer = BufWriter::new(file);
-        let todos = [&self.undone.todos, &self.done.todos];
+        let mut todos = [&mut self.undone.todos, &mut self.done.todos];
 
-        for todo in todos.iter().flat_map(|v| v.iter()) {
+        for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
             let _ = todo.dependencies.write(&todo.dependency_path());
             writeln!(writer, "{}", todo.as_string())?;
+            todo.remove_dependent_files()?;
         }
         writer.flush()?;
         Ok(())

@@ -20,6 +20,7 @@ pub struct Todo {
     pub dependencies: TodoList,
     dependency_name: String,
     done:bool,
+    removed_files: Vec<PathBuf>,
 }
 
 impl Into<String> for &Todo {
@@ -82,6 +83,7 @@ impl TryFrom<&str> for Todo {
             priority*=-1;
         }
         Ok(Todo {
+            removed_files: Vec::new(),
             dependency_name,
             dependencies,
             message,
@@ -95,6 +97,7 @@ impl TryFrom<&str> for Todo {
 impl Todo {
     pub fn new(message:String, priority:i8) -> Self {
         Todo {
+            removed_files: Vec::new(),
             dependency_name: String::new(),
             note: String::new(),
             dependencies: TodoList::new(),
@@ -122,9 +125,13 @@ impl Todo {
     }
 
     pub fn remove_note(&mut self) -> io::Result<()>{
-        remove_file(note_path(&self.note).unwrap())?;
+        self.removed_files.push(note_path(&self.note).unwrap());
         self.note = String::new();
         Ok(())
+    }
+
+    pub fn note_empty(&self) -> bool {
+        self.note.is_empty()
     }
 
     pub fn add_dependency(&mut self) -> Result<(), TodoError>{
@@ -141,16 +148,19 @@ impl Todo {
         Ok(())
     }
 
+    pub fn remove_dependent_files(&mut self) -> io::Result<()>{
+        for path in &self.removed_files {
+            let _ = remove_file(path);
+        }
+        self.removed_files = Vec::new();
+        Ok(())
+    }
+
     pub fn has_dependency(&self) -> bool {
         return !self.dependency_name.is_empty();
-        // self.dependencies.undone.len() != 0
     }
 
     pub fn done(&self) -> bool {
-        // let done_len = self.dependencies.done.len();
-        // if self.has_dependency() && done_len != 0{
-        //     return self.dependencies.undone.len() == 0;
-        // }
         return self.done
     }
 
@@ -172,7 +182,7 @@ impl Todo {
     }
 
     pub fn remove_dependency(&mut self) -> io::Result<()>{
-        remove_file(self.dependency_path())?;
+        self.removed_files.push(self.dependency_path());
         self.dependency_name = String::new();
         self.dependencies = TodoList::new();
         Ok(())
@@ -289,6 +299,7 @@ mod tests {
     fn test_try_from_string() {
         let input = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let expected = Ok(Todo {
+            removed_files: Vec::new(),
             dependency_name: String::new(),
             message: "Test".to_string(),
             note: "2c924e3088204ee77ba681f72be3444357932fca".to_string(),
@@ -395,6 +406,7 @@ mod tests {
         let todo = Todo::try_from(input1).unwrap();
 
         let expected = Todo {
+            removed_files: Vec::new(),
             dependency_name: "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo".to_string(),
             message: "Read for exams".to_string(),
             note: String::new(),

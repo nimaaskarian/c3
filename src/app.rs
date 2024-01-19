@@ -10,9 +10,10 @@ use crossterm::{
 };
 // }}}
 // mod {{{
-use crate::fileio::todo_path;
+use crate::{fileio::todo_path, modules::potato::Potato};
 use crate::todo_list::TodoList;
 use crate::todo_list::todo::Todo;
+use crate::modules::Module;
 //}}}
 
 fn shutdown() -> io::Result<()> {
@@ -22,7 +23,7 @@ fn shutdown() -> io::Result<()> {
     Ok(())
 }
 
-pub struct App {
+pub struct App<'a>{
     pub todo_list: TodoList,
     pub index: usize,
     todo_path: PathBuf, pub changed:bool,
@@ -31,17 +32,18 @@ pub struct App {
     pub text_mode: bool,
     pub on_submit: Option<fn(String, &mut App)->()>,
     pub clipboard: Option<Clipboard>,
-    pub potato: bool,
+    pub module_enabled: bool,
     pub include_done: bool,
     search_indexes: Vec<usize>,
     search_index: usize,
     last_query: String,
+    pub module: &'a mut dyn Module<'a>,
 }
 
-impl App {
+impl<'a>App<'a>{
 
     #[inline]
-    pub fn new() -> Self {
+    pub fn new(module: &'a mut dyn Module<'a>) -> Self {
         let clipboard = match Clipboard::new() {
             Ok(some) => Some(some),
             Err(_) => None,
@@ -49,6 +51,7 @@ impl App {
         let todo_path = todo_path().unwrap();
         let todo_list = TodoList::read(&todo_path);
         App {
+            module,
             last_query: String::new(),
             search_index: 0,
             include_done: false,
@@ -62,7 +65,7 @@ impl App {
             changed: false,
             show_right: true,
             text_mode: false,
-            potato: false,
+            module_enabled: false,
         }
     }
 
