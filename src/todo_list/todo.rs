@@ -124,10 +124,9 @@ impl Todo {
         note_path(&self.dependency_name).unwrap()
     }
 
-    pub fn remove_note(&mut self) -> io::Result<()>{
+    pub fn remove_note(&mut self) {
         self.removed_files.push(note_path(&self.note).unwrap());
         self.note = String::new();
-        Ok(())
     }
 
     pub fn note_empty(&self) -> bool {
@@ -181,11 +180,10 @@ impl Todo {
         format!("[{done_string}] [{}]{note_string}{}", self.priority, self.message)
     }
 
-    pub fn remove_dependency(&mut self) -> io::Result<()>{
+    pub fn remove_dependency(&mut self) {
         self.removed_files.push(self.dependency_path());
         self.dependency_name = String::new();
         self.dependencies = TodoList::new();
-        Ok(())
     }
 
     pub fn add_note(&mut self)-> io::Result<()>{
@@ -250,8 +248,8 @@ impl Todo {
         }
     }
 
-    pub fn set_priority(&mut self, add:i8) {
-        self.priority = add;
+    pub fn set_priority(&mut self, priority:i8) {
+        self.priority = priority;
         self.fix_priority();
     }
 

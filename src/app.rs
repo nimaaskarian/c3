@@ -3,17 +3,21 @@
 use std::{io::{self, stdout}, path::PathBuf};
 //}}}
 // lib{{{
+use tui_textarea::{Input, TextArea, CursorMove};
+use ratatui::prelude::*;
 use arboard::Clipboard;
 use crossterm::{
+    event::{self, Event::Key, KeyCode::Char, KeyCode},
     ExecutableCommand,
-    terminal::{disable_raw_mode, LeaveAlternateScreen}
+    terminal::{enable_raw_mode, EnterAlternateScreen, disable_raw_mode, LeaveAlternateScreen}
 };
 // }}}
 // mod {{{
-use crate::{fileio::todo_path, modules::potato::Potato};
+use crate::fileio::todo_path;
 use crate::todo_list::TodoList;
 use crate::todo_list::todo::Todo;
 use crate::modules::Module;
+use crate::tui::default_block;
 //}}}
 
 fn shutdown() -> io::Result<()> {
@@ -30,7 +34,7 @@ pub struct App<'a>{
     pub show_right:bool,
     prior_indexes: Vec<usize>,
     pub text_mode: bool,
-    pub on_submit: Option<fn(String, &mut App)->()>,
+    pub on_submit: Option<fn(&mut Self, String)->()>,
     pub clipboard: Option<Clipboard>,
     pub module_enabled: bool,
     pub include_done: bool,
@@ -38,6 +42,7 @@ pub struct App<'a>{
     search_index: usize,
     last_query: String,
     pub module: &'a mut dyn Module<'a>,
+    pub textarea: TextArea<'a>,
 }
 
 impl<'a>App<'a>{
@@ -50,7 +55,10 @@ impl<'a>App<'a>{
         };
         let todo_path = todo_path().unwrap();
         let todo_list = TodoList::read(&todo_path);
+        let mut textarea = TextArea::default();
+        textarea.set_cursor_line_style(Style::default());
         App {
+            textarea,
             module,
             last_query: String::new(),
             search_index: 0,
@@ -247,13 +255,8 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn top(&mut self) -> usize{
-        0
-    }
-
-    #[inline]
     pub fn go_top(&mut self) {
-        self.index = self.top();
+        self.index = 0;
     }
 
     #[inline]
@@ -307,10 +310,105 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn set_text_mode(&mut self, on_submit:fn(String, &mut App)->()) {
+    pub fn set_text_mode(&mut self, on_submit:fn(&mut Self, String)->(),title: &'a str ,placeholder: &str) {
         self.on_submit = Some(on_submit);
+        self.textarea.set_placeholder_text(placeholder);
+        self.textarea.set_block(default_block(title));
         self.text_mode = true;
     }
+
+    #[inline]
+    pub fn set_current_priority(&mut self, priority:i8) {
+        if let Some(todo) = self.mut_todo() {
+            todo.set_priority(priority);
+            self.reorder_current();
+        }
+    }
+
+    #[inline]
+    pub fn search_prompt(&mut self) {
+        self.set_text_mode(Self::on_search, "Search todo", "Enter search query")
+    }
+
+    #[inline]
+    fn on_search(&mut self, str:String) {
+        self.search(Some(str));
+        self.search_next_index();
+    }
+
+
+    #[inline]
+    pub fn get_message(&mut self) -> Option<String> {
+        if let Some(todo) = self.todo() {
+            return Some(todo.message.clone())
+        };
+        None
+    }
+
+    #[inline]
+    pub fn edit_prompt(&mut self, start: bool) {
+        let todo_message = match self.get_message() {
+            Some(message)=>message,
+            None=> String::new(),
+        };
+
+        self.set_text_mode(Self::on_edit_todo, "Edit todo", todo_message.as_str());
+        self.textarea.insert_str(todo_message);
+        if start {
+            self.textarea.move_cursor(CursorMove::Head);
+        }
+    }
+
+    #[inline]
+    pub fn prepend_prompt(&mut self) {
+        self.set_text_mode(Self::on_prepend_todo, "Add todo", "Enter the todo message");
+    }
+
+    #[inline]
+    pub fn append_prompt(&mut self) {
+        self.set_text_mode(Self::on_append_todo, "Add todo at first", "Enter the todo message");
+    }
+
+    #[inline]
+    pub fn quit_save_prompt(&mut self) {
+        if self.changed {
+            self.set_text_mode(Self::on_save_prompt, "You have done changes. You wanna save em? [n: no, y: yes, c: cancel]", "N/y/c");
+        } else {
+            self.quit();
+        }
+
+    }
+
+    #[inline]
+    fn on_save_prompt(app:&mut App, str:String) {
+        let lower = str.to_lowercase();
+        if lower.starts_with("y") {
+            app.write();
+        } else if lower.starts_with("c") {
+            return;
+        }
+        app.quit();
+    }
+
+    #[inline]
+    fn on_prepend_todo(app: &mut Self, str:String) {
+        app.mut_current_list().push(Todo::new(str, 0));
+        app.index = app.current_list().undone.len()-1;
+    }
+
+    #[inline]
+    fn on_append_todo(app:&mut App,str:String) {
+        app.mut_current_list().prepend(Todo::new(str, 1));
+        app.index = 0;
+    }
+
+    #[inline]
+    fn on_edit_todo(&mut self,str:String) {
+        if !str.is_empty() {
+            self.mut_todo().unwrap().set_message(str);
+    }
+}
+
 
     #[inline]
     pub fn mut_todo(&mut self) -> Option<&mut Todo> {
@@ -327,6 +425,104 @@ impl<'a>App<'a>{
         }
 
         Some(&mut self.mut_current_list()[index])
+    }
+
+    #[inline]
+    pub fn cut_todo(&mut self) {
+        if !self.is_todos_empty() {
+            let index = self.index;
+            let todo = self.mut_current_list().remove(index);
+            let todo_string:String = (&todo).into();
+            if let Some(clipboard) = &mut self.clipboard {
+                let _ = clipboard.set_text(todo_string);
+            }
+        }
+    }
+
+    #[inline]
+    pub fn add_dependency_traverse_down(&mut self) {
+        if let Some(todo) = self.todo() {
+            if !todo.has_dependency() && todo.note_empty() {
+                self.mut_todo().unwrap().add_dependency();
+            }
+        }
+        self.traverse_down()
+    }
+
+    #[inline]
+    pub fn yank_todo(&mut self) {
+        let todo_string:String = self.todo().unwrap().into();
+        if let Some(clipboard) = &mut self.clipboard {
+            let _ = clipboard.set_text(todo_string);
+        }
+    }
+
+    #[inline]
+    pub fn paste_todo(&mut self) {
+        if let Some(clipboard) = &mut self.clipboard {
+            if let Ok(text) = clipboard.get_text() {
+                match Todo::try_from(text) {
+                    Ok(todo) => {
+                        let list = &mut self.mut_current_list();
+                        list.push(todo);
+                        list.reorder(list.len());
+                    },
+                    _ => {},
+                };
+            }
+        }
+    }
+    
+    #[inline]
+    pub fn increase_current_priority(&mut self) {
+        if let Some(todo) = self.mut_todo() {
+            todo.increase_priority();
+            self.reorder_current();
+        }
+    }
+
+    #[inline]
+    pub fn decrease_current_priority(&mut self) {
+        if let Some(todo) = self.mut_todo() {
+            todo.decrease_priority();
+            self.reorder_current();
+        }
+    }
+
+    #[inline]
+    pub fn edit_or_add_note(&mut self) {
+        if let Some(todo) = self.mut_todo() {
+            if todo.edit_note().is_err() {
+                todo.add_note();
+            }
+        }
+    }
+
+    #[inline]
+    pub fn add_dependency(&mut self) {
+        if let Some(todo) = self.mut_todo() {
+            todo.add_dependency();
+        }
+    }
+
+    pub fn remove_current_dependent(&mut self) {
+        if let Some(todo) = self.mut_todo() {
+            todo.remove_note();
+            todo.remove_dependency();
+        }
+    }
+
+    pub fn delete_todo(&mut self) {
+        if !self.is_todos_empty() {
+            let index = self.index;
+            self.mut_current_list().undone.remove(index);
+        }
+    }
+
+    #[inline]
+    pub fn reorder_current(&mut self) {
+        let index = self.index;
+        self.index = self.mut_current_list().reorder(index);
     }
 
     #[inline]
@@ -391,5 +587,58 @@ impl<'a>App<'a>{
         self.changed = false;
         self.todo_list.write(&self.todo_path)?;
         Ok(())
+    }
+
+    #[inline]
+    fn enable_text_editor(&mut self) -> io::Result<()>{
+        match self.editor()? {
+            None => {},
+            Some(should_add) => {
+                if should_add {
+                    let todo_message = self.textarea.lines()[0].clone();
+                    self.on_submit.unwrap()(self, todo_message);
+                }
+                self.textarea.delete_line_by_head();
+                self.textarea.delete_line_by_end();
+                self.text_mode = false;
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn update_text_editor(&mut self)  -> io::Result<()> {
+        if self.module_enabled {
+            if event::poll(std::time::Duration::from_millis(500))? {
+                return self.enable_text_editor()
+            }
+        } else {
+            return self.enable_text_editor()
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn editor(&mut self) -> io::Result<Option<bool>> {
+        match crossterm::event::read()?.into() {
+            Input {
+                key: tui_textarea::Key::Esc, .. 
+            } => Ok(Some(false)),
+            Input {
+                key: tui_textarea::Key::Enter, ..
+            }=> Ok(Some(true)),
+            Input {
+                key: tui_textarea::Key::Char('u'),
+                ctrl: true,
+                ..
+            } => {
+                self.textarea.delete_line_by_head();
+                Ok(None)
+            },
+            input => {
+                self.textarea.input(input) ;
+                Ok(None)
+            }
+        }
     }
 }

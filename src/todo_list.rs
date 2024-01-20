@@ -79,7 +79,7 @@ impl TodoArray {
         self.todos.remove(index)
     }
 
-    fn push(&mut self,item:Todo) {
+    pub fn push(&mut self,item:Todo) {
         self.todos.push(item)
     }
 
@@ -258,25 +258,28 @@ impl TodoList {
                 Ok(value) => value,
                 Err(..) => continue,
             };
-            if todo.done() {
-                todo_list.done.push(todo);
-            } else {
-                todo_list.undone.push(todo);
-            }
+            todo_list.push(todo)
         }
         todo_list.undone.sort();
         todo_list.done.sort();
         return todo_list
     }
 
-    pub fn add(&mut self, todo:Todo) {
-        self.undone.push(todo);
+    #[inline]
+    pub fn push(&mut self, todo:Todo) {
+        if todo.done() {
+            self.done.push(todo);
+        } else {
+            self.undone.push(todo);
+        }
     }
 
+    #[inline]
     pub fn prepend(&mut self, todo:Todo) {
         self.undone.insert(0,todo);
     }
 
+    #[inline]
     pub fn fix_undone(&mut self) {
         for index in 0..self.undone.todos.len() {
             if self.undone.todos[index].done() {
