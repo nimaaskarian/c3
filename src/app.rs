@@ -1,6 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std{{{
-use std::{io::{self, stdout}, path::PathBuf};
+use std::{io::{self}, path::PathBuf};
 //}}}
 // lib{{{
 use tui_textarea::{Input, TextArea, CursorMove};
@@ -9,7 +9,7 @@ use ratatui::{prelude::*, widgets::*};
 use crossterm::event::{self, Event::Key, KeyCode::Char, KeyCode};
 // }}}
 // mod {{{
-use crate::tui::{default_block, create_todo_widget, TodoWidget, shutdown, redraw};
+use crate::tui::{default_block, create_todo_widget, TodoWidget, shutdown};
 use crate::fileio::todo_path;
 use crate::todo_list::TodoList;
 use crate::todo_list::todo::Todo;
@@ -394,13 +394,13 @@ impl<'a>App<'a>{
 
     #[inline]
     fn on_prepend_todo(app: &mut Self, str:String) {
-        app.mut_current_list().push(Todo::new(str, 0));
+        app.mut_current_list().push(Todo::default(str, 0));
         app.index = app.current_list().undone.len()-1;
     }
 
     #[inline]
     fn on_append_todo(app:&mut App,str:String) {
-        app.mut_current_list().prepend(Todo::new(str, 1));
+        app.mut_current_list().prepend(Todo::default(str, 1));
         app.index = 0;
     }
 
@@ -609,15 +609,15 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn update_editor(&mut self)  -> io::Result<()> {
+    pub fn update_editor(&mut self)  -> io::Result<bool> {
         if self.module_enabled {
             if event::poll(std::time::Duration::from_millis(500))? {
-                return self.enable_text_editor()
+                self.enable_text_editor()?
             }
         } else {
-            return self.enable_text_editor()
+            self.enable_text_editor()?
         }
-        Ok(())
+        Ok(false)
     }
 
     #[inline]
@@ -645,16 +645,12 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn update(&mut self, terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<bool>{
+    pub fn update_return_should_redraw(&mut self) -> io::Result<bool>{
         if self.text_mode {
-            self.update_editor()?;
+            return self.update_editor();
         } else {
             self.fix_index();
-
-            let should_redraw = self.update_no_editor()?;
-            if should_redraw {
-                redraw(terminal)?;
-            }
+            self.update_no_editor()?;
         }
         Ok(false)
     }

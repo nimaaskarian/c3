@@ -112,38 +112,7 @@ impl TodoArray {
             }
         }
         return self.move_index(index, high, 0);
-        // return high
     }
-
-    // pub fn reorder(&mut self, index:usize) -> Result<(), TodoArrayError> {
-    //     if index > self.todos.len() {
-    //         return Err(TodoArrayError::IndexNotFound);
-    //     }
-    //     let priority = self.todos[index].comparison_priority();
-    //     if priority < self.todos[0].comparison_priority() {
-    //         self.move_index(index, 0, 1)
-    //     }
-    //     let (mut low, mut high) = self.reorder_low_high(index);
-
-    //     while low < high {
-    //         let middle = (low + high) / 2;
-    //         if priority < self.todos[middle + 1].comparison_priority()
-    //             && priority >= self.todos[middle].comparison_priority()
-    //         {
-    //             self.move_index(index, middle, 0);
-    //             return Ok(());
-    //         }
-
-    //         if priority < self.todos[middle].comparison_priority() {
-    //             high = middle - 1;
-    //         } else {
-    //             low = middle + 1;
-    //         }
-    //     }
-    //     // If isn't first and not in the middle, then its the last one
-    //     self.move_index(index, self.todos.len()-1, 0);
-    //     Ok(())
-    // }
 
     #[inline(always)]
     fn move_index(&mut self, from: usize, to: usize, shift:usize) -> usize{
@@ -315,5 +284,77 @@ impl TodoList {
         }
         writer.flush()?;
         Ok(())
+    }
+}
+#[cfg(test)]
+mod tests {
+    use std::fs::{self, remove_file};
+
+    use super::*;
+
+    fn get_todo_list() -> TodoList {
+        let path = PathBuf::from("tests/TODO_LIST");
+        TodoList::read(&path)
+    }
+
+    #[test]
+    fn test_todolist_read() {
+        let todo_list = get_todo_list();
+        let expected_undone = vec![Todo::default("this todo has prio 1".to_string(), 1),Todo::default("this one has prio 2".to_string(), 2)];
+        let expected_done = vec![Todo::new("this one is 2 and done".to_string(), 2, true),Todo::new("this one is 0 and done".to_string(), 0, true)];
+        assert_eq!(expected_undone, todo_list.undone.todos);
+        assert_eq!(expected_done, todo_list.done.todos);
+    }
+
+    #[test]
+    fn test_len() {
+        let todo_list = get_todo_list();
+        assert_eq!(todo_list.len(), 4);
+    }
+
+    #[test]
+    fn test_write() {
+        let mut todo_list = get_todo_list();
+        let path = PathBuf::from("tests/tmplist");
+        todo_list.write(&path);
+
+        let contents = fs::read_to_string(&path).expect("Reading file failed :(");
+        let expected = "[1] this todo has prio 1
+[2] this one has prio 2
+[-2] this one is 2 and done
+[-0] this one is 0 and done
+";
+
+        remove_file(path);
+        assert_eq!(contents, expected)
+    }
+
+    #[test]
+    fn test_push() {
+        let mut todo_list = get_todo_list();
+        let path = PathBuf::from("tests/tmplist");
+        todo_list.push(Todo::default("Show me your warface".to_string(), 0));
+        todo_list.write(&path);
+
+        let contents = fs::read_to_string(&path).expect("Reading file failed :(");
+        let expected = "[1] this todo has prio 1
+[2] this one has prio 2
+[0] Show me your warface
+[-2] this one is 2 and done
+[-0] this one is 0 and done
+";
+
+        remove_file(path);
+        assert_eq!(contents, expected);
+    }
+
+    #[test]
+    fn test_initially_sorted() {
+        let todo_list = get_todo_list();
+        let mut sorted_list = todo_list.clone();
+        sorted_list.undone.sort();
+        sorted_list.done.sort();
+
+        assert_eq!(todo_list, sorted_list)
     }
 }

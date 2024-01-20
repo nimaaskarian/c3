@@ -95,7 +95,13 @@ impl TryFrom<&str> for Todo {
 }
 
 impl Todo {
-    pub fn new(message:String, priority:i8) -> Self {
+    #[inline]
+    pub fn default(message:String, priority:i8) -> Self {
+        Self::new(message, priority, false)
+    }
+
+    #[inline]
+    pub fn new(message:String, priority:i8, done: bool) -> Self {
         Todo {
             removed_files: Vec::new(),
             dependency_name: String::new(),
@@ -103,22 +109,13 @@ impl Todo {
             dependencies: TodoList::new(),
             message,
             priority: Todo::fixed_priority(priority),
-            done: false,
+            done,
         }
     }
 
     fn static_dependency_name(name:&String) -> String {
         format!("{name}.todo")
     }
-
-    // fn dependency_name(&self) -> &String {
-    //     if self.dependency_name.is_empty() {
-    //         let hash = self.hash();
-    //         &Self::static_dependency_name(&hash)
-    //     } else {
-    //         &self.dependency_name
-    //     }
-    // }
 
     pub fn dependency_path(&self) -> PathBuf {
         note_path(&self.dependency_name).unwrap()
@@ -284,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_todo_into_string() {
-        let mut todo = Todo::new("Test".to_string(), 1);
+        let mut todo = Todo::default("Test".to_string(), 1);
         todo.set_note(Note::new("Note".to_string()));
 
         let expected = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
@@ -316,7 +313,7 @@ mod tests {
         let message = "New Todo";
         let priority = 2;
 
-        let todo = Todo::new(message.to_string(), priority);
+        let todo = Todo::default(message.to_string(), priority);
 
         assert_eq!(todo.message, message);
         assert_eq!(todo.note, String::new());
@@ -348,10 +345,10 @@ mod tests {
 
     #[test]
     fn test_dependency_name() {
-        let mut todo = Todo::new("Test".to_string(), 1);
+        let mut todo = Todo::default("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
 
-        todo.add_dependency();
+        todo.add_dependency().expect("Error setting dependency");
 
         let result = todo.dependency_name;
 
@@ -360,8 +357,8 @@ mod tests {
 
     #[test]
     fn test_remove_note() {
-        let mut todo = Todo::new("Test".to_string(), 1);
-        todo.set_note(Note::new("Note".to_string()));
+        let mut todo = Todo::default("Test".to_string(), 1);
+        todo.set_note(Note::new("Note".to_string())).expect("Error setting note");
 
         todo.remove_note();
 
@@ -370,7 +367,7 @@ mod tests {
 
     #[test]
     fn test_add_dependency() {
-        let mut todo = Todo::new("Test".to_string(), 1);
+        let mut todo = Todo::default("Test".to_string(), 1);
 
         todo.add_dependency();
 
@@ -379,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_remove_dependency() {
-        let mut todo = Todo::new("Test".to_string(), 1);
+        let mut todo = Todo::default("Test".to_string(), 1);
         todo.add_dependency();
 
         todo.remove_dependency();
@@ -389,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_toggle_done() {
-        let mut todo = Todo::new("Test".to_string(), 1);
+        let mut todo = Todo::default("Test".to_string(), 1);
 
         todo.toggle_done();
         assert_eq!(todo.done(), true);

@@ -1,6 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // standard {{{
-use std::io::{self, stdout};
+use std::io::{self};
 //}}}
 // lib {{{
 use ratatui::{prelude::*, widgets::*};
@@ -13,17 +13,17 @@ mod modules;
 use modules::potato::Potato;
 mod tui;
 use app::App;
-use tui::{startup, shutdown};
+use tui::{startup, shutdown, redraw};
 //}}}
 
 fn main() -> io::Result<()> {
     startup()?;
     match run() {
-        Err(err) => {
+        Ok(_)=>{Ok(())}
+        err => {
             shutdown()?;
-            Err(err)
+            err
         }
-        _ => {Ok(())}
     }
 }
 
@@ -40,6 +40,9 @@ fn run() -> io::Result<()> {
             app.ui(frame, &mut list_state)
         })?;
 
-        app.update(&mut terminal)?;
+        let should_redraw = app.update_return_should_redraw()?;
+        if should_redraw {
+            redraw(&mut terminal)?;
+        }
     }
 }
