@@ -4,45 +4,35 @@ use std::{io::{self, stdout}, path::PathBuf};
 //}}}
 // lib{{{
 use tui_textarea::{Input, TextArea, CursorMove};
-use ratatui::prelude::*;
 use arboard::Clipboard;
-use crossterm::{
-    event::{self, Event::Key, KeyCode::Char, KeyCode},
-    ExecutableCommand,
-    terminal::{enable_raw_mode, EnterAlternateScreen, disable_raw_mode, LeaveAlternateScreen}
-};
+use ratatui::{prelude::*, widgets::*};
+use crossterm::event::{self, Event::Key, KeyCode::Char, KeyCode};
 // }}}
 // mod {{{
+use crate::tui::{default_block, create_todo_widget, TodoWidget, shutdown, redraw};
 use crate::fileio::todo_path;
 use crate::todo_list::TodoList;
 use crate::todo_list::todo::Todo;
 use crate::modules::Module;
-use crate::tui::default_block;
 //}}}
 
-fn shutdown() -> io::Result<()> {
-    disable_raw_mode()?;
-    stdout().execute(crossterm::cursor::Show)?;
-    stdout().execute(LeaveAlternateScreen)?;
-    Ok(())
-}
 
 pub struct App<'a>{
-    pub todo_list: TodoList,
-    pub index: usize,
+    todo_list: TodoList,
+    index: usize,
     todo_path: PathBuf, pub changed:bool,
-    pub show_right:bool,
+    show_right:bool,
     prior_indexes: Vec<usize>,
-    pub text_mode: bool,
-    pub on_submit: Option<fn(&mut Self, String)->()>,
-    pub clipboard: Option<Clipboard>,
-    pub module_enabled: bool,
-    pub include_done: bool,
+    text_mode: bool,
+    on_submit: Option<fn(&mut Self, String)->()>,
+    clipboard: Option<Clipboard>,
+    module_enabled: bool,
+    show_done: bool,
     search_indexes: Vec<usize>,
     search_index: usize,
     last_query: String,
-    pub module: &'a mut dyn Module<'a>,
-    pub textarea: TextArea<'a>,
+    module: &'a mut dyn Module<'a>,
+    textarea: TextArea<'a>,
 }
 
 impl<'a>App<'a>{
@@ -62,7 +52,7 @@ impl<'a>App<'a>{
             module,
             last_query: String::new(),
             search_index: 0,
-            include_done: false,
+            show_done: false,
             clipboard,
             on_submit: None,
             todo_list,
@@ -93,7 +83,7 @@ impl<'a>App<'a>{
         self.mut_todo().unwrap().dependencies.fix_undone();
         self.mut_current_list().fix_undone();
 
-        if self.include_done {
+        if self.show_done {
             self.mut_todo().unwrap().dependencies.fix_done();
             self.mut_current_list().fix_done();
         }
@@ -107,7 +97,7 @@ impl<'a>App<'a>{
                 _ => {}
             }
             self.mut_current_list().fix_undone();
-            if self.include_done {
+            if self.show_done {
                 self.mut_current_list().fix_done();
             }
         }
@@ -122,7 +112,7 @@ impl<'a>App<'a>{
             return;
         }
         let mut todo_messages = self.current_list().undone.messages();
-        if self.include_done {
+        if self.show_done {
             todo_messages.extend(self.current_list().done.messages());
         }
         self.search_indexes = Vec::new();
@@ -149,14 +139,16 @@ impl<'a>App<'a>{
         self.index = self.search_indexes[0];
     }
 
-    pub fn toggle_include_done(&mut self) {
-        self.include_done = !self.include_done;
+    #[inline]
+    pub fn toggle_show_done(&mut self) {
+        self.show_done = !self.show_done;
         while self.only_undone_empty() && !self.prior_indexes.is_empty() {
             self.traverse_up()
         }
         self.search(None);
     }
 
+    #[inline]
     pub fn search_next(&mut self) {
         if self.search_indexes.is_empty() {
             return;
@@ -169,6 +161,7 @@ impl<'a>App<'a>{
         self.index = self.search_indexes[self.search_index]
     }
 
+    #[inline]
     pub fn search_prev(&mut self) {
         if self.search_indexes.is_empty() {
             return;
@@ -181,6 +174,7 @@ impl<'a>App<'a>{
         self.index = self.search_indexes[self.search_index]
     }
 
+    #[inline]
     pub fn toggle_current_done(&mut self) {
         let was_done = self.todo().unwrap().done();
         self.mut_todo().unwrap().toggle_done();
@@ -205,7 +199,7 @@ impl<'a>App<'a>{
         } else {
             ""
         };
-        let size = if self.include_done {
+        let size = if self.show_done {
             self.current_list().len()
         } else {
             self.current_list().undone.len()
@@ -218,6 +212,15 @@ impl<'a>App<'a>{
         } else {
             format!("{todo_string} {}", self.parent().unwrap().message)
         }
+    }
+
+    #[inline]
+    pub fn fix_index(&mut self) {
+        let size = self.len();
+        self.index = match size {
+            0 => 0,
+            _ => self.index.min(size-1),
+        };
     }
 
     #[inline]
@@ -292,7 +295,7 @@ impl<'a>App<'a>{
 
     #[inline]
     pub fn is_todos_empty(&self) -> bool{
-        if self.include_done {
+        if self.show_done {
             self.current_list().is_empty()
         } else {
             self.is_undone_empty()
@@ -372,11 +375,10 @@ impl<'a>App<'a>{
     #[inline]
     pub fn quit_save_prompt(&mut self) {
         if self.changed {
-            self.set_text_mode(Self::on_save_prompt, "You have done changes. You wanna save em? [n: no, y: yes, c: cancel]", "N/y/c");
+            self.set_text_mode(Self::on_save_prompt, "You have done changes. You wanna save? [n: no, y: yes, c: cancel] (default: n)", "N/y/c");
         } else {
             self.quit();
         }
-
     }
 
     #[inline]
@@ -406,8 +408,8 @@ impl<'a>App<'a>{
     fn on_edit_todo(&mut self,str:String) {
         if !str.is_empty() {
             self.mut_todo().unwrap().set_message(str);
+        }
     }
-}
 
 
     #[inline]
@@ -557,12 +559,12 @@ impl<'a>App<'a>{
 
     #[inline]
     pub fn display(&self) -> Vec<String> {
-        self.current_list().display(self.include_done)
+        self.current_list().display(self.show_done)
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        if self.include_done {
+        if self.show_done {
             self.current_list().len()
         } else {
             self.current_list().undone.len()
@@ -607,7 +609,7 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn update_text_editor(&mut self)  -> io::Result<()> {
+    pub fn update_editor(&mut self)  -> io::Result<()> {
         if self.module_enabled {
             if event::poll(std::time::Duration::from_millis(500))? {
                 return self.enable_text_editor()
@@ -639,6 +641,166 @@ impl<'a>App<'a>{
                 self.textarea.input(input) ;
                 Ok(None)
             }
+        }
+    }
+
+    #[inline]
+    pub fn update(&mut self, terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<bool>{
+        if self.text_mode {
+            self.update_editor()?;
+        } else {
+            self.fix_index();
+
+            let should_redraw = self.update_no_editor()?;
+            if should_redraw {
+                redraw(terminal)?;
+            }
+        }
+        Ok(false)
+    }
+
+
+    #[inline]
+    fn update_no_editor(&mut self) -> io::Result<bool> {
+        if self.module_enabled {
+            if event::poll(std::time::Duration::from_millis(500))? {
+                return self.read_keys();
+            }
+        } else {
+            return self.read_keys();
+        }
+        Ok(false)
+    }
+
+    #[inline]
+    fn read_keys(&mut self)  -> io::Result<bool> {
+        if let Key(key) = event::read()? {
+            if key.kind == event::KeyEventKind::Press {
+                match key.code {
+                    Char('d') | Char('x') => self.cut_todo(),
+                    Char('!') => self.toggle_show_done(),
+                    Char('y') => self.yank_todo(),
+                    Char('p') => self.paste_todo(),
+                    Char('j') => self.increment(),
+                    Char('k') => self.decrement(),
+                    Char('g') => self.go_top(),
+                    Char('G') => self.go_bottom(),
+                    Char('w') => self.write()?,
+                    Char('J') => self.decrease_current_priority(),
+                    Char('K') => self.increase_current_priority(),
+                    Char(']') => {
+                        self.show_right = !self.show_right
+                    },
+                    Char('P') => {
+                        self.module_enabled = !self.module_enabled
+                    },
+                    Char('>') => {
+                        self.edit_or_add_note();
+                        return Ok(true)
+                    },
+                    Char('t') => self.add_dependency(),
+                    Char('h') => self.traverse_up(),
+                    Char('D') => self.delete_todo(),
+                    Char('l') => self.add_dependency_traverse_down(),
+                    Char('R') => self.read(),
+                    Char('T') => self.remove_current_dependent(),
+                    KeyCode::Enter => self.toggle_current_done(),
+                    Char('n') => self.search_next(),
+                    Char('N') => self.search_prev(),
+                    Char('a') => self.prepend_prompt(),
+                    Char('/') => self.search_prompt(),
+                    Char('A') => self.append_prompt(),
+                    Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
+                    Char('q') => self.quit_save_prompt(),
+                    Char(c) if c.is_digit(10) => self.set_current_priority(c.to_digit(10).unwrap() as i8),
+
+                    Char(' ') => self.module.on_space(),
+                    Char('s') => self.module.on_s(),
+                    Char('H') => self.module.on_capital_h(),
+                    Char('L') => self.module.on_capital_l(),
+                    Char('r') => self.module.on_r(),
+                    Char('+') | Char('=') => self.module.on_plus(),
+                    Char('-') => self.module.on_minus(),
+                    Char('.') => self.module.on_dot(),
+                    Char(',') => self.module.on_comma(),
+                    _ => {},
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    pub fn ui(&self, frame:&mut Frame, list_state: &mut ListState) {
+        let todo = self.todo();
+
+        list_state.select(Some(self.index));
+
+        let note = match (todo, self.show_right) {
+            (Some(todo), true)  => todo.get_note(),
+            _ => String::new(),
+        };
+
+        let dependency_width = if let Some(todo) = todo {
+            let should_show_right = (todo.has_dependency() || !todo.get_note().is_empty()) && self.show_right;
+            40 * (should_show_right as u16)
+        } else {
+            0
+        };
+        let main_layout = if self.module_enabled {
+             let main_layout = Layout::new(
+                Direction::Vertical,
+                [
+                    Constraint::Length(5),
+                    Constraint::Min(0),
+                ]
+            ).split(frame.size());
+            frame.render_widget(self.module.get_widget(), main_layout[0]);
+            main_layout
+        } else {
+             Layout::new(
+                Direction::Vertical,
+                [
+                    Constraint::Min(0),
+                ]
+            ).split(frame.size())
+        };
+
+        let todos_layout = Layout::new(
+            Direction::Horizontal,
+            [
+                Constraint::Percentage(100 - dependency_width),
+                Constraint::Percentage(dependency_width),
+            ]
+        ).split(main_layout[self.module_enabled as usize]);
+
+        let todo_layout = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Length(3 * self.text_mode as u16),
+                Constraint::Min(0),
+            ]
+        ).split(todos_layout[0]);
+
+
+        match create_todo_widget(&self.display(), self.title()) {
+            TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout[1]),
+            TodoWidget::List(widget) => frame.render_stateful_widget(widget, todo_layout[1], list_state),
+        };
+
+        frame.render_widget(self.textarea.widget(), todo_layout[0]);
+        
+        if todo.is_some() && self.show_right{
+            let todo = todo.unwrap();
+            if !todo.get_note().is_empty(){
+                let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
+                frame.render_widget(note_widget, todos_layout[1]);
+            } else
+            if todo.has_dependency() {
+                match create_todo_widget(&todo.dependencies.display(self.show_done), String::from("Todo dependencies")) {
+                    TodoWidget::List(widget) =>frame.render_widget(widget, todos_layout[1]),
+                    TodoWidget::Paragraph(widget) =>frame.render_widget(widget, todos_layout[1]),
+                }
+            } 
         }
     }
 }
