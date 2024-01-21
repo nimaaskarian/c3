@@ -504,6 +504,7 @@ mod tests {
         let todo = Todo::try_from(input).unwrap();
         assert_eq!(todo, expected);
 
-        assert_eq!(todo.display(None), "[ ] [2] this one should be daily (Daily)");
+        assert_eq!(todo.display(None), "[ ] 2. this one should be daily (Daily)");
+        assert_eq!(todo.display(Some(false)), "2. this one should be daily (Daily)");
     }
 }
