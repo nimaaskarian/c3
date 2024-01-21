@@ -112,9 +112,15 @@ impl TryFrom<&str> for Todo {
             false
         };
 
+        let date_str = if daily && done {
+            date::current_str()
+        } else {
+            String::new()
+        };
+
 
         Ok(Todo {
-            date_str: String::new(),
+            date_str,
             daily,
             removed_files: Vec::new(),
             dependency_name,

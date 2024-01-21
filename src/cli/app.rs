@@ -27,7 +27,7 @@ struct Args {
     stdout: bool,
 }
 pub struct App {
-    todo_path: PathBuf,
+    // todo_path: PathBuf,
     todo_list: TodoList,
     args: Args,
 }
@@ -39,10 +39,10 @@ impl App {
     pub fn new() -> Self {
         let todo_path = todo_path().unwrap();
         let args = Args::parse();
-        let mut todo_list = TodoList::read(&todo_path, args.tree);
+        let todo_list = TodoList::read(&todo_path, args.tree);
         App {
             args,
-            todo_path,
+            // todo_path,
             todo_list,
         }
     }
@@ -58,6 +58,7 @@ impl App {
     pub fn print(&self) -> io::Result<()>{
         if self.args.stdout {
             self.todo_list.print()?;
+            return Ok(())
         }
         if self.args.tree {
             Self::print_tree(&self.todo_list, self.args.show_done, 0)
