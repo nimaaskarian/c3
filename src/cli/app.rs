@@ -1,3 +1,4 @@
+use std::io;
 use std::path::PathBuf;
 
 use crate::fileio::todo_path;
@@ -20,6 +21,10 @@ struct Args {
     /// Show done todos too
     #[arg(short='d', long)]
     show_done: bool,
+
+    /// Show done todos too
+    #[arg(short='s', long)]
+    stdout: bool,
 }
 pub struct App {
     todo_path: PathBuf,
@@ -53,12 +58,16 @@ impl App {
     }
 
     #[inline]
-    pub fn print(&self) {
+    pub fn print(&self) -> io::Result<()>{
+        if self.args.stdout {
+            self.todo_list.print()?;
+        }
         if self.args.tree {
             Self::print_tree(&self.todo_list, self.args.show_done, 0)
         } else {
             self.print_list()
         }
+        Ok(())
     }
 
     #[inline]

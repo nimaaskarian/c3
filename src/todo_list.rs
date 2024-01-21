@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::PathBuf;
 use std::ops::{Index, IndexMut};
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Write, stdout};
 use std::io;
 use std::fs::read_to_string;
 pub mod todo;
@@ -282,17 +282,40 @@ impl TodoList {
 
     }
 
-    pub fn write (&mut self, filename: &PathBuf) -> io::Result<()> {
-        let file = File::create(filename)?;
-        let mut writer = BufWriter::new(file);
-        let mut todos = [&mut self.undone.todos, &mut self.done.todos];
+    #[inline]
+    fn write_to_buf<W: Write> (&self, writer: &mut BufWriter<W>) -> io::Result<()> {
+        let todos = [&self.undone.todos, &self.done.todos];
 
-        for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
-            let _ = todo.dependencies.write(&todo.dependency_path());
+        for todo in todos.iter().flat_map(|v| v.iter()) {
             writeln!(writer, "{}", todo.as_string())?;
-            todo.remove_dependent_files()?;
         }
         writer.flush()?;
+        Ok(())
+    }
+
+    #[inline]
+    fn remove_dependent_files(&mut self) -> io::Result<()> {
+        let mut todos = [&mut self.undone.todos, &mut self.done.todos];
+        for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
+            let _ = todo.dependencies.write(&todo.dependency_path());
+            todo.remove_dependent_files()?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn write(&mut self, filename: &PathBuf) -> io::Result<()> {
+        let file = File::create(filename)?;
+        let mut writer = BufWriter::new(file);
+        self.write_to_buf(&mut writer)?;
+        self.remove_dependent_files()?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn print(&self) -> io::Result<()> {
+        let mut stdout_writer = BufWriter::new(stdout());
+        self.write_to_buf(&mut stdout_writer)?;
         Ok(())
     }
 }
