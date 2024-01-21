@@ -472,9 +472,11 @@ impl<'a>App<'a>{
             if let Ok(text) = clipboard.get_text() {
                 match Todo::try_from(text) {
                     Ok(todo) => {
+                        let size = self.len();
                         let list = &mut self.mut_current_list();
                         list.push(todo);
-                        list.reorder(list.len());
+
+                        self.index = list.reorder(size-1);
                     },
                     _ => {},
                 };
