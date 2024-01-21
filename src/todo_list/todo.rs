@@ -221,14 +221,14 @@ impl Todo {
             "-"
         }
         else {
-            " "
+            "."
         };
         let daily_str = if self.daily {
             " (Daily)"
         } else {
             ""
         };
-        format!("{done_string}[{}]{note_string}{}{daily_str}", self.priority, self.message)
+        format!("{done_string}{}{note_string} {}{daily_str}", self.priority, self.message)
     }
 
     pub fn remove_dependency(&mut self) {
