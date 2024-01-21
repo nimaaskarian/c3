@@ -1,6 +1,7 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
 use std::{io::{self}, path::PathBuf, fs::{File, remove_file}};
+use chrono::Duration;
 //}}}
 // lib{{{
 use scanf::sscanf;
@@ -38,7 +39,7 @@ impl Into<String> for &Todo {
             }
         };
         let daily_str = if self.daily {
-            format!(" [DAILY{}]", self.date_str)
+            format!(" [DAILY {}]", self.date_str)
         } else {
             String::new()
         };
@@ -100,10 +101,10 @@ impl TryFrom<&str> for Todo {
             Err(_) => 0
         };
         
-        let daily = if sscanf!(message.clone().as_str(), "{}[DAILY{}]", message, date_string).is_ok() {
-            if let Ok(date) = date::parse(date_string) {
+        let daily = if sscanf!(message.clone().as_str(), "{}[DAILY {}]", message, date_string).is_ok() {
+            if let Ok(date) = date::parse(&date_string) {
                 let current_date = date::current();
-                if current_date != date {
+                if current_date > date {
                     done = false
                 }
             }
@@ -112,8 +113,12 @@ impl TryFrom<&str> for Todo {
             false
         };
 
-        let date_str = if daily && done {
-            date::current_str()
+        let date_str = if daily {
+            if done {
+                date::current_str()
+            } else {
+                date_string
+            }
         } else {
             String::new()
         };
@@ -230,9 +235,23 @@ impl Todo {
             "."
         };
         let daily_str = if self.daily {
-            " (Daily)"
+            let inner_str = if self.date_str.is_empty() {
+                String::new()
+            } else {
+                let last_save = if let Ok(parsed_date) = date::parse(&self.date_str) {
+                    date::current() - parsed_date
+                } else {
+                    Duration::zero()
+                };
+                match last_save.num_days() {
+                    0 => String::new(),
+                    1 => String::from(", last done yesterday"),
+                    any => format!(", last done {} days ago", any)
+                }
+            };
+            format!(" (Daily{inner_str})")
         } else {
-            ""
+            String::new()
         };
         format!("{done_string}{}{note_string} {}{daily_str}", self.priority, self.message)
     }
@@ -265,6 +284,7 @@ impl Todo {
         Ok(())
     }
 
+    #[inline]
     pub fn get_note(&self) -> String {
         match Note::from_hash(&self.note) {
             Err(_) => return String::new(),
@@ -272,30 +292,38 @@ impl Todo {
         }
     }
 
+    #[inline]
     pub fn set_message(&mut self, message:String) {
         self.message = message;
     }
 
+    #[inline]
     pub fn hash(&self) -> String{
         sha1(&format!("{} {}", self.priority, self.message))
     }
 
+    #[inline]
     pub fn toggle_done(&mut self) {
         self.set_done(!self.done);
     }
 
+    #[inline]
     pub fn toggle_daily(&mut self) {
         self.daily = !self.daily;
     }
 
+    #[inline]
     pub fn set_done(&mut self, done:bool) {
         if self.daily && done {
             self.date_str = date::current_str();
+        } else {
+            self.date_str = String::new();
         }
         self.done = done;
     }
 
 
+    #[inline]
     pub fn decrease_priority(&mut self) {
         if self.comparison_priority() < 9 {
             self.priority+=1
@@ -304,6 +332,7 @@ impl Todo {
         }
     }
 
+    #[inline]
     pub fn increase_priority(&mut self) {
         if self.comparison_priority() > 1 {
             self.priority=self.comparison_priority()-1
@@ -312,11 +341,13 @@ impl Todo {
         }
     }
 
+    #[inline]
     pub fn set_priority(&mut self, priority:i8) {
         self.priority = priority;
         self.fix_priority();
     }
 
+    #[inline]
     fn fix_priority(&mut self) {
         self.priority = Todo::fixed_priority(self.priority)
     }
@@ -326,6 +357,7 @@ impl Todo {
         if self.priority == 0 {10} else {self.priority}
     }
 
+    #[inline]
     fn fixed_priority(priority: i8) -> i8 {
         match priority {
             10.. => 0,
@@ -335,6 +367,7 @@ impl Todo {
         }
     }
 
+    #[inline]
     pub fn as_string(&self) -> String{
         self.into()
     }

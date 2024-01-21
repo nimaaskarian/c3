@@ -1,9 +1,9 @@
 use chrono::{Local ,NaiveDate};
 use chrono::format::ParseError;
-const FORMAT: &str = " %Y-%m-%d";
+const FORMAT: &str = "%Y-%m-%d";
 
 #[inline]
-pub fn parse(date_string: String) -> Result<NaiveDate, ParseError> {
+pub fn parse(date_string: &String) -> Result<NaiveDate, ParseError> {
     NaiveDate::parse_from_str(date_string.as_str(), FORMAT)
 }
 

@@ -22,12 +22,11 @@ struct Args {
     #[arg(short='d', long)]
     show_done: bool,
 
-    /// Show done todos too
+    /// Write contents of todo file in the stdout
     #[arg(short='s', long)]
     stdout: bool,
 }
 pub struct App {
-    // todo_path: PathBuf,
     todo_list: TodoList,
     args: Args,
 }
@@ -42,7 +41,6 @@ impl App {
         let todo_list = TodoList::read(&todo_path, args.tree);
         App {
             args,
-            // todo_path,
             todo_list,
         }
     }
