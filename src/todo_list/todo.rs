@@ -79,11 +79,14 @@ impl TryFrom<&str> for Todo {
                 }
             }
         }
+        // let read_dependency = match read_dependency {
+        //     Some(value) => value,
+        //     _ => true,
+        // }
         let mut dependency_name = String::new();
-        let mut dependencies = TodoList::new();
+        let dependencies = TodoList::new();
         if todo != "" {
             dependency_name = Self::static_dependency_name(&todo);
-            dependencies = TodoList::read(&note_path(&dependency_name).unwrap());
         }
         let mut done = priority_string.chars().nth(0).unwrap() == '-';
 
@@ -158,6 +161,11 @@ impl Todo {
         self.note = String::new();
     }
 
+    #[inline]
+    pub fn read_dependencies(&mut self) {
+        self.dependencies = TodoList::read(&note_path(&self.dependency_name).unwrap());
+    }
+
     pub fn note_empty(&self) -> bool {
         self.note.is_empty()
     }
@@ -192,11 +200,20 @@ impl Todo {
         return self.done
     }
 
-    pub fn display(&self) -> String {
-        let done_string = if self.done() {
-            "x"
+    pub fn display(&self, show_done: Option<bool>) -> String {
+        let show_done = match show_done {
+            None => true,
+            Some(value) => value,
+        };
+        let done_string = if show_done {
+            let inside_str = if self.done() {
+                "x"
+            } else {
+                " "
+            };
+            format!("[{inside_str}] ")
         } else {
-            " "
+            String::new()
         };
         let note_string = if self.note != "" {
             ">"
@@ -211,7 +228,7 @@ impl Todo {
         } else {
             ""
         };
-        format!("[{done_string}] [{}]{note_string}{}{daily_str}", self.priority, self.message)
+        format!("{done_string}[{}]{note_string}{}{daily_str}", self.priority, self.message)
     }
 
     pub fn remove_dependency(&mut self) {
@@ -481,6 +498,6 @@ mod tests {
         let todo = Todo::try_from(input).unwrap();
         assert_eq!(todo, expected);
 
-        assert_eq!(todo.display(), "[ ] [2] this one should be daily (Daily)");
+        assert_eq!(todo.display(None), "[ ] [2] this one should be daily (Daily)");
     }
 }

@@ -44,7 +44,8 @@ impl<'a>App<'a>{
             Err(_) => None,
         };
         let todo_path = todo_path().unwrap();
-        let todo_list = TodoList::read(&todo_path);
+        let mut todo_list = TodoList::read(&todo_path);
+        todo_list.read_dependencies();
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         App {

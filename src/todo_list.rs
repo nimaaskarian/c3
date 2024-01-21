@@ -63,8 +63,8 @@ impl TodoArray {
         self.todos.iter().map(|todo| todo.message.clone()).collect()
     }
 
-    pub fn display(&self) -> Vec<String> {
-        self.todos.iter().map(|todo| todo.display()).collect()
+    pub fn display(&self, show_done: Option<bool>) -> Vec<String> {
+        self.todos.iter().map(|todo| todo.display(show_done)).collect()
     }
 
     pub fn len(&self) -> usize {
@@ -209,10 +209,12 @@ impl TodoList {
         self.undone.len() + self.done.len()
     }
 
-    pub fn display(&self, include_done: bool) -> Vec<String> {
-        let mut display_list = self.undone.display();
-        if include_done {
-            display_list.extend(self.done.display());
+    pub fn display(&self, show_done: bool) -> Vec<String> {
+        let arg = Some(show_done);
+        let mut display_list = self.undone.display(arg);
+
+        if show_done {
+            display_list.extend(self.done.display(arg));
         }
         display_list
     }
@@ -232,6 +234,14 @@ impl TodoList {
         todo_list.undone.sort();
         todo_list.done.sort();
         return todo_list
+    }
+
+    pub fn read_dependencies(&mut self) {
+        let mut todos = [&mut self.undone.todos, &mut self.done.todos];
+
+        for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
+            todo.read_dependencies();
+        }
     }
 
     #[inline]
