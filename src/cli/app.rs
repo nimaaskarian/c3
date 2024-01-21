@@ -38,11 +38,8 @@ impl App {
     #[inline]
     pub fn new() -> Self {
         let todo_path = todo_path().unwrap();
-        let mut todo_list = TodoList::read(&todo_path);
         let args = Args::parse();
-        if args.tree {
-            todo_list.read_dependencies();
-        }
+        let mut todo_list = TodoList::read(&todo_path, args.tree);
         App {
             args,
             todo_path,

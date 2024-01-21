@@ -219,7 +219,7 @@ impl TodoList {
         display_list
     }
 
-    pub fn read (filename: &PathBuf) -> Self{
+    pub fn read (filename: &PathBuf, read_dependencies: bool) -> Self{
         let mut todo_list = Self::new();
         if !filename.is_file() {
             return todo_list
@@ -233,6 +233,9 @@ impl TodoList {
         }
         todo_list.undone.sort();
         todo_list.done.sort();
+        if read_dependencies {
+            todo_list.read_dependencies()
+        }
         return todo_list
     }
 
@@ -327,7 +330,7 @@ mod tests {
 
     fn get_todo_list() -> TodoList {
         let path = PathBuf::from("tests/TODO_LIST");
-        TodoList::read(&path)
+        TodoList::read(&path, true)
     }
 
     #[test]

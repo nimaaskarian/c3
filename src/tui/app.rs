@@ -44,8 +44,7 @@ impl<'a>App<'a>{
             Err(_) => None,
         };
         let todo_path = todo_path().unwrap();
-        let mut todo_list = TodoList::read(&todo_path);
-        todo_list.read_dependencies();
+        let mut todo_list = TodoList::read(&todo_path, true);
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         App {
@@ -198,7 +197,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = TodoList::read(&self.todo_path);
+        self.todo_list = TodoList::read(&self.todo_path, true);
     }
 
     #[inline]

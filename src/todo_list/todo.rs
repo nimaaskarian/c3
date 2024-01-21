@@ -163,7 +163,7 @@ impl Todo {
 
     #[inline]
     pub fn read_dependencies(&mut self) {
-        self.dependencies = TodoList::read(&note_path(&self.dependency_name).unwrap());
+        self.dependencies = TodoList::read(&note_path(&self.dependency_name).unwrap(), true);
     }
 
     pub fn note_empty(&self) -> bool {
@@ -180,7 +180,7 @@ impl Todo {
             return Err(TodoError::DependencyCreationFailed)
         }
 
-        self.dependencies = TodoList::read(&self.dependency_path());
+        self.dependencies = TodoList::read(&self.dependency_path(), true);
         Ok(())
     }
 
