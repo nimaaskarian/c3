@@ -7,6 +7,7 @@ use scanf::sscanf;
 // }}}
 // mod{{{
 mod note;
+mod date;
 use crate::fileio::note_path;
 use note::{Note, sha1};
 use super::TodoList;
@@ -21,19 +22,27 @@ pub struct Todo {
     dependency_name: String,
     done:bool,
     removed_files: Vec<PathBuf>,
+    daily: bool,
+    date_str: String,
 }
 
 impl Into<String> for &Todo {
     fn into(self) -> String{
         let done_str = if self.done() {"-"} else {""};
-        let mut note_str = match self.note.as_str() {
-            "" => String::new(),
-            _ => format!(">{}", self.note),
+        let note_str = if self.has_dependency() {
+            format!(">{}", self.dependency_name)
+        } else {
+            match self.note.as_str() {
+                "" => String::new(),
+                _ => format!(">{}", self.note),
+            }
         };
-        if self.has_dependency() {
-            note_str = format!(">{}", self.dependency_name);
-        }
-        format!("[{done_str}{}]{note_str} {}", self.priority, self.message)
+        let daily_str = if self.daily {
+            format!(" [DAILY{}]", self.date_str)
+        } else {
+            String::new()
+        };
+        format!("[{done_str}{}]{note_str} {}{daily_str}", self.priority, self.message)
     }
 }
 
@@ -56,15 +65,16 @@ impl TryFrom<String> for Todo {
 impl TryFrom<&str> for Todo {
     type Error = TodoError;
 
-    fn try_from(s:&str) -> Result<Todo, TodoError>{
+    fn try_from(input:&str) -> Result<Todo, TodoError>{
         let mut message = String::new();
         let mut note = String::new();
         let mut todo = String::new();
+        let mut date_string = String::new();
         let mut priority_string:String = String::new();
 
-        if sscanf!(s,"[{}]>{}.todo {}", priority_string, todo, message).is_err() {
-            if sscanf!(s,"[{}]>{} {}", priority_string, note, message).is_err() {
-                if sscanf!(s,"[{}] {}", priority_string, message).is_err() {
+        if sscanf!(input,"[{}]>{}.todo {}", priority_string, todo, message).is_err() {
+            if sscanf!(input,"[{}]>{} {}", priority_string, note, message).is_err() {
+                if sscanf!(input,"[{}] {}", priority_string, message).is_err() {
                     return Err(TodoError::ReadFailed);
                 }
             }
@@ -75,14 +85,34 @@ impl TryFrom<&str> for Todo {
             dependency_name = Self::static_dependency_name(&todo);
             dependencies = TodoList::read(&note_path(&dependency_name).unwrap());
         }
+        let mut done = priority_string.chars().nth(0).unwrap() == '-';
 
-        let done = priority_string.chars().nth(0).unwrap() == '-';
-        let mut priority:i8 = priority_string.parse().unwrap();
+        let priority:i8 = match priority_string.parse() {
+            Ok(value) => {
+                match value {
+                    0.. => value,
+                    any => any*-1,
+                }
+            }
+            Err(_) => 0
+        };
+        
+        let daily = if sscanf!(message.clone().as_str(), "{}[DAILY{}]", message, date_string).is_ok() {
+            if let Ok(date) = date::parse(date_string) {
+                let current_date = date::current();
+                if current_date != date {
+                    done = false
+                }
+            }
+            true
+        } else {
+            false
+        };
 
-        if done {
-            priority*=-1;
-        }
+
         Ok(Todo {
+            date_str: String::new(),
+            daily,
             removed_files: Vec::new(),
             dependency_name,
             dependencies,
@@ -103,6 +133,8 @@ impl Todo {
     #[inline]
     pub fn new(message:String, priority:i8, done: bool) -> Self {
         Todo {
+            date_str: String::new(),
+            daily: false,
             removed_files: Vec::new(),
             dependency_name: String::new(),
             note: String::new(),
@@ -174,7 +206,12 @@ impl Todo {
         else {
             " "
         };
-        format!("[{done_string}] [{}]{note_string}{}", self.priority, self.message)
+        let daily_str = if self.daily {
+            " (Daily)"
+        } else {
+            ""
+        };
+        format!("[{done_string}] [{}]{note_string}{}{daily_str}", self.priority, self.message)
     }
 
     pub fn remove_dependency(&mut self) {
@@ -221,10 +258,17 @@ impl Todo {
     }
 
     pub fn toggle_done(&mut self) {
-        self.done = !self.done;
+        self.set_done(!self.done);
+    }
+
+    pub fn toggle_daily(&mut self) {
+        self.daily = !self.daily;
     }
 
     pub fn set_done(&mut self, done:bool) {
+        if self.daily && done {
+            self.date_str = date::current_str();
+        }
         self.done = done;
     }
 
@@ -294,6 +338,8 @@ mod tests {
     fn test_try_from_string() {
         let input = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let expected = Ok(Todo {
+            date_str: String::new(),
+            daily: false,
             removed_files: Vec::new(),
             dependency_name: String::new(),
             message: "Test".to_string(),
@@ -401,6 +447,8 @@ mod tests {
         let todo = Todo::try_from(input1).unwrap();
 
         let expected = Todo {
+            date_str: String::new(),
+            daily: false,
             removed_files: Vec::new(),
             dependency_name: "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo".to_string(),
             message: "Read for exams".to_string(),
@@ -411,5 +459,28 @@ mod tests {
         };
         assert_eq!(todo, expected);
         assert_eq!(todo.dependency_path(), note_path(&"1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo".to_string()).unwrap());
+    }
+
+    #[test]
+    fn test_daily() {
+        let input = "[-2] this one should be daily [DAILY 2023-09-05]";
+        let todo = Todo::try_from(input).unwrap();
+        let expected = Todo {
+            date_str: String::new(),
+            daily: true,
+            removed_files: Vec::new(),
+            dependency_name: String::new(),
+            message: "this one should be daily".to_string(),
+            note: String::new(),
+            priority: 2,
+            dependencies: TodoList::new(),
+            done: false,
+        };
+        assert_eq!(todo, expected);
+        let input = "[2] this one should be daily [DAILY 2023-09-05]";
+        let todo = Todo::try_from(input).unwrap();
+        assert_eq!(todo, expected);
+
+        assert_eq!(todo.display(), "[ ] [2] this one should be daily (Daily)");
     }
 }

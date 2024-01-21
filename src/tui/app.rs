@@ -188,6 +188,13 @@ impl<'a>App<'a>{
     }
 
     #[inline]
+    pub fn toggle_current_daily(&mut self) {
+        if let Some(todo) = self.mut_todo() {
+            todo.toggle_daily()
+        }
+    }
+
+    #[inline]
     pub fn read(&mut self) {
         self.changed = false;
         self.todo_list = TodoList::read(&self.todo_path);
@@ -673,7 +680,8 @@ impl<'a>App<'a>{
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
-                    Char('d') | Char('x') => self.cut_todo(),
+                    Char('x') => self.cut_todo(),
+                    Char('d') => self.toggle_current_daily(),
                     Char('!') => self.toggle_show_done(),
                     Char('y') => self.yank_todo(),
                     Char('p') => self.paste_todo(),

@@ -2,6 +2,9 @@ use crossterm::{
     ExecutableCommand,
     terminal::{disable_raw_mode, LeaveAlternateScreen, enable_raw_mode, EnterAlternateScreen}
 };
+use crate::modules::potato::Potato;
+mod app;
+use app::App;
 use ratatui::{prelude::*, widgets::*};
 use std::io::{self, stdout};
 
@@ -48,4 +51,24 @@ pub fn redraw(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Resu
     terminal.clear()?;
     startup()?;
     Ok(())
+}
+
+#[inline]
+pub fn run() -> io::Result<()> {
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+
+    let mut potato_module = Potato::new(None);
+    let mut list_state = ListState::default();
+    let mut app = App::new(&mut potato_module);
+
+    loop {
+        terminal.draw(|frame| {
+            app.ui(frame, &mut list_state)
+        })?;
+
+        let should_redraw = app.update_return_should_redraw()?;
+        if should_redraw {
+            redraw(&mut terminal)?;
+        }
+    }
 }
