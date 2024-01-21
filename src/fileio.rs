@@ -1,6 +1,6 @@
 use std::fs::{File, remove_file, remove_dir};
 use std::io::{prelude::*, self};
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use home::home_dir;
 
 #[inline(always)]

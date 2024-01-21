@@ -1,12 +1,19 @@
+// vim:fileencoding=utf-8:foldmethod=marker
+// std {{{
+use std::io::{self, stdout};
+// }}}
+// lib {{{
 use crossterm::{
     ExecutableCommand,
     terminal::{disable_raw_mode, LeaveAlternateScreen, enable_raw_mode, EnterAlternateScreen}
 };
+use ratatui::{prelude::*, widgets::*};
+//}}}
+// mod {{{
 use crate::modules::potato::Potato;
 mod app;
 use app::App;
-use ratatui::{prelude::*, widgets::*};
-use std::io::{self, stdout};
+// }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
 where
