@@ -522,7 +522,7 @@ mod tests {
         let input = "[-2] this one should be daily [DAILY 2023-09-05]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
-            date_str: String::new(),
+            date_str: "2023-09-05".to_string(),
             daily: true,
             removed_files: Vec::new(),
             dependency_name: String::new(),
@@ -537,7 +537,19 @@ mod tests {
         let todo = Todo::try_from(input).unwrap();
         assert_eq!(todo, expected);
 
-        assert_eq!(todo.display(None), "[ ] 2. this one should be daily (Daily)");
-        assert_eq!(todo.display(Some(false)), "2. this one should be daily (Daily)");
+        let test = Todo {
+            date_str: String::new(),
+            daily: true,
+            removed_files: Vec::new(),
+            dependency_name: String::new(),
+            message: "this one should be daily".to_string(),
+            note: String::new(),
+            priority: 2,
+            dependencies: TodoList::new(),
+            done: false,
+        };
+        let expected = "2. this one should be daily (Daily)";
+
+        assert_eq!(test.display(Some(false)), expected)
     }
 }

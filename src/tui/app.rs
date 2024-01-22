@@ -27,7 +27,8 @@ pub enum Operation {
 pub struct App<'a>{
     todo_list: TodoList,
     index: usize,
-    todo_path: PathBuf, pub changed:bool,
+    todo_path: PathBuf,
+    pub changed:bool,
     show_right:bool,
     prior_indexes: Vec<usize>,
     text_mode: bool,
