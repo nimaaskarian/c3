@@ -59,7 +59,7 @@ impl App {
             return Ok(())
         }
         if self.args.tree {
-            Self::print_tree(&self.todo_list, self.args.show_done, 0, false)
+            Self::print_tree(&self.todo_list, self.args.show_done, 0, vec![false])
         } else {
             self.print_list()
         }
@@ -67,7 +67,7 @@ impl App {
     }
 
     #[inline]
-    pub fn print_tree(todo_list:&TodoList, show_done: bool, depth: i32, was_last: bool) {
+    pub fn print_tree(todo_list:&TodoList, show_done: bool, depth: usize, was_last: Vec<bool>) {
         let mut todos = todo_list.undone.todos.clone();
         if show_done {
             todos.extend(todo_list.done.todos.clone())
@@ -76,23 +76,24 @@ impl App {
         for (index, todo) in todos.iter().enumerate() {
             let is_last = index == todos.len() - 1;
             if depth > 0 {
-                Self::print_indentation(depth, is_last, was_last);
+                Self::print_indentation(depth, is_last, &was_last);
             }
             println!("{}", todo.display(Some(show_done)));
-            Self::print_tree(&todo.dependencies, show_done, depth+1, is_last);
+            let mut was_last_clone = was_last.clone();
+            was_last_clone.push(is_last);
+            Self::print_tree(&todo.dependencies, show_done, depth+1, was_last_clone);
         }
     }
 
     #[inline]
-    fn print_indentation(depth: i32, is_last: bool, was_last: bool) {
+    fn print_indentation(depth: usize, is_last: bool, was_last: &Vec<bool>) {
         for i in 1..depth {
-            if was_last && i == depth-1{
+            if was_last[i+1] {
                 print!("    ")
             } else {
                 print!("│   ")
             }
         }
-
         if is_last {
             print!("└── ");
         } else {

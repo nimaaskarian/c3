@@ -77,6 +77,7 @@ pub fn run() -> io::Result<()> {
         match operation {
             Operation::Restart => restart(&mut terminal)?,
             Operation::Redraw => {
+                app.fix_index();
                 terminal.draw(|frame| {
                     app.ui(frame, &mut list_state)
                 })?;

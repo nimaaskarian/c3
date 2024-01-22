@@ -51,7 +51,7 @@ impl<'a>App<'a>{
             Err(_) => None,
         };
         let todo_path = todo_path().unwrap();
-        let mut todo_list = TodoList::read(&todo_path, true);
+        let todo_list = TodoList::read(&todo_path, true);
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         App {
@@ -95,7 +95,7 @@ impl<'a>App<'a>{
             self.mut_current_list().fix_done();
         }
 
-        while self.only_undone_empty() && !self.prior_indexes.is_empty() {
+        while self.only_undone_empty() && !self.is_root() {
             self.traverse_up();
             match self.mut_todo() {
                 Some(todo) => {
@@ -149,9 +149,9 @@ impl<'a>App<'a>{
     #[inline]
     pub fn toggle_show_done(&mut self) {
         self.show_done = !self.show_done;
-        while self.only_undone_empty() && !self.prior_indexes.is_empty() {
-            self.traverse_up()
-        }
+        // while self.only_undone_empty() && !self.prior_indexes.is_empty() {
+        //     self.traverse_up()
+        // }
         self.search(None);
     }
 
@@ -208,20 +208,16 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn title(&self) -> String { let changed_str = if self.changed {
+    pub fn title(&self) -> String { 
+        let changed_str = if self.changed {
             "*"
         } else {
             ""
         };
-        let size = if self.show_done {
-            self.current_list().len()
-        } else {
-            self.current_list().undone.len()
-        };
+        let size = self.len();
         let todo_string = format!("Todos ({size}){changed_str}");
-        let depth = self.prior_indexes.len();
         
-        if depth == 0 {
+        if self.is_root() {
             todo_string
         } else {
             format!("{todo_string} {}", self.parent().unwrap().message)
@@ -289,7 +285,7 @@ impl<'a>App<'a>{
 
     #[inline]
     pub fn traverse_up(&mut self) {
-        if !self.prior_indexes.is_empty() {
+        if !self.is_root() {
             self.index = self.prior_indexes.remove(self.prior_indexes.len()-1);
         }
     }
@@ -559,11 +555,15 @@ impl<'a>App<'a>{
         Some(&self.current_list()[index])
     }
 
+    #[inline]
+    pub fn is_root(&self) -> bool {
+        self.prior_indexes.is_empty()
+    }
 
     #[inline]
     pub fn current_list(&self) -> &TodoList {
         let mut list = &self.todo_list;
-        if self.prior_indexes.len() == 0 {
+        if self.is_root() {
             return list;
         }
         for index in self.prior_indexes.iter() {
@@ -589,8 +589,9 @@ impl<'a>App<'a>{
     #[inline]
     pub fn mut_current_list(&mut self) -> &mut TodoList {
         self.changed = true;
+        let is_root = self.is_root();
         let mut list = &mut self.todo_list;
-        if self.prior_indexes.len() == 0 {
+        if  is_root{
             return list;
         }
         for index in self.prior_indexes.iter() {
@@ -722,7 +723,12 @@ impl<'a>App<'a>{
                     }
                     Char('R') => self.read(),
                     Char('T') => self.remove_current_dependent(),
-                    KeyCode::Enter => self.toggle_current_done(),
+                    KeyCode::Enter => {
+                        self.toggle_current_done();
+                        if !self.show_done {
+                            return Ok(Operation::Redraw)
+                        }
+                    },
                     Char('n') => self.search_next(),
                     Char('N') => self.search_prev(),
                     Char('a') => self.prepend_prompt(),
