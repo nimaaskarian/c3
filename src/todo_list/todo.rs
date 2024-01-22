@@ -140,13 +140,13 @@ impl TryFrom<&str> for Todo {
 impl Todo {
     #[inline]
     pub fn default(message:String, priority:i8) -> Self {
-        Self::new(message, priority, false)
+        Self::new(message, priority, false, None)
     }
 
     #[inline]
-    pub fn new(message:String, priority:i8, done: bool) -> Self {
+    pub fn new(message:String, priority:i8, done: bool, todo_dir: Option<PathBuf>) -> Self {
         Todo {
-            todo_dir: None,
+            todo_dir,
             date_str: String::new(),
             daily: false,
             removed_files: Vec::new(),
@@ -157,6 +157,10 @@ impl Todo {
             priority: Todo::fixed_priority(priority),
             done,
         }
+    }
+
+    pub fn set_dir(&mut self, dir: PathBuf) {
+        self.todo_dir = Some(dir);
     }
 
     fn static_dependency_name(name:&String) -> String {

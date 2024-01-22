@@ -25,6 +25,10 @@ struct Args {
     /// Write contents of todo file in the stdout
     #[arg(short='s', long)]
     stdout: bool,
+
+    /// Write contents of todo file in the stdout
+    #[arg(short='p', long)]
+    todo_path: Option<PathBuf>,
 }
 pub struct App {
     todo_list: TodoList,
@@ -36,9 +40,14 @@ impl App {
 
     #[inline]
     pub fn new() -> Self {
-        let todo_path = todo_path().unwrap();
         let args = Args::parse();
-        let todo_list = TodoList::read(&todo_path, args.tree);
+        let todo_list = match &args.todo_path {
+            Some(value) => TodoList::read(value, args.tree),
+            None => {
+                let todo_path = todo_path().unwrap();
+                TodoList::read(&todo_path, args.tree)
+            }
+        };
         App {
             args,
             todo_list,
