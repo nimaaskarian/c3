@@ -10,9 +10,10 @@ use crossterm::{
 use ratatui::{prelude::*, widgets::*};
 //}}}
 // mod {{{
-use crate::modules::potato::Potato;
 mod app;
 use app::{App, Operation};
+pub mod modules;
+use modules::potato::Potato;
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 

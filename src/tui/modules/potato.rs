@@ -1,7 +1,7 @@
 use ratatui::widgets::Paragraph;
 use std::io;
 use std::process::{Command, Output};
-use crate::modules::Module;
+use crate::tui::modules::Module;
 use crate::tui::default_block;
 
 pub struct Potato<'a>{

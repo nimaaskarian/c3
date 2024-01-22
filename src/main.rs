@@ -5,7 +5,6 @@ use std::io::{self};
 //mod{{{
 pub mod todo_list;
 pub mod fileio;
-mod modules;
 mod tui;
 mod cli;
 //}}}

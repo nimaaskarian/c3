@@ -9,11 +9,10 @@ use ratatui::{prelude::*, widgets::*};
 use crossterm::event::{self, Event::Key, KeyCode::Char, KeyCode};
 // }}}
 // mod {{{
-use crate::tui::{default_block, create_todo_widget, TodoWidget, shutdown};
+use crate::tui::{default_block, create_todo_widget, TodoWidget, shutdown, modules::Module};
 use crate::fileio::todo_path;
 use crate::todo_list::TodoList;
 use crate::todo_list::todo::Todo;
-use crate::modules::Module;
 //}}}
 
 
@@ -761,12 +760,12 @@ impl<'a>App<'a>{
         list_state.select(Some(self.index));
 
         let note = match (todo, self.show_right) {
-            (Some(todo), true)  => todo.get_note(),
+            (Some(todo), true)  => todo.get_note_content(),
             _ => String::new(),
         };
 
         let dependency_width = if let Some(todo) = todo {
-            let should_show_right = (todo.has_dependency() || !todo.get_note().is_empty()) && self.show_right;
+            let should_show_right = (todo.has_dependency() || !todo.get_note_content().is_empty()) && self.show_right;
             40 * (should_show_right as u16)
         } else {
             0
@@ -816,7 +815,7 @@ impl<'a>App<'a>{
         
         if todo.is_some() && self.show_right{
             let todo = todo.unwrap();
-            if !todo.get_note().is_empty(){
+            if !todo.get_note_content().is_empty(){
                 let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
                 frame.render_widget(note_widget, todos_layout[1]);
             } else

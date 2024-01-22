@@ -16,6 +16,7 @@ use super::TodoList;
 
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Todo {
+    todo_dir: Option<PathBuf>,
     pub message: String,
     note: String,
     priority: i8,
@@ -80,10 +81,7 @@ impl TryFrom<&str> for Todo {
                 }
             }
         }
-        // let read_dependency = match read_dependency {
-        //     Some(value) => value,
-        //     _ => true,
-        // }
+
         let mut dependency_name = String::new();
         let dependencies = TodoList::new();
         if todo != "" {
@@ -125,6 +123,7 @@ impl TryFrom<&str> for Todo {
 
 
         Ok(Todo {
+            todo_dir: None,
             date_str,
             daily,
             removed_files: Vec::new(),
@@ -147,6 +146,7 @@ impl Todo {
     #[inline]
     pub fn new(message:String, priority:i8, done: bool) -> Self {
         Todo {
+            todo_dir: None,
             date_str: String::new(),
             daily: false,
             removed_files: Vec::new(),
@@ -163,18 +163,30 @@ impl Todo {
         format!("{name}.todo")
     }
 
-    pub fn dependency_path(&self) -> PathBuf {
-        note_path(&self.dependency_name).unwrap()
+    pub fn dependency_dir(&self) -> Option<PathBuf> {
+        if let Some(todo_dir) = &self.todo_dir {
+            Some(todo_dir.clone().join("notes"))
+        } else {
+            None
+        }
+    }
+
+    pub fn dependency_path(&self) -> Option<PathBuf> {
+        note_path(&self.dependency_name, self.dependency_dir()).unwrap()
     }
 
     pub fn remove_note(&mut self) {
-        self.removed_files.push(note_path(&self.note).unwrap());
+        if let Some(path) = self.dependency_path() {
+            self.removed_files.push(path);
+        }
         self.note = String::new();
     }
 
     #[inline]
     pub fn read_dependencies(&mut self) {
-        self.dependencies = TodoList::read(&note_path(&self.dependency_name).unwrap(), true);
+        if let Some(path) = self.dependency_path() {
+            self.dependencies = TodoList::read(&path, true);
+        }
     }
 
     pub fn note_empty(&self) -> bool {
@@ -187,11 +199,14 @@ impl Todo {
         }
         let _ = self.remove_note();
         self.dependency_name = Self::static_dependency_name(&self.hash());
-        if File::create(self.dependency_path()).is_err() {
-            return Err(TodoError::DependencyCreationFailed)
+        if let Some(path) = self.dependency_path() {
+            if File::create(&path).is_err() {
+                return Err(TodoError::DependencyCreationFailed)
+            }
+
+            self.dependencies = TodoList::read(&path, true);
         }
 
-        self.dependencies = TodoList::read(&self.dependency_path(), true);
         Ok(())
     }
 
@@ -257,13 +272,15 @@ impl Todo {
     }
 
     pub fn remove_dependency(&mut self) {
-        self.removed_files.push(self.dependency_path());
+        if let Some(path) = self.dependency_path() {
+            self.removed_files.push(path);
+        }
         self.dependency_name = String::new();
         self.dependencies = TodoList::new();
     }
 
     pub fn add_note(&mut self)-> io::Result<()>{
-        let note = Note::from_editor()?;
+        let note = Note::from_editor(self.dependency_dir())?;
 
         self.set_note(note)?;
         Ok(())
@@ -277,18 +294,20 @@ impl Todo {
     }
 
     pub fn edit_note(&mut self)-> io::Result<()>{
-        let mut note = Note::from_hash(&self.note)?;
-        note.edit_with_editor()?;
-        self.note = note.hash();
-        note.save().expect("Note saving failed");
+        // let mut note = 
+        if let Some(mut note) = Note::from_hash(&self.note, self.dependency_dir())? {
+            note.edit_with_editor()?;
+            self.note = note.hash();
+            note.save().expect("Note saving failed");
+        }
         Ok(())
     }
 
     #[inline]
-    pub fn get_note(&self) -> String {
-        match Note::from_hash(&self.note) {
-            Err(_) => return String::new(),
-            Ok(note) => note.content()
+    pub fn get_note_content(&self) -> String {
+        match Note::from_hash(&self.note, self.dependency_dir()) {
+            Ok(Some(note)) => note.content(),
+            _ => return String::new(),
         }
     }
 
@@ -382,7 +401,7 @@ mod tests {
     #[test]
     fn test_todo_into_string() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        todo.set_note(Note::new("Note".to_string()));
+        todo.set_note(Note::new("Note".to_string(), None));
 
         let expected = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let result: String = (&todo).into();
@@ -394,6 +413,7 @@ mod tests {
     fn test_try_from_string() {
         let input = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let expected = Ok(Todo {
+            todo_dir: None,
             date_str: String::new(),
             daily: false,
             removed_files: Vec::new(),
@@ -440,7 +460,7 @@ mod tests {
         let name = "my_dep".to_string();
         let expected = PathBuf::from(append_home_dir(".local/share/calcurse/notes/my_dep.todo"));
 
-        let result = note_path(&Todo::static_dependency_name(&name)).unwrap();
+        let result = note_path(&Todo::static_dependency_name(&name), None).unwrap().unwrap();
 
         assert_eq!(result, expected);
     }
@@ -460,7 +480,7 @@ mod tests {
     #[test]
     fn test_remove_note() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        todo.set_note(Note::new("Note".to_string())).expect("Error setting note");
+        todo.set_note(Note::new("Note".to_string(), None)).expect("Error setting note");
 
         todo.remove_note();
 
@@ -503,6 +523,7 @@ mod tests {
         let todo = Todo::try_from(input1).unwrap();
 
         let expected = Todo {
+            todo_dir: None,
             date_str: String::new(),
             daily: false,
             removed_files: Vec::new(),
@@ -514,7 +535,7 @@ mod tests {
             done: false,
         };
         assert_eq!(todo, expected);
-        assert_eq!(todo.dependency_path(), note_path(&"1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo".to_string()).unwrap());
+        assert_eq!(todo.dependency_path(), note_path(&"1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo".to_string(), None).unwrap());
     }
 
     #[test]
@@ -522,6 +543,7 @@ mod tests {
         let input = "[-2] this one should be daily [DAILY 2023-09-05]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
+            todo_dir: None,
             date_str: "2023-09-05".to_string(),
             daily: true,
             removed_files: Vec::new(),
@@ -538,6 +560,7 @@ mod tests {
         assert_eq!(todo, expected);
 
         let test = Todo {
+            todo_dir: None,
             date_str: String::new(),
             daily: true,
             removed_files: Vec::new(),

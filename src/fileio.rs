@@ -9,13 +9,23 @@ pub fn append_home_dir(str:&str) -> PathBuf {
 }
 
 #[inline(always)]
-pub fn note_path(hash:&String) -> io::Result<PathBuf> {
-    let dir = append_home_dir(".local/share/calcurse/notes");
-    if dir.is_file() {
-        remove_file(dir.clone())?;
+pub fn note_path(hash:&String, parent_dir: Option<PathBuf>) -> io::Result<Option<PathBuf>> {
+    if hash.is_empty() {
+        return Ok(None)
     }
-    let _ = std::fs::create_dir_all(dir.clone());
-    Ok(dir.join(hash))
+    let parent_dir = match parent_dir {
+        Some(value) => value,
+        None => {
+            let dir = append_home_dir(".local/share/calcurse/notes");
+            if dir.is_file() {
+                remove_file(dir.clone())?;
+            }
+            let _ = std::fs::create_dir_all(dir.clone());
+            dir
+        }
+    };
+    Ok(Some(parent_dir.join(hash)))
+
 }
 
 #[inline(always)]

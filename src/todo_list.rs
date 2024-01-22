@@ -300,7 +300,9 @@ impl TodoList {
     fn remove_dependent_files(&mut self) -> io::Result<()> {
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
-            let _ = todo.dependencies.write(&todo.dependency_path());
+            if let Some(path) = &todo.dependency_path() {
+                let _ = todo.dependencies.write(path);
+            }
             todo.remove_dependent_files()?;
         }
         Ok(())

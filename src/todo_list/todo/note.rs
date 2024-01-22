@@ -9,6 +9,7 @@ use crate::fileio::{note_path, temp_note_path, file_content};
 pub struct Note {
     content: String,
     hash: String,
+    parent_dir: Option<PathBuf>,
 }
 
 #[inline(always)]
@@ -30,44 +31,54 @@ pub fn open_temp_editor(content:String, path:&PathBuf) -> io::Result<String>{
 }
 
 impl Note {
-    pub fn from_editor()-> io::Result<Self> {
+    pub fn new(content:String, parent_dir: Option<PathBuf>)-> Self {
+        let hash = sha1(&content);
+
+        Note {
+            content,
+            hash,
+            parent_dir,
+        }
+    }
+
+    pub fn from_editor(parent_dir: Option<PathBuf>)-> io::Result<Self> {
 
         let content = open_temp_editor(String::new(), &temp_note_path())?;
 
-        Ok(Note::new(content))
+        Ok(Note::new(content, parent_dir))
     }
 
     pub fn content(&self) -> String {
         self.content.clone()
     }
 
-    pub fn from_hash(hash:&String) -> io::Result<Self> {
-        let content = file_content(&note_path(&hash).expect("Unable to get the note's path."))?;
-        Ok(Note::new(content))
-    }
-
-    fn path(&self) -> PathBuf {
-        note_path(&self.hash).expect("Unable to get the note's path.")
-    }
-
-    pub fn new(content:String)-> Self {
-        let hash = sha1(&content);
-
-        Note {
-            content,
-            hash,
+    pub fn from_hash(hash:&String, parent_dir: Option<PathBuf>) -> io::Result<Option<Self>> {
+        if let Some(path) = note_path(&hash, parent_dir.clone())? {
+            let content = file_content(&path)?;
+            return Ok(Some(Note::new(content, parent_dir)))
         }
+        Ok(None)
     }
+
+    fn path(&self) -> Option<PathBuf> {
+        note_path(&self.hash, self.parent_dir.clone()).expect("Unable to get the note's path.")
+    }
+
 
     pub fn save(&self) -> io::Result<()> {
-        let mut file = File::create(self.path().as_os_str())?;
-        file.write_all(self.content.as_bytes())?;
+        if let Some(path) = self.path() {
+            let mut file = File::create(path.as_os_str())?;
+            file.write_all(self.content.as_bytes())?;
+        }
 
         Ok(())
     }
 
-    pub fn remove_file(&self) {
-        remove_file(self.path()).unwrap();
+    pub fn remove_file(&self) -> io::Result<()>{
+        if let Some(path) = self.path() {
+            remove_file(path)?;
+        }
+        Ok(())
     }
 
     pub fn edit_with_editor(&mut self) -> io::Result<()> {
