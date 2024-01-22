@@ -17,6 +17,13 @@ use crate::modules::Module;
 //}}}
 
 
+#[derive(Debug)]
+pub enum Operation {
+    Nothing,
+    Restart,
+    Redraw,
+}
+
 pub struct App<'a>{
     todo_list: TodoList,
     index: usize,
@@ -472,11 +479,10 @@ impl<'a>App<'a>{
             if let Ok(text) = clipboard.get_text() {
                 match Todo::try_from(text) {
                     Ok(todo) => {
-                        let size = self.len();
+                        let bottom = self.bottom();
                         let list = &mut self.mut_current_list();
                         list.push(todo);
-
-                        self.index = list.reorder(size-1);
+                        self.index = list.reorder(bottom);
                     },
                     _ => {},
                 };
@@ -618,7 +624,7 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn update_editor(&mut self)  -> io::Result<bool> {
+    pub fn update_editor(&mut self)  -> io::Result<Operation> {
         if self.module_enabled {
             if event::poll(std::time::Duration::from_millis(500))? {
                 self.enable_text_editor()?
@@ -626,7 +632,7 @@ impl<'a>App<'a>{
         } else {
             self.enable_text_editor()?
         }
-        Ok(false)
+        Ok(Operation::Nothing)
     }
 
     #[inline]
@@ -654,19 +660,19 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn update_return_should_redraw(&mut self) -> io::Result<bool>{
+    pub fn update_return_operation(&mut self) -> io::Result<Operation>{
         if self.text_mode {
             return self.update_editor();
         } else {
             self.fix_index();
             self.update_no_editor()?;
         }
-        Ok(false)
+        Ok(Operation::Nothing)
     }
 
 
     #[inline]
-    fn update_no_editor(&mut self) -> io::Result<bool> {
+    fn update_no_editor(&mut self) -> io::Result<Operation> {
         if self.module_enabled {
             if event::poll(std::time::Duration::from_millis(500))? {
                 return self.read_keys();
@@ -674,15 +680,18 @@ impl<'a>App<'a>{
         } else {
             return self.read_keys();
         }
-        Ok(false)
+        Ok(Operation::Nothing)
     }
 
     #[inline]
-    fn read_keys(&mut self)  -> io::Result<bool> {
+    fn read_keys(&mut self)  -> io::Result<Operation> {
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
-                    Char('x') => self.cut_todo(),
+                    Char('x') => {
+                        self.cut_todo();
+                        return Ok(Operation::Redraw)
+                    }
                     Char('d') => self.toggle_current_daily(),
                     Char('!') => self.toggle_show_done(),
                     Char('y') => self.yank_todo(),
@@ -704,10 +713,13 @@ impl<'a>App<'a>{
                     },
                     Char('>') => {
                         self.edit_or_add_note();
-                        return Ok(true)
+                        return Ok(Operation::Restart)
                     },
                     Char('t') => self.add_dependency(),
-                    Char('D') => self.delete_todo(),
+                    Char('D') => {
+                        self.delete_todo();
+                        return Ok(Operation::Redraw)
+                    }
                     Char('R') => self.read(),
                     Char('T') => self.remove_current_dependent(),
                     KeyCode::Enter => self.toggle_current_done(),
@@ -733,7 +745,7 @@ impl<'a>App<'a>{
                 }
             }
         }
-        Ok(false)
+        Ok(Operation::Nothing)
     }
 
     pub fn ui(&self, frame:&mut Frame, list_state: &mut ListState) {

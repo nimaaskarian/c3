@@ -12,7 +12,7 @@ use ratatui::{prelude::*, widgets::*};
 // mod {{{
 use crate::modules::potato::Potato;
 mod app;
-use app::App;
+use app::{App, Operation};
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
@@ -54,7 +54,7 @@ pub fn startup() -> io::Result<()> {
 }
 
 #[inline]
-pub fn redraw(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
     terminal.clear()?;
     startup()?;
     Ok(())
@@ -73,9 +73,15 @@ pub fn run() -> io::Result<()> {
             app.ui(frame, &mut list_state)
         })?;
 
-        let should_redraw = app.update_return_should_redraw()?;
-        if should_redraw {
-            redraw(&mut terminal)?;
+        let operation = app.update_return_operation()?;
+        match operation {
+            Operation::Restart => restart(&mut terminal)?,
+            Operation::Redraw => {
+                terminal.draw(|frame| {
+                    app.ui(frame, &mut list_state)
+                })?;
+            }
+            Operation::Nothing =>{},
         }
     }
 }
