@@ -20,10 +20,10 @@ pub fn note_path(hash:&String, parent_dir: Option<PathBuf>) -> io::Result<Option
             if dir.is_file() {
                 remove_file(dir.clone())?;
             }
-            let _ = std::fs::create_dir_all(dir.clone());
             dir
         }
     };
+    let _ = std::fs::create_dir_all(parent_dir.clone());
     Ok(Some(parent_dir.join(hash)))
 
 }

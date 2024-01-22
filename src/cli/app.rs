@@ -1,46 +1,18 @@
 use std::io;
-use std::path::PathBuf;
 
 use crate::fileio::todo_path;
 use crate::todo_list::TodoList;
-use clap::Parser;
+use crate::Args;
 
-
-/// A tree-like todo application that makes you smile
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// Show a tree like output
-    #[arg(short, long)]
-    tree: bool,
-
-    /// Show list of todos
-    #[arg(short, long, default_value_t = true)]
-    list: bool,
-
-    /// Show done todos too
-    #[arg(short='d', long)]
-    show_done: bool,
-
-    /// Write contents of todo file in the stdout
-    #[arg(short='s', long)]
-    stdout: bool,
-
-    /// Write contents of todo file in the stdout
-    #[arg(short='p', long)]
-    todo_path: Option<PathBuf>,
-}
 pub struct App {
     todo_list: TodoList,
     args: Args,
 }
 
-
 impl App {
 
     #[inline]
-    pub fn new() -> Self {
-        let args = Args::parse();
+    pub fn new(args: Args) -> Self {
         let todo_list = match &args.todo_path {
             Some(value) => TodoList::read(value, args.tree),
             None => {

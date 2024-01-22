@@ -13,6 +13,7 @@ use crate::tui::{default_block, create_todo_widget, TodoWidget, shutdown, module
 use crate::fileio::todo_path;
 use crate::todo_list::TodoList;
 use crate::todo_list::todo::Todo;
+use crate::Args;
 //}}}
 
 
@@ -45,12 +46,15 @@ pub struct App<'a>{
 impl<'a>App<'a>{
 
     #[inline]
-    pub fn new(module: &'a mut dyn Module<'a>) -> Self {
+    pub fn new(args:Args,module: &'a mut dyn Module<'a>) -> Self {
         let clipboard = match Clipboard::new() {
             Ok(some) => Some(some),
             Err(_) => None,
         };
-        let todo_path = todo_path().unwrap();
+        let todo_path = match args.todo_path {
+            Some(path) => path,
+            None => todo_path().unwrap(),
+        };
         let todo_list = TodoList::read(&todo_path, true);
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
@@ -59,7 +63,7 @@ impl<'a>App<'a>{
             module,
             last_query: String::new(),
             search_index: 0,
-            show_done: false,
+            show_done: args.show_done,
             clipboard,
             on_submit: None,
             todo_list,

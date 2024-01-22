@@ -8,6 +8,7 @@ use crossterm::{
     terminal::{disable_raw_mode, LeaveAlternateScreen, enable_raw_mode, EnterAlternateScreen}
 };
 use ratatui::{prelude::*, widgets::*};
+use crate::Args;
 //}}}
 // mod {{{
 mod app;
@@ -62,12 +63,12 @@ pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Res
 }
 
 #[inline]
-pub fn run() -> io::Result<()> {
+pub fn run(args: Args) -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut potato_module = Potato::new(None);
     let mut list_state = ListState::default();
-    let mut app = App::new(&mut potato_module);
+    let mut app = App::new(args, &mut potato_module);
 
     loop {
         terminal.draw(|frame| {
