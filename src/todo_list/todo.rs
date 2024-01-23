@@ -189,7 +189,11 @@ impl Todo {
     #[inline]
     pub fn read_dependencies(&mut self) {
         if let Some(path) = self.dependency_path() {
-            self.dependencies = TodoList::read(&path, true);
+            self.dependencies = if let Some(dir) = &self.todo_dir {
+                TodoList::read(&path, true, &dir)
+            } else {
+                TodoList::read(&path, true, &path.parent().unwrap().to_path_buf())
+            };
         }
     }
 
@@ -208,7 +212,7 @@ impl Todo {
                 return Err(TodoError::DependencyCreationFailed)
             }
 
-            self.dependencies = TodoList::read(&path, true);
+            self.dependencies = TodoList::read(&path, true, &path.parent().unwrap().to_path_buf());
         }
 
         Ok(())

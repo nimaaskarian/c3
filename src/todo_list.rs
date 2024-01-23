@@ -219,7 +219,7 @@ impl TodoList {
         display_list
     }
 
-    pub fn read (filename: &PathBuf, read_dependencies: bool) -> Self{
+    pub fn read (filename: &PathBuf, read_dependencies: bool, parent_dir: &PathBuf) -> Self{
         let mut todo_list = Self::new();
         if !filename.is_file() {
             return todo_list
@@ -229,7 +229,7 @@ impl TodoList {
                 Ok(value) => value,
                 Err(..) => continue,
             };
-            todo.set_dir(filename.parent().unwrap().clone().to_path_buf());
+            todo.set_dir(parent_dir.clone());
             todo_list.push(todo)
         }
         todo_list.undone.sort();
@@ -333,7 +333,7 @@ mod tests {
 
     fn get_todo_list() -> TodoList {
         let path = PathBuf::from("tests/TODO_LIST");
-        TodoList::read(&path, true)
+        TodoList::read(&path, true, &path.parent().unwrap().clone().to_path_buf())
     }
 
     #[test]

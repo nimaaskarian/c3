@@ -54,7 +54,7 @@ impl<'a>App<'a>{
             Some(path) => path,
             None => todo_path().unwrap(),
         };
-        let todo_list = TodoList::read(&todo_path, true);
+        let todo_list = TodoList::read(&todo_path, true, &todo_path.parent().unwrap().clone().to_path_buf());
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         App {
@@ -209,7 +209,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = TodoList::read(&self.todo_path, true);
+        self.todo_list = TodoList::read(&self.todo_path, true, &self.todo_path.parent().unwrap().clone().to_path_buf());
     }
 
     #[inline]
@@ -232,13 +232,10 @@ impl<'a>App<'a>{
     #[inline]
     pub fn fix_index(&mut self) {
         let size = self.len();
-        let mut file = File::create("log").unwrap();
-        writeln!(file, "{}", self.index);
         self.index = match size {
             0 => 0,
             _ => self.index.min(size-1),
         };
-        writeln!(file, "{}", self.index);
     }
 
     #[inline]
