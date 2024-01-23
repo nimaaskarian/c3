@@ -8,25 +8,30 @@ A crossplatform to-do list app that uses and extends [calcurse](https://www.calc
 
 [Getting started](#getting-started) •
 [Installation](#installation) •
-[Usage](#configuration)
+[Usage](#usage)
 </div>
 
 
 ## Installation
 ### Compiling it yourself
-You can simply compile this like any rust application with the command below
+You can simply compile this like any rust application with the commands below
 ```bash
 git clone https://github.com/nimaaskarian/c3
 cd c3
 cargo build --release
+sudo cp target/release/c3 /usr/bin/
 ```
 
-If you use **Arch linux**, You can install c3 from AUR. Commands using yay would be
+If you use **Arch linux**, You can install [c3 from AUR](https://aur.archlinux.org/packages/c3). Installation using yay would be
 ```bash
 yay -S c3
 ```
 ### Using a pre-built release
 You can check out [releases](https://github.com/nimaaskarian/c3/releases).
+Also if you use **Arch linux**, you can install a pre-built binary [from AUR](https://aur.archlinux.org/packages/c3-bin). Installation using yay would be
+```bash
+yay -S c3-bin
+```
 
 ## Usage
 ### Interactive mode
@@ -68,3 +73,5 @@ A very simple example has been done by default for [potato-c](https://github.com
 
 Keybinds that modules can use are **space, H, L, comma, period, +, -, s, r**
 
+### Non interactive mode
+For command line arguments and such, run `c3 -h` to see full usage.
