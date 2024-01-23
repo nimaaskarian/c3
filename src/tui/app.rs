@@ -1,6 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std{{{
-use std::{io::{self}, path::PathBuf};
+use std::{io::{self, Write}, path::PathBuf, fs::File};
 //}}}
 // lib{{{
 use tui_textarea::{Input, TextArea, CursorMove};
@@ -21,7 +21,6 @@ use crate::Args;
 pub enum Operation {
     Nothing,
     Restart,
-    Redraw,
 }
 
 pub struct App<'a>{
@@ -190,12 +189,14 @@ impl<'a>App<'a>{
         let was_done = self.todo().unwrap().done();
         self.mut_todo().unwrap().toggle_done();
         self.fix_done_undone();
-        let index = if was_done {
-            self.current_list().undone.len()-1
-        } else {
-            self.current_list().len()-1
-        };
-        self.index = self.mut_current_list().reorder(index);
+        if self.show_done {
+            let index = if was_done {
+                self.current_list().undone.len()-1
+            } else {
+                self.current_list().len()-1
+            };
+            self.index = self.mut_current_list().reorder(index);
+        }
     }
 
     #[inline]
@@ -231,10 +232,13 @@ impl<'a>App<'a>{
     #[inline]
     pub fn fix_index(&mut self) {
         let size = self.len();
+        let mut file = File::create("log").unwrap();
+        writeln!(file, "{}", self.index);
         self.index = match size {
             0 => 0,
             _ => self.index.min(size-1),
         };
+        writeln!(file, "{}", self.index);
     }
 
     #[inline]
@@ -669,8 +673,8 @@ impl<'a>App<'a>{
         if self.text_mode {
             return self.update_editor();
         } else {
-            self.fix_index();
             self.update_no_editor()?;
+            self.fix_index();
         }
         Ok(Operation::Nothing)
     }
@@ -693,10 +697,7 @@ impl<'a>App<'a>{
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
-                    Char('x') => {
-                        self.cut_todo();
-                        return Ok(Operation::Redraw)
-                    }
+                    Char('x') => self.cut_todo(),
                     Char('d') => self.toggle_current_daily(),
                     Char('!') => self.toggle_show_done(),
                     Char('y') => self.yank_todo(),
@@ -723,16 +724,10 @@ impl<'a>App<'a>{
                     Char('t') => self.add_dependency(),
                     Char('D') => {
                         self.delete_todo();
-                        return Ok(Operation::Redraw)
                     }
                     Char('R') => self.read(),
                     Char('T') => self.remove_current_dependent(),
-                    KeyCode::Enter => {
-                        self.toggle_current_done();
-                        if !self.show_done {
-                            return Ok(Operation::Redraw)
-                        }
-                    },
+                    KeyCode::Enter => self.toggle_current_done(),
                     Char('n') => self.search_next(),
                     Char('N') => self.search_prev(),
                     Char('a') => self.prepend_prompt(),

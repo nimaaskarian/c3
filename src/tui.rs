@@ -78,12 +78,6 @@ pub fn run(args: Args) -> io::Result<()> {
         let operation = app.update_return_operation()?;
         match operation {
             Operation::Restart => restart(&mut terminal)?,
-            Operation::Redraw => {
-                app.fix_index();
-                terminal.draw(|frame| {
-                    app.ui(frame, &mut list_state)
-                })?;
-            }
             Operation::Nothing =>{},
         }
     }

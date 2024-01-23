@@ -8,8 +8,7 @@ A crossplatform to-do list app that uses and extends [calcurse](https://www.calc
 
 [Getting started](#getting-started) •
 [Installation](#installation) •
-[Configuration](#configuration) •
-[Integrations](#third-party-integrations)
+[Usage](#configuration)
 </div>
 
 
@@ -22,9 +21,50 @@ cd c3
 cargo build --release
 ```
 
-If you use arch linux, You can install c3 from AUR. Commands using yay would be
-```
+If you use **Arch linux**, You can install c3 from AUR. Commands using yay would be
+```bash
 yay -S c3
 ```
 ### Using a pre-built release
-You can check out [releases](https://github.com/nimaaskarian/c3/releases)
+You can check out [releases](https://github.com/nimaaskarian/c3/releases).
+
+## Usage
+### Interactive mode
+The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
+
+| key | action |
+|---|---|
+| a | add todo to bottom|
+| A | add todo to top|
+| e | edit todo |
+| E | edit todo (move cursor to start) |
+| ! | toggle show done |
+| 0-9 | set todo priority |
+| j | go down in todo list |
+| k | go up in todo list |
+| g | go top of todo list |
+| G | go bottom of todo list |
+| J | increase todo priority |
+| K | decrease todo priority |
+| d | toggle daily |
+| D | delete todo |
+| > | add todo note |
+| t | add todo dependency |
+| l | go in depedency/add todo dependency |
+| h | go back to parent |
+| T | delete todo dependency/note |
+| x | cut todo to clipboard |
+| y | yank todo to clipboard |
+| p | paste todo from clipboard |
+| P | enable module |
+| / | search todo |
+| n | search next |
+| N | search previous |
+| w | write changes to file |
+| R | read from file (discard changes)|
+#### Modules
+TUI mode has a section called module. You can develop modules, and assign methods to Module trait methods.
+A very simple example has been done by default for [potato-c](https://github.com/nimaaskarian/potato-c).
+
+Keybinds that modules can use are **space, H, L, comma, period, +, -, s, r**
+
