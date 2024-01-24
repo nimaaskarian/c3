@@ -345,13 +345,17 @@ mod tests {
     }
 
     #[test]
-    fn test_todolist_read() {
+    fn test_todolist_read_undone() {
         let todo_list = get_todo_list();
-        let path = Some(PathBuf::from("tests"));
         let expected_undone = vec![Todo::new("this todo has prio 1".to_string(), 1,false, None)
             ,Todo::new("this one has prio 2".to_string(), 2, false ,None)];
-        let expected_done = vec![Todo::new("this one is 2 and done".to_string(), 2, true, None),Todo::new("this one is 0 and done".to_string(), 0, true, None)];
         assert_eq!(expected_undone, todo_list.undone.todos);
+    }
+
+    #[test]
+    fn test_todolist_read_done() {
+        let todo_list = get_todo_list();
+        let expected_done = vec![Todo::new("this one is 2 and done".to_string(), 2, true, None),Todo::new("this one is 0 and done".to_string(), 0, true, None)];
         assert_eq!(expected_done, todo_list.done.todos);
     }
 

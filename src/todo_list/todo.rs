@@ -1,6 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
-use std::{io::{self}, path::PathBuf, fs::{File, remove_file}};
+use std::{io::{self, Write}, path::PathBuf, fs::{File, remove_file}};
 use chrono::Duration;
 //}}}
 // lib{{{
@@ -9,19 +9,29 @@ use scanf::sscanf;
 // mod{{{
 mod note;
 mod date;
-use crate::fileio::note_path;
-use note::{Note, sha1};
+use crate::fileio::{note_path, temp_note_path};
+use note::{sha1, open_temp_editor};
+
 use super::TodoList;
 //}}}
 
 #[derive(Debug, PartialEq, Clone, Default)]
+enum DependencyType {
+    #[default]
+    None,
+    TodoList,
+    Note,
+}
+
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Todo {
     todo_dir: Option<PathBuf>,
-    pub message: String,
     note: String,
+    pub message: String,
     priority: i8,
     pub dependencies: TodoList,
     dependency_name: String,
+    dependency_type: DependencyType,
     done:bool,
     removed_files: Vec<PathBuf>,
     daily: bool,
@@ -31,14 +41,19 @@ pub struct Todo {
 impl Into<String> for &Todo {
     fn into(self) -> String{
         let done_str = if self.done() {"-"} else {""};
-        let note_str = if self.has_dependency() {
-            format!(">{}", self.dependency_name)
-        } else {
-            match self.note.as_str() {
-                "" => String::new(),
-                _ => format!(">{}", self.note),
-            }
+        let note_str = match self.dependency_type {
+            DependencyType::None => String::new(),
+            DependencyType::TodoList| DependencyType::Note => format!(">{}", self.dependency_name),
+
         };
+        // let note_str = if self.has_dependency() {
+        //     format!(">{}", self.dependency_name)
+        // } else {
+        //     match self.note.as_str() {
+        //         "" => String::new(),
+        //         _ => format!(">{}", self.note),
+        //     }
+        // };
         let daily_str = if self.daily {
             format!(" [DAILY {}]", self.date_str)
         } else {
@@ -69,24 +84,30 @@ impl TryFrom<&str> for Todo {
 
     fn try_from(input:&str) -> Result<Todo, TodoError>{
         let mut message = String::new();
-        let mut note = String::new();
-        let mut todo = String::new();
         let mut date_string = String::new();
         let mut priority_string:String = String::new();
+        let mut dependency_type = DependencyType::None;
+        let mut dependency_name = String::new();
 
-        if sscanf!(input,"[{}]>{}.todo {}", priority_string, todo, message).is_err() {
-            if sscanf!(input,"[{}]>{} {}", priority_string, note, message).is_err() {
+        if sscanf!(input,"[{}]>{}.todo {}", priority_string, dependency_name, message).is_err() {
+            if sscanf!(input,"[{}]>{} {}", priority_string, dependency_name, message).is_err() {
                 if sscanf!(input,"[{}] {}", priority_string, message).is_err() {
                     return Err(TodoError::ReadFailed);
                 }
             }
+        } else {
+            dependency_type = DependencyType::TodoList;
         }
 
-        let mut dependency_name = String::new();
-        let dependencies = TodoList::new();
-        if todo != "" {
-            dependency_name = Self::static_dependency_name(&todo);
+        if dependency_type == DependencyType::None && !dependency_name.is_empty() {
+            dependency_type = DependencyType::Note;
         }
+        let dependencies = TodoList::new();
+        let dependency_name = match dependency_type {
+            DependencyType::None => String::new(),
+            DependencyType::TodoList => Self::static_dependency_name(&dependency_name),
+            DependencyType::Note => dependency_name,
+        };
         let mut done = priority_string.chars().nth(0).unwrap() == '-';
 
         let priority:i8 = match priority_string.parse() {
@@ -123,6 +144,8 @@ impl TryFrom<&str> for Todo {
 
 
         Ok(Todo {
+            note: String::new(),
+            dependency_type,
             todo_dir: None,
             date_str,
             daily,
@@ -130,7 +153,6 @@ impl TryFrom<&str> for Todo {
             dependency_name,
             dependencies,
             message,
-            note,
             priority,
             done,
         })
@@ -146,12 +168,13 @@ impl Todo {
     #[inline]
     pub fn new(message:String, priority:i8, done: bool, todo_dir: Option<PathBuf>) -> Self {
         Todo {
+            note: String::new(),
+            dependency_type: DependencyType::None,
             todo_dir,
             date_str: String::new(),
             daily: false,
             removed_files: Vec::new(),
             dependency_name: String::new(),
-            note: String::new(),
             dependencies: TodoList::new(),
             message,
             priority: Todo::fixed_priority(priority),
@@ -161,6 +184,12 @@ impl Todo {
 
     pub fn set_dir(&mut self, dir: PathBuf) {
         self.todo_dir = Some(dir);
+    }
+
+    #[inline]
+    pub fn note_empty(&self) -> bool {
+        // self.dependency_type != DependencyType::Note
+        self.note.is_empty()
     }
 
     fn static_dependency_name(name:&String) -> String {
@@ -183,11 +212,11 @@ impl Todo {
         if let Some(path) = self.dependency_path() {
             self.removed_files.push(path);
         }
-        self.note = String::new();
+        self.dependency_type = DependencyType::None;
     }
 
     #[inline]
-    pub fn read_dependencies(&mut self, path: &PathBuf) {
+    pub fn read_dependencies(&mut self, path: &PathBuf) -> io::Result<()>{
         // if let Some(path) = self.dependency_path() {
         //     self.dependencies = if let Some(dir) = &self.todo_dir {
         //         TodoList::read(&path, true)
@@ -195,14 +224,18 @@ impl Todo {
         //         TodoList::read(&path, true)
         //     };
         // }
-        if !self.dependency_name.is_empty() {
-            self.dependencies = TodoList::read(&path.join(&self.dependency_name), true, false);
+        let name = self.dependency_name.clone();
+        match self.dependency_type {
+            DependencyType::Note => {
+                self.note = std::fs::read_to_string(path.join(&name))?;
+            }
+            DependencyType::TodoList => {
+                self.dependencies = TodoList::read(&path.join(&name), true, false);
+            }
+            DependencyType::None => {}
         }
+        Ok(())
         // self.dependencies.write(&path.join(&self.dependency_name), false)?;
-    }
-
-    pub fn note_empty(&self) -> bool {
-        self.note.is_empty()
     }
 
     pub fn add_dependency(&mut self) -> Result<(), TodoError>{
@@ -216,6 +249,7 @@ impl Todo {
                 return Err(TodoError::DependencyCreationFailed)
             }
 
+            self.dependency_type = DependencyType::TodoList;
             self.dependencies = TodoList::read(&path, true, false);
         }
 
@@ -223,8 +257,14 @@ impl Todo {
     }
 
     pub fn dependency_write(&mut self, path: &PathBuf) -> io::Result<()> {
-        if !self.dependency_name.is_empty() {
-            self.dependencies.write(&path.join(&self.dependency_name), false)?;
+        let name = self.dependency_name.clone();
+        match self.dependency_type {
+            DependencyType::TodoList =>self.dependencies.write(&path.join(&name), false)?,
+            DependencyType::Note => {
+                let mut file = File::create(path.join(name))?;
+                write!(file, "{}", self.note);
+            }
+            DependencyType::None => {}
         }
         Ok(())
     }
@@ -238,7 +278,7 @@ impl Todo {
     }
 
     pub fn has_dependency(&self) -> bool {
-        return !self.dependency_name.is_empty();
+        self.dependency_type == DependencyType::TodoList
     }
 
     pub fn done(&self) -> bool {
@@ -260,13 +300,10 @@ impl Todo {
         } else {
             String::new()
         };
-        let note_string = if self.note != "" {
-            ">"
-        } else if self.has_dependency() {
-            "-"
-        }
-        else {
-            "."
+        let note_string = match self.dependency_type {
+            DependencyType::None => ".",
+            DependencyType::Note => ">",
+            DependencyType::TodoList => "-",
         };
         let daily_str = if self.daily {
             let inner_str = if self.date_str.is_empty() {
@@ -294,40 +331,30 @@ impl Todo {
         if let Some(path) = self.dependency_path() {
             self.removed_files.push(path);
         }
+        self.dependency_type = DependencyType::None;
         self.dependency_name = String::new();
+        self.note = String::new();
         self.dependencies = TodoList::new();
     }
 
-    pub fn add_note(&mut self)-> io::Result<()>{
-        let note = Note::from_editor(self.dependency_dir())?;
+    pub fn set_note(&mut self, note:String) -> io::Result<()>{
+        let _ = self.remove_dependency();
+        self.dependency_name = sha1(&note);
+        self.dependency_type = DependencyType::Note;
+        self.note = note;
+        Ok(())
+    }
+
+    pub fn edit_note(&mut self)-> io::Result<()>{
+        let note = open_temp_editor(self.note.clone())?;
 
         self.set_note(note)?;
         Ok(())
     }
 
-    pub fn set_note(&mut self, note:Note) -> io::Result<()>{
-        let _ = self.remove_dependency();
-        self.note = note.hash();
-        note.save().expect("Note saving failed");
-        Ok(())
-    }
-
-    pub fn edit_note(&mut self)-> io::Result<()>{
-        // let mut note = 
-        if let Some(mut note) = Note::from_hash(&self.note, self.dependency_dir())? {
-            note.edit_with_editor()?;
-            self.note = note.hash();
-            note.save().expect("Note saving failed");
-        }
-        Ok(())
-    }
-
     #[inline]
-    pub fn get_note_content(&self) -> String {
-        match Note::from_hash(&self.note, self.dependency_dir()) {
-            Ok(Some(note)) => note.content(),
-            _ => return String::new(),
-        }
+    pub fn get_note_content(&self) -> &String {
+        return &self.note
     }
 
     #[inline]
@@ -420,7 +447,7 @@ mod tests {
     #[test]
     fn test_todo_into_string() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        todo.set_note(Note::new("Note".to_string(), None));
+        todo.set_note("Note".to_string());
 
         let expected = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let result: String = (&todo).into();
@@ -432,13 +459,14 @@ mod tests {
     fn test_try_from_string() {
         let input = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let expected = Ok(Todo {
+            note: String::new(),
+            dependency_type: DependencyType::Note,
             todo_dir: None,
             date_str: String::new(),
             daily: false,
             removed_files: Vec::new(),
-            dependency_name: String::new(),
+            dependency_name: String::from("2c924e3088204ee77ba681f72be3444357932fca"),
             message: "Test".to_string(),
-            note: "2c924e3088204ee77ba681f72be3444357932fca".to_string(),
             priority: 1,
             dependencies: TodoList::new(),
             done: false,
@@ -457,7 +485,6 @@ mod tests {
         let todo = Todo::default(message.to_string(), priority);
 
         assert_eq!(todo.message, message);
-        assert_eq!(todo.note, String::new());
         assert_eq!(todo.priority, 2);
         assert_eq!(todo.dependencies, TodoList::new());
         assert_eq!(todo.dependency_name, String::new());
@@ -499,11 +526,11 @@ mod tests {
     #[test]
     fn test_remove_note() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        todo.set_note(Note::new("Note".to_string(), None)).expect("Error setting note");
+        todo.set_note("Note".to_string()).expect("Error setting note");
 
         todo.remove_note();
 
-        assert_eq!(todo.note, String::new());
+        assert_eq!(todo.dependency_type, DependencyType::None);
     }
 
     #[test]
@@ -542,13 +569,14 @@ mod tests {
         let todo = Todo::try_from(input1).unwrap();
 
         let expected = Todo {
+            note: String::new(),
+            dependency_type: DependencyType::TodoList,
             todo_dir: None,
             date_str: String::new(),
             daily: false,
             removed_files: Vec::new(),
             dependency_name: "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo".to_string(),
             message: "Read for exams".to_string(),
-            note: String::new(),
             priority: 1,
             dependencies: TodoList::new(),
             done: false,
@@ -562,13 +590,14 @@ mod tests {
         let input = "[-2] this one should be daily [DAILY 2023-09-05]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
+            note: String::new(),
+            dependency_type: DependencyType::None,
             todo_dir: None,
             date_str: "2023-09-05".to_string(),
             daily: true,
             removed_files: Vec::new(),
             dependency_name: String::new(),
             message: "this one should be daily".to_string(),
-            note: String::new(),
             priority: 2,
             dependencies: TodoList::new(),
             done: false,
@@ -579,13 +608,14 @@ mod tests {
         assert_eq!(todo, expected);
 
         let test = Todo {
+            note: String::new(),
+            dependency_type: DependencyType::None,
             todo_dir: None,
             date_str: String::new(),
             daily: true,
             removed_files: Vec::new(),
             dependency_name: String::new(),
             message: "this one should be daily".to_string(),
-            note: String::new(),
             priority: 2,
             dependencies: TodoList::new(),
             done: false,

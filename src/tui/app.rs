@@ -510,9 +510,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn edit_or_add_note(&mut self) {
         if let Some(todo) = self.mut_todo() {
-            if todo.edit_note().is_err() {
-                todo.add_note();
-            }
+            todo.edit_note();
         }
     }
 
@@ -667,13 +665,14 @@ impl<'a>App<'a>{
 
     #[inline]
     pub fn update_return_operation(&mut self) -> io::Result<Operation>{
+        let output;
         if self.text_mode {
-            return self.update_editor();
+            output = self.update_editor()?;
         } else {
-            self.update_no_editor()?;
+            output = self.update_no_editor()?;
             self.fix_index();
         }
-        Ok(Operation::Nothing)
+        Ok(output)
     }
 
 
@@ -754,11 +753,10 @@ impl<'a>App<'a>{
         let todo = self.todo();
 
         list_state.select(Some(self.index));
-
-        let note = match (todo, self.show_right) {
-            (Some(todo), true)  => todo.get_note_content(),
-            _ => String::new(),
-        };
+        // let note = match (todo, self.show_right) {
+        //     (Some(todo), true)  => todo.get_note_content(),
+        //     _ => String::new(),
+        // };
 
         let dependency_width = if let Some(todo) = todo {
             let should_show_right = (todo.has_dependency() || !todo.get_note_content().is_empty()) && self.show_right;
@@ -812,7 +810,8 @@ impl<'a>App<'a>{
         if todo.is_some() && self.show_right{
             let todo = todo.unwrap();
             if !todo.get_note_content().is_empty(){
-                let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
+
+                let note_widget = Paragraph::new(Text::styled(todo.get_note_content(), Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
                 frame.render_widget(note_widget, todos_layout[1]);
             } else
             if todo.has_dependency() {
