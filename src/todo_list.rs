@@ -302,11 +302,20 @@ impl TodoList {
     }
 
     #[inline]
+    fn remove_dependencies(&mut self, path: &PathBuf) -> io::Result<()> {
+        let mut todos = [&mut self.undone.todos, &mut self.done.todos];
+        for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
+            todo.remove_dependency(path);
+        }
+        Ok(())
+    }
+
+    #[inline]
     fn handle_dependent_files(&mut self, path: &PathBuf) -> io::Result<()> {
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
             todo.dependency_write(path)?;
-            todo.remove_dependent_files()?;
+            todo.remove_dependent_files(path)?;
         }
         Ok(())
     }
@@ -347,15 +356,15 @@ mod tests {
     #[test]
     fn test_todolist_read_undone() {
         let todo_list = get_todo_list();
-        let expected_undone = vec![Todo::new("this todo has prio 1".to_string(), 1,false, None)
-            ,Todo::new("this one has prio 2".to_string(), 2, false ,None)];
+        let expected_undone = vec![Todo::new("this todo has prio 1".to_string(), 1,false)
+            ,Todo::new("this one has prio 2".to_string(), 2, false)];
         assert_eq!(expected_undone, todo_list.undone.todos);
     }
 
     #[test]
     fn test_todolist_read_done() {
         let todo_list = get_todo_list();
-        let expected_done = vec![Todo::new("this one is 2 and done".to_string(), 2, true, None),Todo::new("this one is 0 and done".to_string(), 0, true, None)];
+        let expected_done = vec![Todo::new("this one is 2 and done".to_string(), 2, true),Todo::new("this one is 0 and done".to_string(), 0, true)];
         assert_eq!(expected_done, todo_list.done.todos);
     }
 
