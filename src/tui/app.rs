@@ -460,7 +460,8 @@ impl<'a>App<'a>{
     pub fn add_dependency_traverse_down(&mut self) {
         if let Some(todo) = self.todo() {
             if !todo.has_dependency() && todo.note_empty() {
-                self.mut_todo().unwrap().add_dependency();
+                let todo_path = self.todo_path.clone();
+                self.mut_todo().unwrap().add_dependency(&todo_path);
             }
         }
         self.traverse_down()
@@ -509,25 +510,29 @@ impl<'a>App<'a>{
 
     #[inline]
     pub fn edit_or_add_note(&mut self) {
+        let path = self.todo_path.clone();
         if let Some(todo) = self.mut_todo() {
-            todo.edit_note();
+            todo.edit_note(&path);
         }
     }
 
     #[inline]
     pub fn add_dependency(&mut self) {
+        let todo_path = self.todo_path.clone();
         if let Some(todo) = self.mut_todo() {
-            todo.add_dependency();
+            todo.add_dependency(&todo_path);
         }
     }
 
+    #[inline]
     pub fn remove_current_dependent(&mut self) {
+        let path = self.todo_path.clone();
         if let Some(todo) = self.mut_todo() {
-            todo.remove_note();
-            todo.remove_dependency();
+            todo.remove_dependency(&path);
         }
     }
 
+    #[inline]
     pub fn delete_todo(&mut self) {
         if !self.is_todos_empty() {
             let index = self.index;
