@@ -1,6 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std{{{
-use std::{io::{self, Write}, path::PathBuf, fs::File};
+use std::{io, path::PathBuf};
 //}}}
 // lib{{{
 use tui_textarea::{Input, TextArea, CursorMove};
@@ -54,7 +54,7 @@ impl<'a>App<'a>{
             Some(path) => path,
             None => todo_path().unwrap(),
         };
-        let todo_list = TodoList::read(&todo_path, true, &todo_path.parent().unwrap().clone().to_path_buf());
+        let todo_list = TodoList::read(&todo_path, true, true);
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         App {
@@ -209,7 +209,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = TodoList::read(&self.todo_path, true, &self.todo_path.parent().unwrap().clone().to_path_buf());
+        self.todo_list = TodoList::read(&self.todo_path, true, true);
     }
 
     #[inline]
@@ -608,7 +608,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
         self.changed = false;
-        self.todo_list.write(&self.todo_path)?;
+        self.todo_list.write(&self.todo_path, true)?;
         Ok(())
     }
 

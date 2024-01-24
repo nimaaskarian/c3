@@ -1,7 +1,7 @@
 use std::io;
 
 use crate::fileio::todo_path;
-use crate::todo_list::{TodoList, self};
+use crate::todo_list::TodoList;
 use crate::Args;
 
 pub struct App {
@@ -14,10 +14,10 @@ impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
         let todo_list = match &args.todo_path {
-            Some(value) => TodoList::read(value, args.tree, &value.parent().unwrap().to_path_buf()),
+            Some(value) => TodoList::read(value, args.tree, true),
             None => {
                 let todo_path = todo_path().unwrap();
-                TodoList::read(&todo_path, args.tree, &todo_path.parent().unwrap().to_path_buf())
+                TodoList::read(&todo_path, args.tree, true)
             }
         };
         App {

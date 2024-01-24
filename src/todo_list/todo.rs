@@ -187,14 +187,18 @@ impl Todo {
     }
 
     #[inline]
-    pub fn read_dependencies(&mut self) {
-        if let Some(path) = self.dependency_path() {
-            self.dependencies = if let Some(dir) = &self.todo_dir {
-                TodoList::read(&path, true, &dir)
-            } else {
-                TodoList::read(&path, true, &path.parent().unwrap().to_path_buf())
-            };
+    pub fn read_dependencies(&mut self, path: &PathBuf) {
+        // if let Some(path) = self.dependency_path() {
+        //     self.dependencies = if let Some(dir) = &self.todo_dir {
+        //         TodoList::read(&path, true)
+        //     } else {
+        //         TodoList::read(&path, true)
+        //     };
+        // }
+        if !self.dependency_name.is_empty() {
+            self.dependencies = TodoList::read(&path.join(&self.dependency_name), true, false);
         }
+        // self.dependencies.write(&path.join(&self.dependency_name), false)?;
     }
 
     pub fn note_empty(&self) -> bool {
@@ -212,9 +216,16 @@ impl Todo {
                 return Err(TodoError::DependencyCreationFailed)
             }
 
-            self.dependencies = TodoList::read(&path, true, &path.parent().unwrap().to_path_buf());
+            self.dependencies = TodoList::read(&path, true, false);
         }
 
+        Ok(())
+    }
+
+    pub fn dependency_write(&mut self, path: &PathBuf) -> io::Result<()> {
+        if !self.dependency_name.is_empty() {
+            self.dependencies.write(&path.join(&self.dependency_name), false)?;
+        }
         Ok(())
     }
 
