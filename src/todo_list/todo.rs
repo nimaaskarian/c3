@@ -31,7 +31,7 @@ pub struct Todo {
     dependency_name: String,
     dependency_type: DependencyType,
     done:bool,
-    removed_files: Vec<PathBuf>,
+    removed_names: Vec<String>,
     daily: bool,
     date_str: String,
 }
@@ -137,7 +137,7 @@ impl TryFrom<&str> for Todo {
             dependency_type,
             date_str,
             daily,
-            removed_files: Vec::new(),
+            removed_names: Vec::new(),
             dependency_name,
             dependencies,
             message,
@@ -160,7 +160,7 @@ impl Todo {
             dependency_type: DependencyType::None,
             date_str: String::new(),
             daily: false,
-            removed_files: Vec::new(),
+            removed_names: Vec::new(),
             dependency_name: String::new(),
             dependencies: TodoList::new(),
             message,
@@ -183,20 +183,10 @@ impl Todo {
         format!("{name}.todo")
     }
 
-    // pub fn dependency_path(&self) -> Option<PathBuf> {
-    //     note_path(&self.dependency_name, self.dependency_dir()).unwrap()
-    // }
-
-    pub fn remove_note(&mut self, path: &PathBuf) {
-        // if let Some(path) = self.dependency_path() {
-        //     self.removed_files.push(path);
-        // }
-        // if !self.dependency_name.is_empty() {
+    pub fn remove_note(&mut self) {
         if self.dependency_type == DependencyType::Note {
-            self.remove_dependency(path);
-            // self.removed_files.push(path.join(name));
+            self.remove_dependency();
         }
-        self.dependency_type = DependencyType::None;
     }
 
     #[inline]
@@ -215,13 +205,13 @@ impl Todo {
     }
 
     #[inline]
-    pub fn add_dependency(&mut self, path: &PathBuf) -> Result<(), TodoError>{
-        if self.has_dependency() {
+    pub fn add_todo_dependency(&mut self) -> Result<(), TodoError>{
+        if self.has_todo_dependency() {
             return Err(TodoError::AlreadyExists)
         }
-        if let Some(path) = self.dependency_path(path) {
-            let _ = self.remove_note(&path);
-        }
+        // if let Some(path) = self.dependency_path(path) {
+        //     let _ = self.remove_note(&path);
+        // }
         self.dependency_name = Self::todolist_name(&self.hash());
 
         self.dependency_type = DependencyType::TodoList;
@@ -245,14 +235,14 @@ impl Todo {
 
     pub fn remove_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
         self.dependencies.handle_dependent_files(path);
-        for path in &self.removed_files {
-            let _ = remove_file(path);
+        for name in &self.removed_names {
+            let _ = remove_file(path.join(name));
         }
-        self.removed_files = Vec::new();
+        self.removed_names = Vec::new();
         Ok(())
     }
 
-    pub fn has_dependency(&self) -> bool {
+    pub fn has_todo_dependency(&self) -> bool {
         self.dependency_type == DependencyType::TodoList
     }
 
@@ -309,30 +299,28 @@ impl Todo {
         }
     }
 
-    pub fn remove_dependency(&mut self, path: &PathBuf) {
-        if let Some(path) = self.dependency_path(path) {
-            self.removed_files.push(path);
+    pub fn remove_dependency(&mut self) {
+        if self.dependency_type != DependencyType::None {
+            self.removed_names.push(self.dependency_name.clone());
         }
 
         self.dependency_type = DependencyType::None;
-        self.dependencies.remove_dependencies(path);
+        self.dependencies.remove_dependencies();
         self.dependency_name = String::new();
         self.note = String::new();
-        // self.dependencies = TodoList::new();
     }
 
-    pub fn set_note(&mut self, note:String, path: &PathBuf) -> io::Result<()>{
-        // let _ = self.remove_dependency(&path);
+    pub fn set_note(&mut self, note:String) -> io::Result<()>{
         self.dependency_name = sha1(&note);
         self.dependency_type = DependencyType::Note;
         self.note = note;
         Ok(())
     }
 
-    pub fn edit_note(&mut self, path: &PathBuf)-> io::Result<()>{
+    pub fn edit_note(&mut self)-> io::Result<()>{
         let note = open_temp_editor(self.note.clone())?;
 
-        self.set_note(note, path)?;
+        self.set_note(note)?;
         Ok(())
     }
 
@@ -433,7 +421,7 @@ mod tests {
     fn test_todo_into_string() {
         let mut todo = Todo::default("Test".to_string(), 1);
         let path = PathBuf::new();
-        todo.set_note("Note".to_string(), &path);
+        todo.set_note("Note".to_string());
 
         let expected = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let result: String = (&todo).into();
@@ -449,7 +437,7 @@ mod tests {
             dependency_type: DependencyType::Note,
             date_str: String::new(),
             daily: false,
-            removed_files: Vec::new(),
+            removed_names: Vec::new(),
             dependency_name: String::from("2c924e3088204ee77ba681f72be3444357932fca"),
             message: "Test".to_string(),
             priority: 1,
@@ -501,7 +489,7 @@ mod tests {
         let mut todo = Todo::default("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         let pathbuf = PathBuf::from("tests/TODO_LIST");
-        todo.add_dependency(&pathbuf).expect("Error setting dependency");
+        todo.add_todo_dependency().expect("Error setting dependency");
 
         let result = &todo.dependency_name;
         assert_eq!(result, expected);
@@ -511,10 +499,10 @@ mod tests {
     fn test_remove_note() {
         let mut todo = Todo::default("Test".to_string(), 1);
         let path = PathBuf::new();
-        todo.set_note("Note".to_string(), &path).expect("Error setting note");
+        todo.set_note("Note".to_string()).expect("Error setting note");
         let pathbuf = PathBuf::from("test/TODO_LIST");
 
-        todo.remove_note(&pathbuf);
+        todo.remove_note();
 
         assert_eq!(todo.dependency_type, DependencyType::None);
         assert!(todo.note_empty());
@@ -526,20 +514,20 @@ mod tests {
 
         let pathbuf = PathBuf::from("test/TODO_LIST");
 
-        todo.add_dependency(&pathbuf);
+        todo.add_todo_dependency();
 
-        assert!(todo.has_dependency());
+        assert!(todo.has_todo_dependency());
     }
 
     #[test]
     fn test_remove_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
         let pathbuf = PathBuf::from("test/TODO_LIST");
-        todo.add_dependency(&pathbuf);
+        todo.add_todo_dependency();
 
-        todo.remove_dependency(&pathbuf);
+        todo.remove_dependency();
 
-        assert!(!todo.has_dependency());
+        assert!(!todo.has_todo_dependency());
     }
 
     #[test]
@@ -563,7 +551,7 @@ mod tests {
             dependency_type: DependencyType::TodoList,
             date_str: String::new(),
             daily: false,
-            removed_files: Vec::new(),
+            removed_names: Vec::new(),
             dependency_name: "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo".to_string(),
             message: "Read for exams".to_string(),
             priority: 1,
@@ -582,7 +570,7 @@ mod tests {
             dependency_type: DependencyType::None,
             date_str: "2023-09-05".to_string(),
             daily: true,
-            removed_files: Vec::new(),
+            removed_names: Vec::new(),
             dependency_name: String::new(),
             message: "this one should be daily".to_string(),
             priority: 2,
@@ -599,7 +587,7 @@ mod tests {
             dependency_type: DependencyType::None,
             date_str: String::new(),
             daily: true,
-            removed_files: Vec::new(),
+            removed_names: Vec::new(),
             dependency_name: String::new(),
             message: "this one should be daily".to_string(),
             priority: 2,

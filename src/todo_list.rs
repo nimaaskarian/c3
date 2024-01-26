@@ -317,12 +317,11 @@ impl TodoList {
     }
 
     #[inline]
-    fn remove_dependencies(&mut self, path: &PathBuf) -> io::Result<()> {
+    fn remove_dependencies(&mut self) {
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
-            todo.remove_dependency(path);
+            todo.remove_dependency();
         }
-        Ok(())
     }
 
     #[inline]

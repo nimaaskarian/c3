@@ -280,7 +280,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn traverse_down(&mut self) {
         match self.todo() {
-            Some(todo) if todo.has_dependency() => {
+            Some(todo) if todo.has_todo_dependency() => {
                 self.prior_indexes.push(self.index);
                 self.index = 0;
             }
@@ -459,9 +459,9 @@ impl<'a>App<'a>{
     #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
         if let Some(todo) = self.todo() {
-            if !todo.has_dependency() && todo.note_empty() {
+            if !todo.has_todo_dependency() && todo.note_empty() {
                 let todo_path = self.todo_path.clone();
-                self.mut_todo().unwrap().add_dependency(&todo_path);
+                self.mut_todo().unwrap().add_todo_dependency();
             }
         }
         self.traverse_down()
@@ -510,25 +510,22 @@ impl<'a>App<'a>{
 
     #[inline]
     pub fn edit_or_add_note(&mut self) {
-        let path = self.todo_path.clone();
         if let Some(todo) = self.mut_todo() {
-            todo.edit_note(&path);
+            todo.edit_note();
         }
     }
 
     #[inline]
     pub fn add_dependency(&mut self) {
-        let todo_path = self.todo_path.clone();
         if let Some(todo) = self.mut_todo() {
-            todo.add_dependency(&todo_path);
+            todo.add_todo_dependency();
         }
     }
 
     #[inline]
     pub fn remove_current_dependent(&mut self) {
-        let path = self.todo_path.clone();
         if let Some(todo) = self.mut_todo() {
-            todo.remove_dependency(&path);
+            todo.remove_dependency();
         }
     }
 
@@ -765,7 +762,7 @@ impl<'a>App<'a>{
         // };
 
         let dependency_width = if let Some(todo) = todo {
-            let should_show_right = (todo.has_dependency() || !todo.get_note_content().is_empty()) && self.show_right;
+            let should_show_right = (todo.has_todo_dependency() || !todo.get_note_content().is_empty()) && self.show_right;
             40 * (should_show_right as u16)
         } else {
             0
@@ -820,7 +817,7 @@ impl<'a>App<'a>{
                 let note_widget = Paragraph::new(Text::styled(todo.get_note_content(), Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
                 frame.render_widget(note_widget, todos_layout[1]);
             } else
-            if todo.has_dependency() {
+            if todo.has_todo_dependency() {
                 match create_todo_widget(&todo.dependencies.display(self.show_done), String::from("Todo dependencies")) {
                     TodoWidget::List(widget) =>frame.render_widget(widget, todos_layout[1]),
                     TodoWidget::Paragraph(widget) =>frame.render_widget(widget, todos_layout[1]),
