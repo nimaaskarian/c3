@@ -35,6 +35,7 @@ pub struct Args {
     #[arg(short='p', long)]
     todo_path: Option<PathBuf>,
 }
+
 impl Args {
     pub fn is_cli(&self) -> bool {
         self.stdout | self.non_interactive | self.tree

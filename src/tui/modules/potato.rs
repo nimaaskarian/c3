@@ -23,6 +23,16 @@ impl <'a> Module <'a> for Potato <'a> {
     }
 
     #[inline]
+    fn update_time_ms(&self) -> u64 {
+        500
+    }
+
+    #[inline]
+    fn on_c(&mut self) {
+        self.quit()
+    }
+
+    #[inline]
     fn on_space(&mut self) {
         self.toggle_pause()
     }
@@ -154,5 +164,10 @@ impl<'a> Potato<'a> {
         } else {
             self.index = self.len() - 1;
         }
+    }
+
+    #[inline]
+    pub fn quit(&mut self) {
+        self.run(vec![self.resolve_arg("q")])
     }
 }

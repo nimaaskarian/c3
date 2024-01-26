@@ -267,6 +267,21 @@ impl TodoList {
     }
 
     #[inline]
+    pub fn all_dependent_files(&mut self, path: &PathBuf, output: &mut Vec<PathBuf>) -> Vec<PathBuf>{
+        let mut todos = [&mut self.undone.todos, &mut self.done.todos];
+
+        for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
+            if let Some(todo_path) = todo.dependency_path(path) {
+                output.push(todo_path);
+                todo.dependencies.all_dependent_files(path, output);
+            }
+        }
+
+        return output.clone();
+    }
+
+
+    #[inline]
     pub fn fix_undone(&mut self) {
         for index in 0..self.undone.todos.len() {
             if self.undone.todos[index].done() {
@@ -346,6 +361,8 @@ impl TodoList {
 mod tests {
     use std::fs::{self, remove_file};
 
+    use crate::fileio::todo_path;
+
     use super::*;
 
     fn get_todo_list() -> TodoList {
@@ -418,5 +435,13 @@ mod tests {
         sorted_list.done.sort();
 
         assert_eq!(todo_list, sorted_list)
+    }
+
+    #[test]
+    fn test_something() {
+        let todo_path = todo_path().unwrap();
+        let mut todo_list = TodoList::read(&todo_path, true, true);
+        let mut output = vec![];
+        println!("{:?}", todo_list.all_dependent_files(&todo_path, &mut output));
     }
 }

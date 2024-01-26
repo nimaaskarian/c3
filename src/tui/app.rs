@@ -635,7 +635,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn update_editor(&mut self)  -> io::Result<Operation> {
         if self.module_enabled {
-            if event::poll(std::time::Duration::from_millis(500))? {
+            if event::poll(std::time::Duration::from_millis(self.module.update_time_ms()))? {
                 self.enable_text_editor()?
             }
         } else {
@@ -684,7 +684,7 @@ impl<'a>App<'a>{
     #[inline]
     fn update_no_editor(&mut self) -> io::Result<Operation> {
         if self.module_enabled {
-            if event::poll(std::time::Duration::from_millis(500))? {
+            if event::poll(std::time::Duration::from_millis(self.module.update_time_ms()))? {
                 return self.read_keys();
             }
         } else {
@@ -741,6 +741,7 @@ impl<'a>App<'a>{
                     Char(' ') => self.module.on_space(),
                     Char('s') => self.module.on_s(),
                     Char('H') => self.module.on_capital_h(),
+                    Char('c') => self.module.on_c(),
                     Char('L') => self.module.on_capital_l(),
                     Char('r') => self.module.on_r(),
                     Char('+') | Char('=') => self.module.on_plus(),

@@ -212,7 +212,6 @@ impl Todo {
             DependencyType::None => {}
         }
         Ok(())
-        // self.dependencies.write(&path.join(&self.dependency_name), false)?;
     }
 
     #[inline]
@@ -220,14 +219,13 @@ impl Todo {
         if self.has_dependency() {
             return Err(TodoError::AlreadyExists)
         }
-        // let _ = self.remove_note(path);
+        if let Some(path) = self.dependency_path(path) {
+            let _ = self.remove_note(&path);
+        }
         self.dependency_name = Self::todolist_name(&self.hash());
-        // if File::create(&path).is_err() {
-        //     return Err(TodoError::DependencyCreationFailed)
-        // }
 
         self.dependency_type = DependencyType::TodoList;
-        self.dependencies = TodoList::read(&path, true, false);
+        self.dependencies = TodoList::new();
 
         Ok(())
     }
