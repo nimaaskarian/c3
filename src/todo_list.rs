@@ -219,12 +219,15 @@ impl TodoList {
         display_list
     }
 
-    pub fn read (filename: &PathBuf, read_dependencies: bool, is_root: bool) -> Self{
-        let dependency_path = if is_root {
+    pub fn dependency_parent(filename: &PathBuf, is_root: bool) -> PathBuf {
+        if is_root {
             filename.parent().unwrap().to_path_buf().join("notes")
         } else {
             filename.parent().unwrap().to_path_buf()
-        };
+        }
+    }
+
+    pub fn read (filename: &PathBuf, read_dependencies: bool, is_root: bool) -> Self{
         let mut todo_list = Self::new();
         if !filename.is_file() {
             return todo_list
@@ -239,12 +242,13 @@ impl TodoList {
         todo_list.undone.sort();
         todo_list.done.sort();
         if read_dependencies {
+            let dependency_path = Self::dependency_parent(filename, is_root);
             todo_list.read_dependencies(&dependency_path)
         }
         return todo_list
     }
 
-    pub fn read_dependencies(&mut self, path: &PathBuf) {
+    fn read_dependencies(&mut self, path: &PathBuf) {
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
 
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
@@ -434,13 +438,5 @@ mod tests {
         sorted_list.done.sort();
 
         assert_eq!(todo_list, sorted_list)
-    }
-
-    #[test]
-    fn test_something() {
-        let todo_path = todo_path().unwrap();
-        let mut todo_list = TodoList::read(&todo_path, true, true);
-        let mut output = vec![];
-        println!("{:?}", todo_list.all_dependent_files(&todo_path, &mut output));
     }
 }

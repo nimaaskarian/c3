@@ -2,6 +2,7 @@ use chrono::{Local ,NaiveDate};
 use chrono::format::ParseError;
 const FORMAT: &str = "%Y-%m-%d";
 
+
 #[inline]
 pub fn parse(date_string: &String) -> Result<NaiveDate, ParseError> {
     NaiveDate::parse_from_str(date_string.as_str(), FORMAT)
@@ -13,6 +14,9 @@ pub fn current() -> NaiveDate {
 }
 
 #[inline]
-pub fn current_str() -> String {
-    current().format(FORMAT).to_string()
+pub fn format(input: Option<NaiveDate>) -> String {
+    match input {
+        Some(date)=> date.format(FORMAT).to_string(),
+        None => String::new(),
+    }
 }

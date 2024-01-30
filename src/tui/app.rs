@@ -207,6 +207,13 @@ impl<'a>App<'a>{
     }
 
     #[inline]
+    pub fn toggle_current_weekly(&mut self) {
+        if let Some(todo) = self.mut_todo() {
+            todo.toggle_weekly()
+        }
+    }
+
+    #[inline]
     pub fn read(&mut self) {
         self.changed = false;
         self.todo_list = TodoList::read(&self.todo_path, true, true);
@@ -301,7 +308,7 @@ impl<'a>App<'a>{
     }
 
     #[inline]
-    pub fn bottom(&mut self) -> usize {
+    pub fn bottom(&self) -> usize {
         match self.len() {
             0=>0,
             length=>length-1,
@@ -362,6 +369,20 @@ impl<'a>App<'a>{
         };
         None
     }
+
+    #[inline]
+    pub fn schedule_prompt(&mut self) {
+        self.set_text_mode(Self::on_schedule, "Change schedule day", "");
+    }
+
+    #[inline]
+    fn on_schedule(&mut self,str:String) {
+        let day = str.parse::<u64>().ok();
+        if let Some(todo) = self.mut_todo() {
+            todo.enable_day(day.unwrap() as i64);
+        }
+    }
+
 
     #[inline]
     pub fn edit_prompt(&mut self, start: bool) {
@@ -480,8 +501,9 @@ impl<'a>App<'a>{
         if let Some(clipboard) = &mut self.clipboard {
             if let Ok(text) = clipboard.get_text() {
                 match Todo::try_from(text) {
-                    Ok(todo) => {
+                    Ok(mut todo) => {
                         let bottom = self.bottom();
+                        let todo_parent = TodoList::dependency_parent(&self.todo_path, true);
                         let list = &mut self.mut_current_list();
                         list.push(todo);
                         self.index = list.reorder(bottom);
@@ -697,6 +719,8 @@ impl<'a>App<'a>{
                 match key.code {
                     Char('x') => self.cut_todo(),
                     Char('d') => self.toggle_current_daily(),
+                    Char('W') => self.toggle_current_weekly(),
+                    Char('S') => self.schedule_prompt(),
                     Char('!') => self.toggle_show_done(),
                     Char('y') => self.yank_todo(),
                     Char('p') => self.paste_todo(),

@@ -8,7 +8,8 @@ use scanf::sscanf;
 // }}}
 // mod{{{
 mod note;
-mod date;
+mod schedule;
+use schedule::Schedule;
 use note::{sha1, open_temp_editor};
 
 use super::TodoList;
@@ -32,8 +33,7 @@ pub struct Todo {
     dependency_type: DependencyType,
     done:bool,
     removed_names: Vec<String>,
-    daily: bool,
-    date_str: String,
+    schedule: Schedule,
 }
 
 impl Into<String> for &Todo {
@@ -43,12 +43,9 @@ impl Into<String> for &Todo {
             DependencyType::None => String::new(),
             _ => format!(">{}", self.dependency_name),
         };
-        let daily_str = if self.daily {
-            format!(" [DAILY {}]", self.date_str)
-        } else {
-            String::new()
-        };
-        format!("[{done_str}{}]{note_str} {}{daily_str}", self.priority, self.message)
+        let schedule_str:String =(&self.schedule).into();
+
+        format!("[{done_str}{}]{note_str} {}{schedule_str}", self.priority, self.message)
     }
 }
 
@@ -77,27 +74,25 @@ impl TryFrom<&str> for Todo {
         let mut priority_string:String = String::new();
         let mut dependency_type = DependencyType::None;
         let mut dependency_name = String::new();
-
-        if sscanf!(input,"[{}]>{}.todo {}", priority_string, dependency_name, message).is_err() {
-            if sscanf!(input,"[{}]>{} {}", priority_string, dependency_name, message).is_err() {
-                if sscanf!(input,"[{}] {}", priority_string, message).is_err() {
-                    return Err(TodoError::ReadFailed);
-                }
+        match input {
+            _ if sscanf!(input, "[{}]>{}.todo {}", priority_string, dependency_name, message).is_ok() => {
+                dependency_type = DependencyType::TodoList;
             }
-        } else {
-            dependency_type = DependencyType::TodoList;
+            _ if sscanf!(input, "[{}]>{} {}", priority_string, dependency_name, message).is_ok() => {
+                dependency_type = DependencyType::Note;
+            }
+            _ if sscanf!(input, "[{}] {}", priority_string, message).is_ok() => {
+                dependency_type = DependencyType::None;
+            }
+            _ => return Err(TodoError::ReadFailed),
         }
 
-        if dependency_type == DependencyType::None && !dependency_name.is_empty() {
-            dependency_type = DependencyType::Note;
-        }
         let dependencies = TodoList::new();
         let dependency_name = match dependency_type {
             DependencyType::None => String::new(),
             DependencyType::TodoList => Self::todolist_name(&dependency_name),
             DependencyType::Note => dependency_name,
         };
-        let mut done = priority_string.chars().nth(0).unwrap() == '-';
 
         let priority:i8 = match priority_string.parse() {
             Ok(value) => {
@@ -109,34 +104,16 @@ impl TryFrom<&str> for Todo {
             Err(_) => 0
         };
         
-        let daily = if sscanf!(message.clone().as_str(), "{}[DAILY {}]", message, date_string).is_ok() {
-            if let Ok(date) = date::parse(&date_string) {
-                let current_date = date::current();
-                if current_date > date {
-                    done = false
-                }
-            }
-            true
-        } else {
-            false
-        };
+        let schedule = Schedule::match_message(&mut message);
+        let mut done = priority_string.chars().nth(0).unwrap() == '-';
 
-        let date_str = if daily {
-            if done {
-                date::current_str()
-            } else {
-                date_string
-            }
-        } else {
-            String::new()
-        };
-
-
+        if schedule.should_undone() {
+            done = false;
+        }
         Ok(Todo {
             note: String::new(),
             dependency_type,
-            date_str,
-            daily,
+            schedule,
             removed_names: Vec::new(),
             dependency_name,
             dependencies,
@@ -158,8 +135,7 @@ impl Todo {
         Todo {
             note: String::new(),
             dependency_type: DependencyType::None,
-            date_str: String::new(),
-            daily: false,
+            schedule: Schedule::new(),
             removed_names: Vec::new(),
             dependency_name: String::new(),
             dependencies: TodoList::new(),
@@ -270,31 +246,13 @@ impl Todo {
             DependencyType::Note => ">",
             DependencyType::TodoList => "-",
         };
-        let daily_str = if self.daily {
-            let inner_str = if self.date_str.is_empty() {
-                String::new()
-            } else {
-                let last_save = if let Ok(parsed_date) = date::parse(&self.date_str) {
-                    date::current() - parsed_date
-                } else {
-                    Duration::zero()
-                };
-                match last_save.num_days() {
-                    0 => String::new(),
-                    1 => String::from(", last done yesterday"),
-                    any => format!(", last done {} days ago", any)
-                }
-            };
-            format!(" (Daily{inner_str})")
-        } else {
-            String::new()
-        };
+        let daily_str = self.schedule.display();
         format!("{done_string}{}{note_string} {}{daily_str}", self.priority, self.message)
     }
 
-    pub fn dependency_path(&self ,path : &PathBuf) -> Option<PathBuf>{
+    pub fn dependency_path(&self ,path: &PathBuf) -> Option<PathBuf>{
         match path.parent() {
-            Some(path) => Some(path.to_path_buf().join("notes").join(&self.dependency_name).clone()),
+            Some(path) => Some(TodoList::dependency_parent(&path.to_path_buf(), false)),
             None => None,
         }
     }
@@ -346,15 +304,28 @@ impl Todo {
 
     #[inline]
     pub fn toggle_daily(&mut self) {
-        self.daily = !self.daily;
+        self.schedule.toggle();
+        self.schedule.set_daily();
+    }
+
+    #[inline]
+    pub fn toggle_weekly(&mut self) {
+        self.schedule.toggle();
+        self.schedule.set_weekly();
+    }
+
+    #[inline]
+    pub fn enable_day(&mut self, day: i64) {
+        self.schedule.enable();
+        self.schedule.set_day(day);
     }
 
     #[inline]
     pub fn set_done(&mut self, done:bool) {
-        if self.daily && done {
-            self.date_str = date::current_str();
+        if done {
+            self.schedule.current_date()
         } else {
-            self.date_str = String::new();
+            self.schedule.none_date()
         }
         self.done = done;
     }
@@ -435,8 +406,7 @@ mod tests {
         let expected = Ok(Todo {
             note: String::new(),
             dependency_type: DependencyType::Note,
-            date_str: String::new(),
-            daily: false,
+            schedule: Schedule::new(),
             removed_names: Vec::new(),
             dependency_name: String::from("2c924e3088204ee77ba681f72be3444357932fca"),
             message: "Test".to_string(),
@@ -549,8 +519,7 @@ mod tests {
         let expected = Todo {
             note: String::new(),
             dependency_type: DependencyType::TodoList,
-            date_str: String::new(),
-            daily: false,
+            schedule: Schedule::new(),
             removed_names: Vec::new(),
             dependency_name: "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo".to_string(),
             message: "Read for exams".to_string(),
@@ -568,8 +537,7 @@ mod tests {
         let expected = Todo {
             note: String::new(),
             dependency_type: DependencyType::None,
-            date_str: "2023-09-05".to_string(),
-            daily: true,
+            schedule: Schedule::from("DAILY 2023-09-05"),
             removed_names: Vec::new(),
             dependency_name: String::new(),
             message: "this one should be daily".to_string(),
@@ -581,12 +549,14 @@ mod tests {
         let input = "[2] this one should be daily [DAILY 2023-09-05]";
         let todo = Todo::try_from(input).unwrap();
         assert_eq!(todo, expected);
+    }
 
+    #[test]
+    fn test_daily_display() {
         let test = Todo {
             note: String::new(),
             dependency_type: DependencyType::None,
-            date_str: String::new(),
-            daily: true,
+            schedule: Schedule::from("DAILY"),
             removed_names: Vec::new(),
             dependency_name: String::new(),
             message: "this one should be daily".to_string(),
