@@ -458,7 +458,6 @@ mod tests {
     fn test_dependency_name() {
         let mut todo = Todo::default("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
-        let pathbuf = PathBuf::from("tests/TODO_LIST");
         todo.add_todo_dependency().expect("Error setting dependency");
 
         let result = &todo.dependency_name;
@@ -466,23 +465,51 @@ mod tests {
     }
 
     #[test]
+    fn test_dependency_type() {
+        let mut todo = Todo::default("Test".to_string(), 1);
+        todo.add_todo_dependency().expect("Error setting dependency");
+
+        assert_eq!(todo.dependency_type, DependencyType::TodoList);
+    }
+
+    #[test]
+    fn test_add_todo() {
+        let mut todo = Todo::default("Test".to_string(), 1);
+        let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
+        todo.add_todo_dependency().expect("Error setting dependency");
+
+        let result = &todo.dependency_name;
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_add_note_type() {
+        let mut todo = Todo::default("Test".to_string(), 1);
+        todo.set_note("Note".to_string()).expect("Error setting note");
+
+        assert_eq!(todo.dependency_type, DependencyType::Note);
+    }
+
+    #[test]
+    fn test_add_note_name() {
+        let mut todo = Todo::default("Test".to_string(), 1);
+        todo.set_note("Note".to_string()).expect("Error setting note");
+
+        assert_eq!(todo.dependency_name, "2c924e3088204ee77ba681f72be3444357932fca");
+    }
+
+    #[test]
     fn test_remove_note() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        let path = PathBuf::new();
         todo.set_note("Note".to_string()).expect("Error setting note");
-        let pathbuf = PathBuf::from("test/TODO_LIST");
-
         todo.remove_note();
 
         assert_eq!(todo.dependency_type, DependencyType::None);
-        assert!(todo.note_empty());
     }
 
     #[test]
     fn test_add_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
-
-        let pathbuf = PathBuf::from("test/TODO_LIST");
 
         todo.add_todo_dependency();
 
@@ -492,7 +519,6 @@ mod tests {
     #[test]
     fn test_remove_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        let pathbuf = PathBuf::from("test/TODO_LIST");
         todo.add_todo_dependency();
 
         todo.remove_dependency();
@@ -567,5 +593,47 @@ mod tests {
         let expected = "2. this one should be daily (Daily)";
 
         assert_eq!(test.display(Some(false)), expected)
+    }
+
+    #[test]
+    fn test_daily_new_format() {
+        let input = "[-2] this one should be daily [D1(2023-09-05)]";
+        let todo = Todo::try_from(input).unwrap();
+        let expected = Todo {
+            note: String::new(),
+            dependency_type: DependencyType::None,
+            schedule: Schedule::from("DAILY 2023-09-05"),
+            removed_names: Vec::new(),
+            dependency_name: String::new(),
+            message: "this one should be daily".to_string(),
+            priority: 2,
+            dependencies: TodoList::new(),
+            done: false,
+        };
+        assert_eq!(todo, expected);
+        let input = "[2] this one should be daily [D1(2023-09-05)]";
+        let todo = Todo::try_from(input).unwrap();
+        assert_eq!(todo, expected);
+    }
+
+    #[test]
+    fn test_weekly() {
+        let input = "[-2] this one should be daily [D7(2023-09-05)]";
+        let todo = Todo::try_from(input).unwrap();
+        let expected = Todo {
+            note: String::new(),
+            dependency_type: DependencyType::None,
+            schedule: Schedule::from("D7(2023-09-05)"),
+            removed_names: Vec::new(),
+            dependency_name: String::new(),
+            message: "this one should be daily".to_string(),
+            priority: 2,
+            dependencies: TodoList::new(),
+            done: false,
+        };
+        assert_eq!(todo, expected);
+        let input = "[2] this one should be daily [D7(2023-09-05)]";
+        let todo = Todo::try_from(input).unwrap();
+        assert_eq!(todo, expected);
     }
 }

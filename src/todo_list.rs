@@ -284,6 +284,11 @@ impl TodoList {
         return output.clone();
     }
 
+    #[inline]
+    pub fn todos_with_dependency<'a>() -> Vec<&'a Todo> {
+        let output = vec![];
+        output
+    }
 
     #[inline]
     pub fn fix_undone(&mut self) {
@@ -362,7 +367,7 @@ impl TodoList {
 }
 #[cfg(test)]
 mod tests {
-    use std::fs::{self, remove_file};
+    use std::fs::{self, remove_file, remove_dir};
 
     use crate::fileio::todo_path;
 
@@ -438,5 +443,23 @@ mod tests {
         sorted_list.done.sort();
 
         assert_eq!(todo_list, sorted_list)
+    }
+
+    #[test]
+    fn test_write_dependencies() {
+        let mut todo_list = get_todo_list();
+        todo_list[0].add_todo_dependency();
+        let path = PathBuf::from("tests/tmplist");
+        todo_list[0].dependencies.push(Todo::try_from("[0] Some dependency").unwrap());
+        todo_list.write(&path, true);
+
+        let todo_dependency_path = PathBuf::from(format!("tests/notes/{}.todo", todo_list[0].hash()));
+        let contents = fs::read_to_string(&todo_dependency_path).expect("Reading file failed :(");
+        let expected = "[0] Some dependency\n";
+        assert_eq!(contents, expected);
+
+        todo_list[0].remove_dependency();
+        todo_list.write(&path, true);
+        remove_file(path);
     }
 }

@@ -504,6 +504,7 @@ impl<'a>App<'a>{
                     Ok(mut todo) => {
                         let bottom = self.bottom();
                         let todo_parent = TodoList::dependency_parent(&self.todo_path, true);
+                        todo.read_dependencies(&todo_parent);
                         let list = &mut self.mut_current_list();
                         list.push(todo);
                         self.index = list.reorder(bottom);
