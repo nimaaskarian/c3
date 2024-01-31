@@ -62,7 +62,9 @@ impl App {
             println!("{}", todo.display(Some(show_done)));
             let mut was_last_clone = was_last.clone();
             was_last_clone.push(is_last);
-            Self::print_tree(&todo.dependencies, show_done, depth+1, was_last_clone);
+            if let Some(todo_list) = todo.dependency.todo_list() {
+                Self::print_tree(&todo_list, show_done, depth+1, was_last_clone);
+            }
         }
     }
 

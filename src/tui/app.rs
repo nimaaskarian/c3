@@ -90,14 +90,35 @@ impl<'a>App<'a>{
 
     #[inline]
     pub fn fix_done_undone(&mut self) {
-        self.mut_todo().unwrap().dependencies.fix_undone();
-        self.mut_current_list().fix_undone();
-
-        if self.show_done {
-            self.mut_todo().unwrap().dependencies.fix_done();
-            self.mut_current_list().fix_done();
+        self.fix_dependency_done_undone();
+        let show_done = self.show_done;
+        let current_list = self.mut_current_list();
+        current_list.fix_undone();
+        if show_done {
+            current_list.fix_done();
         }
 
+        self.traverse_up_and_fix();
+    }
+
+    #[inline]
+    fn fix_dependency_done_undone(&mut self) {
+        let show_done = self.show_done;
+        if let Some(todo) = self.mut_todo() {
+
+            let dep_list = &mut todo.dependency.todo_list;
+
+            dep_list.fix_undone();
+            if show_done {
+                dep_list.fix_done();
+            }
+
+        }
+
+    }
+
+    #[inline]
+    fn traverse_up_and_fix(&mut self) {
         while self.only_undone_empty() && !self.is_root() {
             self.traverse_up();
             match self.mut_todo() {
@@ -251,7 +272,11 @@ impl<'a>App<'a>{
         let mut parent = None;
         for index in self.prior_indexes.iter() {
             parent = Some(&list[*index]);
-            list = &list[*index].dependencies
+            if let Some(todo_list) = &list[*index].dependency.todo_list() {
+                list = todo_list
+            } else {
+                break
+            }
         };
         parent
     }
@@ -453,8 +478,6 @@ impl<'a>App<'a>{
         if self.is_todos_empty() {
             return None
         }
-
-        // let current_list = self.current_list();
         let index = self.index.min(self.len() - 1);
         let size = self.len();
 
@@ -504,7 +527,7 @@ impl<'a>App<'a>{
                     Ok(mut todo) => {
                         let bottom = self.bottom();
                         let todo_parent = TodoList::dependency_parent(&self.todo_path, true);
-                        todo.read_dependencies(&todo_parent);
+                        todo.dependency.read(&todo_parent);
                         let list = &mut self.mut_current_list();
                         list.push(todo);
                         self.index = list.reorder(bottom);
@@ -595,7 +618,11 @@ impl<'a>App<'a>{
             return list;
         }
         for index in self.prior_indexes.iter() {
-            list = &list[*index].dependencies
+            if let Some(todo_list) = &list[*index].dependency.todo_list() {
+                list = todo_list
+            } else {
+                break
+            }
         };
         list
     }
@@ -623,7 +650,7 @@ impl<'a>App<'a>{
             return list;
         }
         for index in self.prior_indexes.iter() {
-            list = &mut list[*index].dependencies
+            list = &mut list[*index].dependency.todo_list
         };
         list
     }
@@ -787,7 +814,7 @@ impl<'a>App<'a>{
         // };
 
         let dependency_width = if let Some(todo) = todo {
-            let should_show_right = (todo.has_todo_dependency() || !todo.get_note_content().is_empty()) && self.show_right;
+            let should_show_right = !todo.dependency.is_none() && self.show_right;
             40 * (should_show_right as u16)
         } else {
             0
@@ -837,13 +864,13 @@ impl<'a>App<'a>{
         
         if todo.is_some() && self.show_right{
             let todo = todo.unwrap();
-            if !todo.get_note_content().is_empty(){
+            if let Some(note) = todo.dependency.note(){
 
-                let note_widget = Paragraph::new(Text::styled(todo.get_note_content(), Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
+                let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
                 frame.render_widget(note_widget, todos_layout[1]);
             } else
-            if todo.has_todo_dependency() {
-                match create_todo_widget(&todo.dependencies.display(self.show_done), String::from("Todo dependencies")) {
+            if let Some(todo_list) = todo.dependency.todo_list() {
+                match create_todo_widget(&todo_list.display(self.show_done), String::from("Todo dependencies")) {
                     TodoWidget::List(widget) =>frame.render_widget(widget, todos_layout[1]),
                     TodoWidget::Paragraph(widget) =>frame.render_widget(widget, todos_layout[1]),
                 }

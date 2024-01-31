@@ -252,7 +252,7 @@ impl TodoList {
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
 
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
-            todo.read_dependencies(&path);
+            todo.dependency.read(&path);
         }
     }
 
@@ -275,9 +275,8 @@ impl TodoList {
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
 
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
-            if let Some(todo_path) = todo.dependency_path(path) {
-                output.push(todo_path);
-                todo.dependencies.all_dependent_files(path, output);
+            if todo.dependency.is_list() {
+                todo.dependency.todo_list.all_dependent_files(path, output);
             }
         }
 
@@ -337,7 +336,7 @@ impl TodoList {
     fn handle_dependent_files(&mut self, path: &PathBuf) -> io::Result<()> {
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
-            todo.dependency_write(path)?;
+            todo.dependency.write(path)?;
             todo.remove_dependent_files(path)?;
         }
         Ok(())
@@ -450,7 +449,7 @@ mod tests {
         let mut todo_list = get_todo_list();
         todo_list[0].add_todo_dependency();
         let path = PathBuf::from("tests/tmplist");
-        todo_list[0].dependencies.push(Todo::try_from("[0] Some dependency").unwrap());
+        todo_list[0].dependency.push(Todo::try_from("[0] Some dependency").unwrap());
         todo_list.write(&path, true);
 
         let todo_dependency_path = PathBuf::from(format!("tests/notes/{}.todo", todo_list[0].hash()));
