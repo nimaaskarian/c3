@@ -9,17 +9,26 @@ if [ "$#" -ne 1 ]; then
   exit 1
 fi
 
-git tag "$1" || {
-  echo List of existing tags:
-  git tag
-  echo_exit tag exists.
-}
 LAST_TAG=$(git tag | tail -n 1)
 
 PACKAGE_NAME=c3
 USERNAME=nimaaskarian
-TAG=$(git tag | tail -n 1)
-sed -i "s/^version = .*/version = \"$TAG\"/" Cargo.toml
+TAG="$1"
+update_cargo_toml() {
+  sed -i "s/^version = .*/version = \"$TAG\"/" Cargo.toml
+  git add Cargo.toml
+  git commit -m "Bumped version $TAG"
+}
+
+push_tag() {
+  git push
+  git tag "$TAG" || {
+    echo List of existing tags:
+    git tag
+    echo_exit tag exists.
+  }
+  git push --tags
+}
 
 release_package() {
   cargo build --release || echo_exit linux build failed
@@ -62,6 +71,8 @@ release_c3_bin() {
   cd ../..
 }
 
+update_cargo_toml
+push_tag
 release_package
 release_c3
 release_c3_bin
