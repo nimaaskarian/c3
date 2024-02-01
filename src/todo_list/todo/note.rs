@@ -6,10 +6,12 @@ use std::env;
 use crate::fileio::{file_content, temp_note_path};
 
 #[inline(always)]
-pub fn open_temp_editor(content:String) -> io::Result<String>{
+pub fn open_temp_editor(content:Option<&String>) -> io::Result<String>{
     let path = temp_note_path();
     let mut file = File::create(&path)?;
-    write!(file, "{content}")?;
+    if let Some(content) = content {
+        write!(file, "{content}")?;
+    }
     let editor = if cfg!(windows) {
         String::from("notepad")
     } else {

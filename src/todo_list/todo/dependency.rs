@@ -4,7 +4,7 @@ use super::TodoList;
 use super::Todo;
 
 #[derive(Debug, PartialEq, Clone, Default)]
-pub enum DependencyMode {
+enum DependencyMode {
     #[default]
     None,
     TodoList,
@@ -20,6 +20,7 @@ pub struct Dependency {
 }
 
 impl Dependency {
+    #[inline]
     pub fn default() -> Self {
         Dependency {
             mode: DependencyMode::None,
@@ -29,7 +30,8 @@ impl Dependency {
         }
     }
 
-    pub fn new(name: String, mode: DependencyMode) -> Self {
+    #[inline]
+    fn new(name: String, mode: DependencyMode) -> Self {
         Dependency {
             mode,
             name,
@@ -38,28 +40,33 @@ impl Dependency {
         }
     }
 
+    #[inline]
     pub fn note(&self) -> Option<&String> {
-        if self.mode == DependencyMode::Note {
+        if self.is_note() {
             Some(&self.note)
         } else {
             None
         }
     }
 
+    #[inline]
     pub fn get_name(&self) -> String {
         self.name.clone()
     }
 
+    #[inline]
     pub fn push(&mut self, todo:Todo) {
-        if self.mode == DependencyMode::TodoList {
+        if self.is_list() {
             self.todo_list.push(todo);
         }
     }
 
+    #[inline]
     pub fn new_todo_list(hash: String) -> Self {
         Dependency::new(format!("{}.todo", hash), DependencyMode::TodoList)
     }
 
+    #[inline]
     pub fn new_note(hash: String, note: String) -> Self {
         let mut dependency = Dependency::new(format!("{}", hash), DependencyMode::Note);
         dependency.note = note;
@@ -67,6 +74,7 @@ impl Dependency {
         dependency
     }
 
+    #[inline]
     pub fn read(&mut self, path: &PathBuf)  -> io::Result<()> {
         match self.mode {
             DependencyMode::Note => {
@@ -81,6 +89,7 @@ impl Dependency {
         Ok(())
     }
 
+    #[inline]
     pub fn todo_list(&self) -> Option<&TodoList> {
         if self.mode == DependencyMode::TodoList {
             Some(&self.todo_list)
@@ -89,6 +98,7 @@ impl Dependency {
         }
     }
 
+    #[inline]
     pub fn write(&mut self, path: &PathBuf) -> io::Result<()> {
         let name = self.name.clone();
         match self.mode.clone() {
@@ -104,6 +114,7 @@ impl Dependency {
         Ok(())
     }
 
+    #[inline]
     pub fn path(&self ,path: &PathBuf) -> Option<PathBuf>{
         match path.parent() {
             Some(path) => Some(TodoList::dependency_parent(&path.to_path_buf(), false)),
@@ -111,18 +122,22 @@ impl Dependency {
         }
     }
 
+    #[inline]
     pub fn is_none(&self) -> bool {
         self.mode == DependencyMode::None
     }
 
+    #[inline]
     pub fn is_note(&self) -> bool {
         self.mode == DependencyMode::Note
     }
 
+    #[inline]
     pub fn is_list(&self) -> bool {
         self.mode == DependencyMode::TodoList
     }
 
+    #[inline]
     pub fn display<'a>(&self) -> &'a str {
         match self.mode {
             DependencyMode::None => ".",
@@ -131,6 +146,7 @@ impl Dependency {
         }
     }
 
+    #[inline]
     pub fn remove(&mut self) -> Option<String> {
         let name = match self.mode {
             DependencyMode::None => None,
@@ -144,6 +160,7 @@ impl Dependency {
 
 
 impl Into<String> for &Dependency {
+    #[inline]
     fn into (self) -> String {
         match self.mode {
             DependencyMode::None => String::new(),
@@ -153,6 +170,7 @@ impl Into<String> for &Dependency {
 }
 
 impl From<&str> for Dependency {
+    #[inline]
     fn from (input: &str) -> Dependency {
         let mut name = String::new();
         let mode: DependencyMode;

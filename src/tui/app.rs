@@ -312,7 +312,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn traverse_down(&mut self) {
         match self.todo() {
-            Some(todo) if todo.has_todo_dependency() => {
+            Some(todo) if todo.dependency.is_list() => {
                 self.prior_indexes.push(self.index);
                 self.index = 0;
             }
@@ -503,8 +503,7 @@ impl<'a>App<'a>{
     #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
         if let Some(todo) = self.todo() {
-            if !todo.has_todo_dependency() && todo.note_empty() {
-                let todo_path = self.todo_path.clone();
+            if todo.dependency.is_none() {
                 self.mut_todo().unwrap().add_todo_dependency();
             }
         }
@@ -557,7 +556,9 @@ impl<'a>App<'a>{
     #[inline]
     pub fn edit_or_add_note(&mut self) {
         if let Some(todo) = self.mut_todo() {
-            todo.edit_note();
+            if todo.edit_note().is_ok() {
+                return;
+            }
         }
     }
 
@@ -864,8 +865,7 @@ impl<'a>App<'a>{
         
         if todo.is_some() && self.show_right{
             let todo = todo.unwrap();
-            if let Some(note) = todo.dependency.note(){
-
+            if let Some(note) = todo.dependency.note() {
                 let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
                 frame.render_widget(note_widget, todos_layout[1]);
             } else

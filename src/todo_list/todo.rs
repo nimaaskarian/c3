@@ -139,7 +139,7 @@ impl Todo {
 
     #[inline]
     pub fn add_todo_dependency(&mut self) -> Result<(), TodoError>{
-        if self.has_todo_dependency() {
+        if !self.dependency.is_none() {
             return Err(TodoError::AlreadyExists)
         }
         self.dependency = Dependency::new_todo_list(self.hash());
@@ -155,10 +155,6 @@ impl Todo {
         }
         self.removed_names = Vec::new();
         Ok(())
-    }
-
-    pub fn has_todo_dependency(&self) -> bool {
-        self.dependency.is_list()
     }
 
     pub fn done(&self) -> bool {
@@ -199,10 +195,8 @@ impl Todo {
     }
 
     pub fn edit_note(&mut self)-> io::Result<()>{
-        if let Some(note) = self.dependency.note() {
-            let note = open_temp_editor(note.clone())?;
-            self.set_note(note)?;
-        }
+        let note = open_temp_editor(self.dependency.note())?;
+        self.set_note(note)?;
 
         Ok(())
     }
@@ -409,7 +403,7 @@ mod tests {
 
         todo.add_todo_dependency();
 
-        assert!(todo.has_todo_dependency());
+        assert!(todo.dependency.is_list());
     }
 
     #[test]
@@ -419,7 +413,7 @@ mod tests {
 
         todo.remove_dependency();
 
-        assert!(!todo.has_todo_dependency());
+        assert!(!todo.dependency.is_list());
     }
 
     #[test]
