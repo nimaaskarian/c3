@@ -1,48 +1,24 @@
-name: Release
-
 on:
   push:
     tags:
       - '*'
 
 jobs:
-  build-and-release:
+  build:
+    name: Release
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Rust
-        uses: actions/setup-rust@v1
-
-      - name: Build for Linux
-        run: cargo build --release --target x86_64-unknown-linux-gnu
-
-      - name: Build for Windows
-        run: cargo build --release --target x86_64-pc-windows-msvc
-
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@master
+      - name: Compile
+        id: compile
+        uses: rust-build/rust-build.action@v1.4.4
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            Changes in this release.
-          draft: false
-          prerelease: false
-
-      - name: Upload Linux build
-        uses: actions/upload-artifact@v2
+          RUSTTARGET: x86_64-unknown-linux-musl
+          UPLOAD_MODE: none
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: c3.x86.linux
-          path: target/x86_64-unknown-linux-gnu/release/c3
-
-      - name: Upload Windows build
-        uses: actions/upload-artifact@v2
-        with:
-          name: c3.x86_64.windows.exe
-          path: target/x86_64-pc-windows-msvc/release/c3
+          name: Binary
+          path: |
+            ${{ steps.compile.outputs.BUILT_ARCHIVE }}
+            ${{ steps.compile.outputs.BUILT_CHECKSUM }}
