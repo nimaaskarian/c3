@@ -38,7 +38,7 @@ pub struct Args {
 
 impl Args {
     pub fn is_cli(&self) -> bool {
-        self.stdout | self.non_interactive | self.tree
+        self.stdout || self.non_interactive || self.tree
     }
 }
 

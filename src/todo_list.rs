@@ -243,17 +243,18 @@ impl TodoList {
         todo_list.done.sort();
         if read_dependencies {
             let dependency_path = Self::dependency_parent(filename, is_root);
-            todo_list.read_dependencies(&dependency_path)
+            let _ = todo_list.read_dependencies(&dependency_path);
         }
         return todo_list
     }
 
-    fn read_dependencies(&mut self, path: &PathBuf) {
+    fn read_dependencies(&mut self, path: &PathBuf) -> io::Result<()>{
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
 
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
-            todo.dependency.read(&path);
+            todo.dependency.read(&path)?;
         }
+        Ok(())
     }
 
     #[inline]
@@ -366,9 +367,7 @@ impl TodoList {
 }
 #[cfg(test)]
 mod tests {
-    use std::fs::{self, remove_file, remove_dir};
-
-    use crate::fileio::todo_path;
+    use std::fs::{self, remove_file};
 
     use super::*;
 
@@ -402,7 +401,7 @@ mod tests {
     fn test_write() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("tests/tmplist");
-        todo_list.write(&path, true);
+        let _ = todo_list.write(&path, true);
 
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
         let expected = "[1] this todo has prio 1

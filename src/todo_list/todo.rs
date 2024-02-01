@@ -9,7 +9,7 @@ use scanf::sscanf;
 mod note;
 mod schedule;
 mod dependency;
-use dependency::TodoDependency;
+use dependency::Dependency;
 use schedule::Schedule;
 use note::{sha1, open_temp_editor};
 
@@ -20,7 +20,7 @@ use super::TodoList;
 pub struct Todo {
     pub message: String,
     priority: i8,
-    pub dependency: TodoDependency,
+    pub dependency: Dependency,
     done:bool,
     removed_names: Vec<String>,
     schedule: Schedule,
@@ -69,8 +69,7 @@ impl TryFrom<&str> for Todo {
             }
             _ => return Err(TodoError::ReadFailed),
         }
-        let dependency = TodoDependency::from(dependency_string.as_str());
-        let dependencies = TodoList::new();
+        let dependency = Dependency::from(dependency_string.as_str());
 
         let priority:i8 = match priority_string.parse() {
             Ok(value) => {
@@ -110,7 +109,7 @@ impl Todo {
         Todo {
             schedule: Schedule::new(),
             removed_names: Vec::new(),
-            dependency: TodoDependency::default(),
+            dependency: Dependency::default(),
             message,
             priority: Todo::fixed_priority(priority),
             done,
@@ -132,10 +131,6 @@ impl Todo {
         self.dependency.is_none()
     }
 
-    fn todolist_name(name:&String) -> String {
-        format!("{name}.todo")
-    }
-
     pub fn remove_note(&mut self) {
         if self.dependency.is_note() {
             self.remove_dependency();
@@ -147,7 +142,7 @@ impl Todo {
         if self.has_todo_dependency() {
             return Err(TodoError::AlreadyExists)
         }
-        self.dependency = TodoDependency::new_todo_list(self.hash());
+        self.dependency = Dependency::new_todo_list(self.hash());
 
         Ok(())
     }
@@ -199,7 +194,7 @@ impl Todo {
     }
 
     pub fn set_note(&mut self, note:String) -> io::Result<()>{
-        self.dependency = TodoDependency::new_note(sha1(&note), note);
+        self.dependency = Dependency::new_note(sha1(&note), note);
         Ok(())
     }
 
@@ -313,9 +308,6 @@ impl Todo {
 
 #[cfg(test)]
 mod tests {
-    use crate::fileio::append_home_dir;
-    use crate::fileio::note_path;
-
     use super::*;
 
     #[test]
@@ -335,7 +327,7 @@ mod tests {
         let expected = Ok(Todo {
             schedule: Schedule::new(),
             removed_names: Vec::new(),
-            dependency:TodoDependency::new_note("2c924e3088204ee77ba681f72be3444357932fca".to_string(), "".to_string()),
+            dependency:Dependency::new_note("2c924e3088204ee77ba681f72be3444357932fca".to_string(), "".to_string()),
             message: "Test".to_string(),
             priority: 1,
             done: false,
@@ -356,26 +348,6 @@ mod tests {
         assert_eq!(todo.message, message);
         assert_eq!(todo.priority, 2);
         assert_eq!(todo.done, false);
-    }
-
-    #[test]
-    fn test_static_dependency_name() {
-        let name = "my_dep".to_string();
-        let expected = "my_dep.todo".to_string();
-
-        let result = Todo::todolist_name(&name);
-
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_default_dependency_path() {
-        let name = "my_dep".to_string();
-        let expected = PathBuf::from(append_home_dir(".local/share/calcurse/notes/my_dep.todo"));
-
-        let result = note_path(&Todo::todolist_name(&name), None).unwrap().unwrap();
-
-        assert_eq!(result, expected);
     }
 
     #[test]
@@ -469,7 +441,7 @@ mod tests {
         let expected = Todo {
             schedule: Schedule::new(),
             removed_names: Vec::new(),
-            dependency: TodoDependency::new_todo_list( "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c".to_string()),
+            dependency: Dependency::new_todo_list( "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c".to_string()),
             message: "Read for exams".to_string(),
             priority: 1,
             done: false,
@@ -484,7 +456,7 @@ mod tests {
         let expected = Todo {
             schedule: Schedule::from("DAILY 2023-09-05"),
             removed_names: Vec::new(),
-            dependency: TodoDependency::default(),
+            dependency: Dependency::default(),
             message: "this one should be daily".to_string(),
             priority: 2,
             done: false,
@@ -498,7 +470,7 @@ mod tests {
     #[test]
     fn test_daily_display() {
         let test = Todo {
-            dependency: TodoDependency::default(),
+            dependency: Dependency::default(),
             schedule: Schedule::from("DAILY"),
             removed_names: Vec::new(),
             message: "this one should be daily".to_string(),
@@ -515,7 +487,7 @@ mod tests {
         let input = "[-2] this one should be daily [D1(2023-09-05)]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
-            dependency: TodoDependency::default(),
+            dependency: Dependency::default(),
             schedule: Schedule::from("DAILY 2023-09-05"),
             removed_names: Vec::new(),
             message: "this one should be daily".to_string(),
@@ -533,7 +505,7 @@ mod tests {
         let input = "[-2] this one should be daily [D7(2023-09-05)]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
-            dependency: TodoDependency::default(),
+            dependency: Dependency::default(),
             schedule: Schedule::from("D7(2023-09-05)"),
             removed_names: Vec::new(),
             message: "this one should be daily".to_string(),

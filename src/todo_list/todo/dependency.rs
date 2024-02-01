@@ -4,7 +4,7 @@ use super::TodoList;
 use super::Todo;
 
 #[derive(Debug, PartialEq, Clone, Default)]
-pub enum Mode {
+pub enum DependencyMode {
     #[default]
     None,
     TodoList,
@@ -12,25 +12,25 @@ pub enum Mode {
 }
 
 #[derive(Debug, PartialEq, Clone, Default)]
-pub struct TodoDependency {
+pub struct Dependency {
     name: String,
-    mode: Mode,
+    mode: DependencyMode,
     note: String,
     pub(crate) todo_list: TodoList,
 }
 
-impl TodoDependency {
+impl Dependency {
     pub fn default() -> Self {
-        TodoDependency {
-            mode: Mode::None,
+        Dependency {
+            mode: DependencyMode::None,
             name: String::new(),
             note: String::new(),
             todo_list: TodoList::new(),
         }
     }
 
-    pub fn new(name: String, mode: Mode) -> Self {
-        TodoDependency {
+    pub fn new(name: String, mode: DependencyMode) -> Self {
+        Dependency {
             mode,
             name,
             note: String::new(),
@@ -39,7 +39,7 @@ impl TodoDependency {
     }
 
     pub fn note(&self) -> Option<&String> {
-        if self.mode == Mode::Note {
+        if self.mode == DependencyMode::Note {
             Some(&self.note)
         } else {
             None
@@ -51,35 +51,38 @@ impl TodoDependency {
     }
 
     pub fn push(&mut self, todo:Todo) {
-        if self.mode == Mode::TodoList {
+        if self.mode == DependencyMode::TodoList {
             self.todo_list.push(todo);
         }
     }
 
     pub fn new_todo_list(hash: String) -> Self {
-        TodoDependency::new(format!("{}.todo", hash), Mode::TodoList)
+        Dependency::new(format!("{}.todo", hash), DependencyMode::TodoList)
     }
 
     pub fn new_note(hash: String, note: String) -> Self {
-        TodoDependency::new(format!("{}", hash), Mode::Note)
+        let mut dependency = Dependency::new(format!("{}", hash), DependencyMode::Note);
+        dependency.note = note;
+
+        dependency
     }
 
     pub fn read(&mut self, path: &PathBuf)  -> io::Result<()> {
         match self.mode {
-            Mode::Note => {
+            DependencyMode::Note => {
                 self.note = std::fs::read_to_string(path.join(&self.name))?;
             }
-            Mode::TodoList => {
+            DependencyMode::TodoList => {
                 self.todo_list = TodoList::read(&path.join(&self.name), true, false);
             }
-            Mode::None => {}
+            DependencyMode::None => {}
         };
 
         Ok(())
     }
 
     pub fn todo_list(&self) -> Option<&TodoList> {
-        if self.mode == Mode::TodoList {
+        if self.mode == DependencyMode::TodoList {
             Some(&self.todo_list)
         } else {
             None
@@ -89,12 +92,12 @@ impl TodoDependency {
     pub fn write(&mut self, path: &PathBuf) -> io::Result<()> {
         let name = self.name.clone();
         match self.mode.clone() {
-            Mode::TodoList => {
+            DependencyMode::TodoList => {
                 self.todo_list.write(&path.join(&self.name), false)?;
             }
-            Mode::Note => {
+            DependencyMode::Note => {
                 let mut file = File::create(path.join(name))?;
-                write!(file, "{}", self.note);
+                write!(file, "{}", self.note)?;
             }
             _ => {}
         };
@@ -109,28 +112,28 @@ impl TodoDependency {
     }
 
     pub fn is_none(&self) -> bool {
-        self.mode == Mode::None
+        self.mode == DependencyMode::None
     }
 
     pub fn is_note(&self) -> bool {
-        self.mode == Mode::Note
+        self.mode == DependencyMode::Note
     }
 
     pub fn is_list(&self) -> bool {
-        self.mode == Mode::TodoList
+        self.mode == DependencyMode::TodoList
     }
 
     pub fn display<'a>(&self) -> &'a str {
         match self.mode {
-            Mode::None => ".",
-            Mode::Note => ">",
-            Mode::TodoList => "-",
+            DependencyMode::None => ".",
+            DependencyMode::Note => ">",
+            DependencyMode::TodoList => "-",
         }
     }
 
     pub fn remove(&mut self) -> Option<String> {
         let name = match self.mode {
-            Mode::None => None,
+            DependencyMode::None => None,
             _ => Some(self.name.clone()),
         };
         *self = Self::default();
@@ -140,34 +143,34 @@ impl TodoDependency {
 }
 
 
-impl Into<String> for &TodoDependency {
+impl Into<String> for &Dependency {
     fn into (self) -> String {
         match self.mode {
-            Mode::None => String::new(),
+            DependencyMode::None => String::new(),
             _ => format!(">{}", self.name),
         }
     }
 }
 
-impl From<&str> for TodoDependency {
-    fn from (input: &str) -> TodoDependency {
+impl From<&str> for Dependency {
+    fn from (input: &str) -> Dependency {
         let mut name = String::new();
-        let mode: Mode;
+        let mode: DependencyMode;
 
         match input {
             _ if sscanf!(input, "{}.todo", name).is_ok() => {
-                mode = Mode::TodoList;
+                mode = DependencyMode::TodoList;
                 name = format!("{name}.todo");
             }
             _ if sscanf!(input, "{}", name).is_ok() && !name.is_empty() => {
-                mode = Mode::Note;
+                mode = DependencyMode::Note;
             }
             _ => {
-                mode = Mode::None;
+                mode = DependencyMode::None;
             }
         };
 
-        TodoDependency::new(name, mode)
+        Dependency::new(name, mode)
     }
 }
 
