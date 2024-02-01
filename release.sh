@@ -75,7 +75,7 @@ release_c3_bin() {
 update_cargo_toml
 build_package
 git add Cargo.lock
-  git commit -m "Bumped version $TAG"
+git commit -m "Bumped version $TAG"
 push_tag
 release_package
 release_c3
