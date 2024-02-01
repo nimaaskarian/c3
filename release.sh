@@ -17,7 +17,6 @@ TAG="$1"
 update_cargo_toml() {
   sed -i "s/^version = .*/version = \"$TAG\"/" Cargo.toml
   git add Cargo.toml
-  git commit -m "Bumped version $TAG"
 }
 
 push_tag() {
@@ -30,9 +29,12 @@ push_tag() {
   git push --tags
 }
 
-release_package() {
+build_package() {
   cargo build --release || echo_exit linux build failed
   cargo build --release --target x86_64-pc-windows-gnu || echo_exit windows build failed
+}
+
+release_package() {
   cp target/release/c3 c3.x86.linux || echo_exit copy linux binary failed
   cp target/x86_64-pc-windows-gnu/release/c3.exe c3.x86_64.windows.exe || echo_exit copy windows binary failed
   FILES="c3.x86.linux c3.x86_64.windows.exe"
@@ -65,13 +67,15 @@ release_c3_bin() {
   cd c3-bin || echo_exit cd to c3 failed
   makepkg --printsrcinfo > .SRCINFO
   git add .
-  pwd
   git commit -m "Bumped version $TAG"
   git push
   cd ../..
 }
 
 update_cargo_toml
+build_package
+git add Cargo.lock
+  git commit -m "Bumped version $TAG"
 push_tag
 release_package
 release_c3
