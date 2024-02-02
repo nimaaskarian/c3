@@ -32,7 +32,7 @@ pub enum TodoWidget<'a> {
 }
 
 pub fn create_todo_widget(display_list:&Vec<String>, title:String) ->  TodoWidget {
-    if display_list.len() == 0 {
+    if display_list.is_empty() {
         return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
     }
     return TodoWidget::List(List::new((*display_list).clone())

@@ -43,9 +43,6 @@ T: ToString,
         let mut date_string = String::new();
         let mut is_scheduled = true;
         match input {
-            _ if sscanf!(input.to_string().as_str(), "DAILY{}", date_string).is_ok() => {
-                day = 1;
-            }
             _ if sscanf!(input.to_string().as_str(), "D{}({})", day, date_string).is_ok() => {
             }
             _ => {
