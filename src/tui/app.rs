@@ -31,7 +31,7 @@ pub struct App<'a>{
     prior_indexes: Vec<usize>,
     text_mode: bool,
     on_submit: Option<fn(&mut Self, String)->()>,
-    clipboard: String,
+    buffer: String,
     module_enabled: bool,
     show_done: bool,
     search_indexes: Vec<usize>,
@@ -59,7 +59,7 @@ impl<'a>App<'a>{
             last_query: String::new(),
             search_index: 0,
             show_done: args.show_done,
-            clipboard,
+            buffer: clipboard,
             on_submit: None,
             todo_list,
             prior_indexes: Vec::new(),
@@ -490,7 +490,7 @@ impl<'a>App<'a>{
             let index = self.index;
             let todo = self.mut_current_list().remove(index);
             let todo_string:String = (&todo).into();
-            self.clipboard = todo_string;
+            self.buffer = todo_string;
         }
     }
 
@@ -507,12 +507,12 @@ impl<'a>App<'a>{
     #[inline]
     pub fn yank_todo(&mut self) {
         let todo_string:String = self.todo().unwrap().into();
-        self.clipboard = todo_string;
+        self.buffer = todo_string;
     }
 
     #[inline]
     pub fn paste_todo(&mut self) {
-        match Todo::try_from(self.clipboard.clone()) {
+        match Todo::try_from(self.buffer.clone()) {
             Ok(mut todo) => {
                 let bottom = self.bottom();
                 let todo_parent = TodoList::dependency_parent(&self.todo_path, true);
