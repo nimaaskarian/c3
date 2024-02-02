@@ -4,7 +4,6 @@ use std::{io, path::PathBuf};
 //}}}
 // lib{{{
 use tui_textarea::{Input, TextArea, CursorMove};
-use arboard::Clipboard;
 use ratatui::{prelude::*, widgets::*};
 use crossterm::event::{self, Event::Key, KeyCode::Char, KeyCode};
 // }}}
@@ -32,7 +31,7 @@ pub struct App<'a>{
     prior_indexes: Vec<usize>,
     text_mode: bool,
     on_submit: Option<fn(&mut Self, String)->()>,
-    clipboard: Option<Clipboard>,
+    clipboard: String,
     module_enabled: bool,
     show_done: bool,
     search_indexes: Vec<usize>,
@@ -46,10 +45,7 @@ impl<'a>App<'a>{
 
     #[inline]
     pub fn new(args:Args,module: &'a mut dyn Module<'a>) -> Self {
-        let clipboard = match Clipboard::new() {
-            Ok(some) => Some(some),
-            Err(_) => None,
-        };
+        let clipboard = String::new();
         let todo_path = match args.todo_path {
             Some(path) => path,
             None => todo_path().unwrap(),
@@ -494,9 +490,7 @@ impl<'a>App<'a>{
             let index = self.index;
             let todo = self.mut_current_list().remove(index);
             let todo_string:String = (&todo).into();
-            if let Some(clipboard) = &mut self.clipboard {
-                let _ = clipboard.set_text(todo_string);
-            }
+            self.clipboard = todo_string;
         }
     }
 
@@ -513,28 +507,22 @@ impl<'a>App<'a>{
     #[inline]
     pub fn yank_todo(&mut self) {
         let todo_string:String = self.todo().unwrap().into();
-        if let Some(clipboard) = &mut self.clipboard {
-            let _ = clipboard.set_text(todo_string);
-        }
+        self.clipboard = todo_string;
     }
 
     #[inline]
     pub fn paste_todo(&mut self) {
-        if let Some(clipboard) = &mut self.clipboard {
-            if let Ok(text) = clipboard.get_text() {
-                match Todo::try_from(text) {
-                    Ok(mut todo) => {
-                        let bottom = self.bottom();
-                        let todo_parent = TodoList::dependency_parent(&self.todo_path, true);
-                        todo.dependency.read(&todo_parent);
-                        let list = &mut self.mut_current_list();
-                        list.push(todo);
-                        self.index = list.reorder(bottom);
-                    },
-                    _ => {},
-                };
-            }
-        }
+        match Todo::try_from(self.clipboard.clone()) {
+            Ok(mut todo) => {
+                let bottom = self.bottom();
+                let todo_parent = TodoList::dependency_parent(&self.todo_path, true);
+                todo.dependency.read(&todo_parent);
+                let list = &mut self.mut_current_list();
+                list.push(todo);
+                self.index = list.reorder(bottom);
+            },
+            _ => {},
+        };
     }
     
     #[inline]

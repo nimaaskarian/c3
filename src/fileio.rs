@@ -1,4 +1,5 @@
 use std::fs::{File, remove_file, remove_dir};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::io::{prelude::*, self};
 use std::path::PathBuf;
 use home::home_dir;
@@ -41,7 +42,11 @@ pub fn todo_path() -> io::Result<PathBuf> {
 
 #[inline(always)]
 pub fn temp_note_path() -> PathBuf{
-    let filename = format!("potato-note.{}", rand::random::<u16>());
+    let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Err(_)=>12345,
+        Ok(some) => some.as_secs(),
+    };
+    let filename = format!("potato-note.{time}");
     let path = home_dir().unwrap().join(filename);
     path.to_path_buf()
 }

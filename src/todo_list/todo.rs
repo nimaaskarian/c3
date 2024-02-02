@@ -131,6 +131,7 @@ impl Todo {
         self.dependency.is_none()
     }
 
+    #[inline]
     pub fn remove_note(&mut self) {
         if self.dependency.is_note() {
             self.remove_dependency();
@@ -147,6 +148,7 @@ impl Todo {
         Ok(())
     }
 
+    #[inline]
     pub fn remove_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
         self.dependency.todo_list.handle_dependent_files(path)?;
 
@@ -157,10 +159,12 @@ impl Todo {
         Ok(())
     }
 
+    #[inline]
     pub fn done(&self) -> bool {
         return self.done
     }
 
+    #[inline]
     pub fn display(&self, show_done: Option<bool>) -> String {
         let show_done = match show_done {
             None => true,
@@ -181,6 +185,7 @@ impl Todo {
         format!("{done_string}{}{note_string} {}{daily_str}", self.priority, self.message)
     }
 
+    #[inline]
     pub fn remove_dependency(&mut self) {
         if let Some(name) = self.dependency.remove() {
             self.removed_names.push(name);
@@ -189,15 +194,20 @@ impl Todo {
         self.dependency.todo_list.remove_dependencies();
     }
 
+    #[inline]
     pub fn set_note(&mut self, note:String) -> io::Result<()>{
         self.dependency = Dependency::new_note(sha1(&note), note);
         Ok(())
     }
 
+    #[inline]
     pub fn edit_note(&mut self)-> io::Result<()>{
-        let note = open_temp_editor(self.dependency.note())?;
-        self.set_note(note)?;
-
+        if !self.dependency.is_list() {
+            let note = open_temp_editor(self.dependency.note())?;
+            if !note.is_empty() {
+                self.set_note(note)?;
+            }
+        }
         Ok(())
     }
 
