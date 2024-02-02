@@ -14,6 +14,7 @@ use crate::Args;
 mod app;
 use app::{App, Operation};
 pub mod modules;
+pub mod clipboard;
 use modules::potato::Potato;
 // }}}
 
