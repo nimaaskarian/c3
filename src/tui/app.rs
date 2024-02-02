@@ -569,7 +569,7 @@ impl<'a>App<'a>{
     pub fn delete_todo(&mut self) {
         if !self.is_todos_empty() {
             let index = self.index;
-            self.mut_current_list().undone.remove(index);
+            self.mut_current_list().remove(index);
         }
     }
 
