@@ -52,6 +52,8 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | J | increase todo priority |
 | K | decrease todo priority |
 | d | toggle daily |
+| W | toggle weekly |
+| S | set custom schedule |
 | D | delete todo |
 | > | add todo note |
 | t | add todo dependency |
