@@ -108,7 +108,7 @@ impl Schedule {
             1 =>format!(" (Daily{inner_str})"),
             7 => format!(" (Weekly{inner_str})"),
             day if day%7 == 0 => format!(" (Each {} weeks{inner_str})", day/7),
-            day =>format!(" (Each {day} day{inner_str})"),
+            day =>format!(" (Each {day} days{inner_str})"),
         }
     }
 
