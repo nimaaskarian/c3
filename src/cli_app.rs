@@ -2,19 +2,19 @@ use std::io;
 use super::todo_app::{App ,TodoList};
 
 #[inline]
-pub fn run(app: &mut App) -> io::Result<()>{
+pub fn run(app: &App) -> io::Result<()>{
     let app = CliApp::new(app);
     app.print()?;
     Ok(())
 }
 
 pub struct CliApp<'a> {
-    todo_app: &'a mut App,
+    todo_app: &'a App,
 }
 
 impl <'a>CliApp <'a>{
     #[inline]
-    pub fn new(app: &'a mut App) -> Self {
+    pub fn new(app: &'a App) -> Self {
         CliApp {
             todo_app: app,
         }

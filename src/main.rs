@@ -8,7 +8,6 @@ use clap::Parser;
 // }}}
 //mod{{{
 pub mod fileio;
-mod app;
 pub(crate) mod todo_app;
 pub(crate) mod cli_app;
 pub(crate) mod tui_app;
@@ -54,7 +53,7 @@ fn main() -> io::Result<()> {
     let mut app = App::new(args);
 
     if is_cli {
-        cli_app::run(&mut app)
+        cli_app::run(&app)
     } else {
         tui_app::startup()?;
         match tui_app::run(&mut app) {
