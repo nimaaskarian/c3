@@ -20,17 +20,21 @@ use fileio::get_todo_path;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Show a tree like output (non interactive)
+    /// Performance mode, don't read dependencies
     #[arg(short='n', long)]
     no_tree: bool,
 
-    /// List todos in non interactive mode
+    /// List todos (non interactive)
     #[arg(short='l', long)]
     non_interactive: bool,
 
     /// Show done todos too
     #[arg(short='d', long)]
     show_done: bool,
+
+    /// Enable TUI module at startup
+    #[arg(short='m', long)]
+    enable_module: bool,
 
     /// Write contents of todo file in the stdout (non interactive)
     #[arg(short='s', long)]

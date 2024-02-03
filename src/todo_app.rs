@@ -254,7 +254,6 @@ impl App {
         }
     }
 
-
     #[inline]
     pub fn go_top(&mut self) {
         self.index = 0;
@@ -477,9 +476,9 @@ impl App {
 
     #[inline]
     pub fn edit_or_add_note(&mut self) {
-        if let Some(todo) = self.mut_todo() {
-            if todo.edit_note().is_ok() {
-                return;
+        if self.is_tree() {
+            if let Some(todo) = self.mut_todo() {
+                todo.edit_note();
             }
         }
     }

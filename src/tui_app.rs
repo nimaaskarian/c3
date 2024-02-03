@@ -71,7 +71,7 @@ pub fn run(app:&mut App) -> io::Result<()> {
 
     let mut potato_module = Potato::new(None);
     let mut list_state = ListState::default();
-    let mut app = TuiApp::new(app, &mut potato_module);
+    let mut app = TuiApp::new(app, &mut potato_module, app.args.enable_module);
 
     loop {
         terminal.draw(|frame| {
@@ -105,7 +105,7 @@ pub struct TuiApp<'a>{
 impl<'a>TuiApp<'a>{
 
     #[inline]
-    pub fn new(app:&'a mut App,module: &'a mut dyn Module<'a>) -> Self {
+    pub fn new(app:&'a mut App,module: &'a mut dyn Module<'a>, module_enabled:bool) -> Self {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         TuiApp {
@@ -115,7 +115,7 @@ impl<'a>TuiApp<'a>{
             on_submit: None,
             show_right: true,
             text_mode: false,
-            module_enabled: false,
+            module_enabled,
         }
     }
 
