@@ -58,6 +58,12 @@ impl <'a>CliApp <'a>{
             was_last_clone.push(is_last);
             if let Some(todo_list) = todo.dependency.todo_list() {
                 Self::print_tree(&todo_list, show_done, depth+1, was_last_clone);
+            } 
+            if let Some(note) = todo.dependency.note() {
+                let mut was_last = was_last.clone();
+                was_last.push(is_last);
+                Self::print_indentation(depth+1, true, &was_last);
+                print!("{}", note);
             }
         }
     }
