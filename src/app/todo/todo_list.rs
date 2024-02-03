@@ -25,10 +25,6 @@ impl IndexMut<usize> for TodoArray {
     }
 }
 
-pub enum TodoArrayError {
-    IndexNotFound
-}
-
 impl Index<usize> for TodoList {
     type Output = Todo;
     fn index(&self, index:usize) -> &Self::Output {

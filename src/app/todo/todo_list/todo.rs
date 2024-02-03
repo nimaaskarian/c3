@@ -455,45 +455,12 @@ mod tests {
 
     #[test]
     fn test_daily() {
-        let input = "[-2] this one should be daily [DAILY 2023-09-05]";
-        let todo = Todo::try_from(input).unwrap();
-        let expected = Todo {
-            schedule: Schedule::from("DAILY 2023-09-05"),
-            removed_names: Vec::new(),
-            dependency: Dependency::default(),
-            message: "this one should be daily".to_string(),
-            priority: 2,
-            done: false,
-        };
-        assert_eq!(todo, expected);
-        let input = "[2] this one should be daily [DAILY 2023-09-05]";
-        let todo = Todo::try_from(input).unwrap();
-        assert_eq!(todo, expected);
-    }
-
-    #[test]
-    fn test_daily_display() {
-        let test = Todo {
-            dependency: Dependency::default(),
-            schedule: Schedule::from("DAILY"),
-            removed_names: Vec::new(),
-            message: "this one should be daily".to_string(),
-            priority: 2,
-            done: false,
-        };
-        let expected = "2. this one should be daily (Daily)";
-
-        assert_eq!(test.display(Some(false)), expected)
-    }
-
-    #[test]
-    fn test_daily_new_format() {
         let input = "[-2] this one should be daily [D1(2023-09-05)]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
-            dependency: Dependency::default(),
-            schedule: Schedule::from("DAILY 2023-09-05"),
+            schedule: Schedule::from("D1(2023-09-05)"),
             removed_names: Vec::new(),
+            dependency: Dependency::default(),
             message: "this one should be daily".to_string(),
             priority: 2,
             done: false,
@@ -502,6 +469,21 @@ mod tests {
         let input = "[2] this one should be daily [D1(2023-09-05)]";
         let todo = Todo::try_from(input).unwrap();
         assert_eq!(todo, expected);
+    }
+
+    #[test]
+    fn test_daily_display() {
+        let test = Todo {
+            dependency: Dependency::default(),
+            schedule: Schedule::from("D1()"),
+            removed_names: Vec::new(),
+            message: "this one should be daily".to_string(),
+            priority: 2,
+            done: false,
+        };
+        let expected = "2. this one should be daily (Daily)";
+
+        assert_eq!(test.display(Some(false)), expected)
     }
 
     #[test]

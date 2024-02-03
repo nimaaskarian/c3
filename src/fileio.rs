@@ -30,7 +30,7 @@ pub fn note_path(hash:&String, parent_dir: Option<PathBuf>) -> io::Result<Option
 }
 
 #[inline(always)]
-pub fn todo_path() -> io::Result<PathBuf> {
+pub fn get_todo_path() -> io::Result<PathBuf> {
     let file = append_home_dir( ".local/share/calcurse/todo");
     if file.is_dir() {
         remove_dir(file.clone())?;

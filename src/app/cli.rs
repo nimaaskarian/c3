@@ -1,46 +1,40 @@
 use std::io;
+use super::todo::{App ,TodoList};
 
-use crate::fileio::todo_path;
-use crate::todo_list::TodoList;
-use crate::Args;
-
-pub struct App {
-    todo_list: TodoList,
-    args: Args,
+#[inline]
+pub fn run(app: &mut App) -> io::Result<()>{
+    let app = CliApp::new(app);
+    app.print()?;
+    Ok(())
 }
 
-impl App {
+pub struct CliApp<'a> {
+    todo_app: &'a mut App,
+}
 
+impl <'a>CliApp <'a>{
     #[inline]
-    pub fn new(args: Args) -> Self {
-        let todo_list = match &args.todo_path {
-            Some(value) => TodoList::read(value, args.tree, true),
-            None => {
-                let todo_path = todo_path().unwrap();
-                TodoList::read(&todo_path, args.tree, true)
-            }
-        };
-        App {
-            args,
-            todo_list,
+    pub fn new(app: &'a mut App) -> Self {
+        CliApp {
+            todo_app: app,
         }
     }
 
     #[inline]
     fn print_list(&self) {
-        for todo_str in self.todo_list.display(self.args.show_done) {
-            println!("{}", todo_str);
+        for display in self.todo_app.display() {
+            println!("{}", display);
         }
     }
 
     #[inline]
     pub fn print(&self) -> io::Result<()>{
-        if self.args.stdout {
-            self.todo_list.print()?;
+        if self.todo_app.args.stdout {
+            self.todo_app.print()?;
             return Ok(())
         }
-        if self.args.tree {
-            Self::print_tree(&self.todo_list, self.args.show_done, 0, vec![false])
+        if self.todo_app.is_tree() {
+            Self::print_tree(&self.todo_app.todo_list, self.todo_app.args.show_done, 0, vec![false])
         } else {
             self.print_list()
         }
