@@ -149,8 +149,8 @@ impl Todo {
     }
 
     #[inline]
-    pub fn remove_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
-        self.dependency.todo_list.handle_dependent_files(path)?;
+    pub fn remove_dependent_files(&mut self, path: &PathBuf, should_write:bool) -> io::Result<()>{
+        self.dependency.todo_list.handle_dependent_files(path, should_write)?;
 
         for name in &self.removed_names {
             let _ = remove_file(path.join(name));

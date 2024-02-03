@@ -1,8 +1,8 @@
 use ratatui::widgets::Paragraph;
 use std::io;
 use std::process::{Command, Output};
-use crate::tui::modules::Module;
-use crate::tui::default_block;
+use super::Module;
+use super::super::default_block;
 
 pub struct Potato<'a>{
     command: &'a str, 

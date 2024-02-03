@@ -5,15 +5,19 @@ use std::io::{self, stdout};
 // lib {{{
 use crossterm::{
     ExecutableCommand,
-    terminal::{disable_raw_mode, LeaveAlternateScreen, enable_raw_mode, EnterAlternateScreen}
+    terminal::{disable_raw_mode, LeaveAlternateScreen, enable_raw_mode, EnterAlternateScreen},
+    event::{self, Event::Key, KeyCode::Char, KeyCode},
 };
+use tui_textarea::{Input, TextArea, CursorMove};
 use ratatui::{prelude::*, widgets::*};
-use crate::Args;
-//}}}
+// }}}
 // mod {{{
-mod app;
-use modules::potato::Potato;
-use super::todo::App;
+mod modules;
+use modules::{
+    Module,
+    potato::Potato,
+};
+use super::todo_app::App;
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
@@ -81,18 +85,6 @@ pub fn run(app:&mut App) -> io::Result<()> {
         }
     }
 }
-
-// vim:fileencoding=utf-8:foldmethod=marker
-// lib{{{
-use tui_textarea::{Input, TextArea, CursorMove};
-use ratatui::{prelude::*, widgets::*};
-use crossterm::event::{self, Event::Key, KeyCode::Char, KeyCode};
-// }}}
-// mod {{{
-mod modules;
-use modules::Module;
-//}}}
-
 
 #[derive(Debug)]
 pub enum Operation {

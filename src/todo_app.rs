@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf};
+use std::io;
 mod clipboard;
 use clipboard::Clipboard;
 mod todo_list;
@@ -368,7 +368,7 @@ impl App {
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
         self.changed = false;
-        self.todo_list.write(&self.args.todo_path, true)?;
+        self.todo_list.write(&self.args.todo_path, true, self.is_tree())?;
         Ok(())
     }
 

@@ -9,7 +9,10 @@ use clap::Parser;
 //mod{{{
 pub mod fileio;
 mod app;
-use app::{cli, tui, todo::App};
+pub(crate) mod todo_app;
+pub(crate) mod cli_app;
+pub(crate) mod tui_app;
+use todo_app::App;
 use fileio::get_todo_path;
 //}}}
 
@@ -51,13 +54,13 @@ fn main() -> io::Result<()> {
     let mut app = App::new(args);
 
     if is_cli {
-        cli::run(&mut app)
+        cli_app::run(&mut app)
     } else {
-        tui::startup()?;
-        match tui::run(&mut app) {
+        tui_app::startup()?;
+        match tui_app::run(&mut app) {
             Ok(_)=>{Ok(())}
             err => {
-                tui::shutdown()?;
+                tui_app::shutdown()?;
                 err
             }
         }
