@@ -10,10 +10,10 @@ index 6269407..db31eef 100644
  scanf = "1.2.1"
  sha1 = "0.10.1"
  home = "0.5.9"
-diff --git a/src/tui/clipboard.rs b/src/tui/clipboard.rs
+diff --git a/src/app/todo/clipboard.rs b/src/app/todo/clipboard.rs
 index 9ad8932..d173736 100644
---- a/src/tui/clipboard.rs
-+++ b/src/tui/clipboard.rs
+--- a/src/app/todo/clipboard.rs
++++ b/src/app/todo/clipboard.rs
 @@ -1,20 +1,32 @@
 -#[derive(Debug)]
 +use arboard;
