@@ -103,7 +103,9 @@ impl Dependency {
         let name = self.name.clone();
         match self.mode.clone() {
             DependencyMode::TodoList => {
-                self.todo_list.write(&path.join(&self.name), false, should_write)?;
+                if should_write {
+                    self.todo_list.write(&path.join(&self.name), false, should_write)?;
+                }
             }
             DependencyMode::Note => {
                 let mut file = File::create(path.join(name))?;

@@ -262,12 +262,14 @@ impl App {
 
     #[inline]
     pub fn traverse_down(&mut self) {
-        match self.todo() {
-            Some(todo) if todo.dependency.is_list() => {
-                self.prior_indexes.push(self.index);
-                self.index = 0;
+        if self.is_tree() {
+            match self.todo() {
+                Some(todo) if todo.dependency.is_list() => {
+                    self.prior_indexes.push(self.index);
+                    self.index = 0;
+                }
+                _ => {},
             }
-            _ => {},
         }
     }
 
@@ -521,12 +523,14 @@ impl App {
 
     #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
-        if let Some(todo) = self.todo() {
-            if todo.dependency.is_none() {
-                self.mut_todo().unwrap().add_todo_dependency();
+        if self.is_tree() {
+            if let Some(todo) = self.todo() {
+                if todo.dependency.is_none() {
+                    self.mut_todo().unwrap().add_todo_dependency();
+                }
             }
+            self.traverse_down()
         }
-        self.traverse_down()
     }
 
     #[inline]

@@ -385,13 +385,9 @@ impl<'a>TuiApp<'a>{
         let todo = self.todo_app.todo();
 
         list_state.select(Some(self.todo_app.index()));
-        // let note = match (todo, self.show_right) {
-        //     (Some(todo), true)  => todo.get_note_content(),
-        //     _ => String::new(),
-        // };
 
         let dependency_width = if let Some(todo) = todo {
-            let should_show_right = !todo.dependency.is_none() && self.show_right;
+            let should_show_right = !todo.dependency.is_none() && self.show_right && self.todo_app.is_tree();
             40 * (should_show_right as u16)
         } else {
             0
