@@ -56,6 +56,8 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | S | set custom schedule |
 | D | delete todo |
 | > | add todo note |
+| i | increase day done |
+| o | decrease day done |
 | t | add todo dependency |
 | l | go in depedency/add todo dependency |
 | h | go back to parent |

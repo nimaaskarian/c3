@@ -49,14 +49,14 @@ impl App {
     #[inline]
     pub fn increase_day_done(&mut self) {
         if let Some(mut todo) = self.mut_todo() {
-            todo.schedule.add_days_to_done_date(1)
+            todo.schedule.add_days_to_done_date(-1)
         }
     }
 
     #[inline]
     pub fn decrease_day_done(&mut self) {
         if let Some(mut todo) = self.mut_todo() {
-            todo.schedule.add_days_to_done_date(-1)
+            todo.schedule.add_days_to_done_date(1)
         }
     }
 
