@@ -329,6 +329,8 @@ impl<'a>TuiApp<'a>{
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('y') => self.todo_app.yank_todo(),
                     Char('p') => self.todo_app.paste_todo(),
+                    Char('i') => self.todo_app.increase_day_done(),
+                    Char('o') => self.todo_app.decrease_day_done(),
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up |Char('k') => self.todo_app.decrement(),
                     KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),

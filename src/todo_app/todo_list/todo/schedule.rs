@@ -84,7 +84,7 @@ impl Schedule {
         }
     }
 
-    fn last_save (&self) -> Duration {
+    fn last_save(&self) -> Duration {
         if let Some(done_date) = self.done_date {
             date::current() - done_date
         } else {
@@ -106,6 +106,14 @@ impl Schedule {
             7 => format!(" (Weekly{inner_str})"),
             day if day%7 == 0 => format!(" (Each {} weeks{inner_str})", day/7),
             day =>format!(" (Each {day} days{inner_str})"),
+        }
+    }
+
+    pub fn add_days_to_done_date(&mut self, days:i64) {
+        if let Some(date) = self.done_date {
+            if days <= self.last_save().num_days() {
+                self.done_date = Some(date+Duration::days(days));
+            }
         }
     }
 

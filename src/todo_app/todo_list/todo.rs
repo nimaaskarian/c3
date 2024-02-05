@@ -23,7 +23,7 @@ pub struct Todo {
     pub dependency: Dependency,
     done:bool,
     removed_names: Vec<String>,
-    schedule: Schedule,
+    pub schedule: Schedule,
 }
 
 impl Into<String> for &Todo {
