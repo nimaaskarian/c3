@@ -119,9 +119,14 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_prenote(&self) {
-        for _ in 0..self.depth+1 {
-            print!("    ")
+        for i in 0..self.depth {
+            if self.was_last[i+1] {
+                print!("    ")
+            } else {
+                print!("│   ")
+            }
         }
+        print!("    ")
     }
 
     #[inline]
