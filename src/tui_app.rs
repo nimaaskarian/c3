@@ -1,6 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std {{{
-use std::io::{self, stdout};
+use std::{io::{self, stdout}, rc::Rc};
 // }}}
 // lib {{{
 use crossterm::{
@@ -17,7 +17,7 @@ use modules::{
     Module,
     potato::Potato,
 };
-use super::todo_app::App;
+use super::todo_app::{App, Todo};
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
@@ -45,6 +45,7 @@ pub fn create_todo_widget(display_list:&Vec<String>, title:String) ->  TodoWidge
 
 }
 
+/// Shutdown TUI app (undo everything did in startup, and show cursor)
 pub fn shutdown() -> io::Result<()> {
     disable_raw_mode()?;
     stdout().execute(crossterm::cursor::Show)?;
@@ -52,12 +53,14 @@ pub fn shutdown() -> io::Result<()> {
     Ok(())
 }
 
+/// Prepare terminal for TUI applicaton by enabling rowmode and entering alternate screen.
 pub fn startup() -> io::Result<()> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
     Ok(())
 }
 
+/// Restart terminal
 #[inline]
 pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
     terminal.clear()?;
@@ -65,6 +68,7 @@ pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Res
     Ok(())
 }
 
+/// Restart TUI app
 #[inline]
 pub fn run(app:&mut App) -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -383,72 +387,76 @@ impl<'a>TuiApp<'a>{
         Ok(Operation::Nothing)
     }
 
+    #[inline]
+    fn get_dependency_width(&self, todo: Option<&Todo>) -> u16 {
+        if let Some(todo) = todo {
+            if !self.show_right || todo.dependency.is_none() || !self.todo_app.is_tree() {
+                return 0;
+            }
+            40
+        } else {
+            0
+        }
+    }
+
+    #[inline]
+    fn render_module_widget(&self, frame: &mut Frame, direction: Direction, constraint1: Constraint, constraint2: Constraint) -> Rc<[Rect]> {
+        let main_layout = Layout::default().direction(direction).constraints([constraint1, constraint2]).split(frame.size());
+        frame.render_widget(self.module.get_widget(), main_layout[0]);
+        main_layout
+    }
+
+    #[inline]
+    fn render_dependency_widget(&self, frame: &mut Frame, todo: Option<&Todo>, dependency_layout: Rect) {
+        if let Some(todo) = todo {
+            if let Some(note) = todo.dependency.note() {
+                let note_widget = Paragraph::new(Text::styled(note, Style::default()))
+                    .wrap(Wrap { trim: true })
+                    .block(default_block("Todo note"));
+                frame.render_widget(note_widget, dependency_layout);
+            } 
+            if let Some(todo_list) = todo.dependency.todo_list() {
+                match create_todo_widget(&todo_list.display(self.todo_app.show_done()), String::from("Todo dependencies")) {
+                    TodoWidget::List(widget) => frame.render_widget(widget, dependency_layout),
+                    TodoWidget::Paragraph(widget) => frame.render_widget(widget, dependency_layout),
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn render_todos_widget(&self, frame: &mut Frame, list_state: &mut ListState, todo_layout: &Rc<[Rect]>) {
+        match create_todo_widget(&self.todo_app.display(), self.title()) {
+            TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout[1]),
+            TodoWidget::List(widget) => frame.render_stateful_widget(widget, todo_layout[1], list_state),
+        }
+    }
+
+    #[inline]
     pub fn ui(&self, frame:&mut Frame, list_state: &mut ListState) {
         let todo = self.todo_app.todo();
 
         list_state.select(Some(self.todo_app.index()));
+        let dependency_width = self.get_dependency_width(todo);
 
-        let dependency_width = if let Some(todo) = todo {
-            let should_show_right = !todo.dependency.is_none() && self.show_right && self.todo_app.is_tree();
-            40 * (should_show_right as u16)
-        } else {
-            0
-        };
         let main_layout = if self.module_enabled {
-             let main_layout = Layout::new(
-                Direction::Vertical,
-                [
-                    Constraint::Length(5),
-                    Constraint::Min(0),
-                ]
-            ).split(frame.size());
-            frame.render_widget(self.module.get_widget(), main_layout[0]);
-            main_layout
+            self.render_module_widget(frame, Direction::Vertical, Constraint::Length(5), Constraint::Min(0))
         } else {
-             Layout::new(
-                Direction::Vertical,
-                [
-                    Constraint::Min(0),
-                ]
-            ).split(frame.size())
+            Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(0)]).split(frame.size())
         };
 
-        let todos_layout = Layout::new(
-            Direction::Horizontal,
-            [
-                Constraint::Percentage(100 - dependency_width),
-                Constraint::Percentage(dependency_width),
-            ]
-        ).split(main_layout[self.module_enabled as usize]);
+        let todo_app_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(100 - dependency_width), Constraint::Percentage(dependency_width)])
+            .split(main_layout[self.module_enabled as usize]);
 
-        let todo_layout = Layout::new(
-            Direction::Vertical,
-            [
-                Constraint::Length(3 * self.text_mode as u16),
-                Constraint::Min(0),
-            ]
-        ).split(todos_layout[0]);
+        let todo_and_textarea_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3 * self.text_mode as u16), Constraint::Min(0)])
+            .split(todo_app_layout[0]);
+        self.render_dependency_widget(frame, todo, todo_app_layout[1]);
 
-
-        match create_todo_widget(&self.todo_app.display(), self.title()) {
-            TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout[1]),
-            TodoWidget::List(widget) => frame.render_stateful_widget(widget, todo_layout[1], list_state),
-        };
-
-        frame.render_widget(self.textarea.widget(), todo_layout[0]);
-        
-        if todo.is_some() && self.show_right{
-            let todo = todo.unwrap();
-            if let Some(note) = todo.dependency.note() {
-                let note_widget = Paragraph::new(Text::styled(note, Style::default())).wrap(Wrap { trim: true }).block(default_block("Todo note"));
-                frame.render_widget(note_widget, todos_layout[1]);
-            } else
-            if let Some(todo_list) = todo.dependency.todo_list() {
-                match create_todo_widget(&todo_list.display(self.todo_app.show_done()), String::from("Todo dependencies")) {
-                    TodoWidget::List(widget) =>frame.render_widget(widget, todos_layout[1]),
-                    TodoWidget::Paragraph(widget) =>frame.render_widget(widget, todos_layout[1]),
-                }
-            } 
-        }
+        frame.render_widget(self.textarea.widget(), todo_and_textarea_layout[0]);
+        self.render_todos_widget(frame, list_state, &todo_and_textarea_layout);
     }
 }
