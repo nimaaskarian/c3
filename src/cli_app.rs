@@ -62,9 +62,23 @@ impl <'a>CliApp <'a>{
             if let Some(note) = todo.dependency.note() {
                 let mut was_last = was_last.clone();
                 was_last.push(is_last);
+                let mut lines = note.lines();
                 Self::print_indentation(depth+1, true, &was_last);
-                print!("{}", note);
+                if let Some(line) = lines.next() {
+                    println!("{}", line);
+                }
+                for line in lines {
+                    Self::print_prenote(depth);
+                    println!("{}", line);
+                }
             }
+        }
+    }
+
+    #[inline]
+    fn print_prenote(depth: usize) {
+        for _ in 0..depth+1 {
+            print!("    ")
         }
     }
 
