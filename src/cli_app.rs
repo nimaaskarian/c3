@@ -1,5 +1,5 @@
 use std::io;
-use super::todo_app::{App ,TodoList};
+use super::todo_app::{App ,TodoList, Todo};
 
 #[inline]
 pub fn run(app: &App) -> io::Result<()>{
@@ -34,67 +34,114 @@ impl <'a>CliApp <'a>{
             return Ok(())
         }
         if self.todo_app.is_tree() {
-            Self::print_tree(&self.todo_app.todo_list, self.todo_app.args.show_done, 0, vec![false])
+            let mut print_todo = PrintTodoTree::new(self.todo_app.args.show_done);
+            print_todo.print_list(&self.todo_app.todo_list);
         } else {
             self.print_list()
         }
         Ok(())
     }
+}
+
+#[derive(Clone)]
+struct PrintTodoTree {
+    was_last: Vec<bool>,
+    is_last: bool,
+    depth: usize,
+    show_done: bool,
+}
+
+impl PrintTodoTree {
+    #[inline]
+    pub fn new(show_done: bool) -> Self {
+        PrintTodoTree {
+            was_last: vec![],
+            is_last: false,
+            depth: 0,
+            show_done,
+        }
+    }
 
     #[inline]
-    pub fn print_tree(todo_list:&TodoList, show_done: bool, depth: usize, was_last: Vec<bool>) {
+    pub fn tree_child(&self) -> Self {
+        let mut new_print = self.clone();
+        new_print.depth+=1;
+        new_print.was_last.push(self.is_last);
+
+        new_print
+    }
+
+    #[inline]
+    pub fn print_list(&mut self, todo_list: &TodoList) {
         let mut todos = todo_list.undone.todos.clone();
-        if show_done {
+        if self.show_done {
             todos.extend(todo_list.done.todos.clone())
         }
 
         for (index, todo) in todos.iter().enumerate() {
-            let is_last = index == todos.len() - 1;
-            if depth > 0 {
-                Self::print_indentation(depth, is_last, &was_last);
+            self.is_last = index == todos.len() - 1;
+            if self.depth > 0 {
+                self.print_indention();
             }
-            println!("{}", todo.display(Some(show_done)));
-            let mut was_last_clone = was_last.clone();
-            was_last_clone.push(is_last);
+            self.print_todo(todo);
+
             if let Some(todo_list) = todo.dependency.todo_list() {
-                Self::print_tree(&todo_list, show_done, depth+1, was_last_clone);
-            } 
+                let mut tree_child = self.tree_child();
+                tree_child.print_list(todo_list);
+            }
+
             if let Some(note) = todo.dependency.note() {
-                let mut was_last = was_last.clone();
-                was_last.push(is_last);
-                let mut lines = note.lines();
-                Self::print_indentation(depth+1, true, &was_last);
-                if let Some(line) = lines.next() {
-                    println!("{}", line);
-                }
-                for line in lines {
-                    Self::print_prenote(depth);
-                    println!("{}", line);
-                }
+                self.print_note(note)
             }
         }
     }
 
     #[inline]
-    fn print_prenote(depth: usize) {
-        for _ in 0..depth+1 {
+    fn print_todo(&self, todo: &Todo) {
+        println!("{}", todo.display(Some(self.show_done)));
+    }
+
+    #[inline]
+    fn print_note(&mut self, note: &String) {
+        self.was_last.push(self.is_last);
+        self.is_last = true;
+
+        let mut lines = note.lines();
+        self.print_indention_with_depth(self.depth+1);
+        if let Some(line) = lines.next() {
+            println!("{}", line);
+        }
+        for line in lines {
+            self.print_prenote();
+            println!("{}", line);
+        }
+    }
+
+    #[inline]
+    fn print_prenote(&self) {
+        for _ in 0..self.depth+1 {
             print!("    ")
         }
     }
 
     #[inline]
-    fn print_indentation(depth: usize, is_last: bool, was_last: &Vec<bool>) {
+    fn print_indention_with_depth(&self, depth: usize) {
         for i in 1..depth {
-            if was_last[i+1] {
+            if self.was_last[i+1] {
                 print!("    ")
             } else {
                 print!("│   ")
             }
         }
-        if is_last {
+        if self.is_last {
             print!("└── ");
         } else {
             print!("├── ");
         }
+    }
+
+    #[inline]
+    fn print_indention(&self) {
+        self.print_indention_with_depth(self.depth);
     }
 }

@@ -3,7 +3,7 @@ mod clipboard;
 use clipboard::Clipboard;
 mod todo_list;
 pub use todo_list::TodoList;
-use todo_list::todo::Todo;
+pub use todo_list::todo::Todo;
 use crate::Args;
 
 pub struct App {
