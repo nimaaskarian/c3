@@ -4,8 +4,7 @@ use std::ops::{Index, IndexMut};
 use std::io::{BufWriter, Write, stdout};
 use std::io;
 use std::fs::read_to_string;
-pub mod todo;
-use todo::Todo;
+use super::Todo;
 
 #[derive(Debug,PartialEq, Clone, Default)]
 pub struct TodoArray {
@@ -320,7 +319,7 @@ impl TodoList {
     }
 
     #[inline]
-    fn remove_dependencies(&mut self) {
+    pub(super) fn remove_dependencies(&mut self) {
         let mut todos = [&mut self.undone.todos, &mut self.done.todos];
         for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
             todo.remove_dependency();
@@ -332,7 +331,7 @@ impl TodoList {
     }
 
     #[inline]
-    fn handle_dependent_files(&mut self, path: &PathBuf, should_write: bool) -> io::Result<()> {
+    pub(super) fn handle_dependent_files(&mut self, path: &PathBuf, should_write: bool) -> io::Result<()> {
         for todo in self.all_todos().iter_mut().flat_map(|v| v.iter_mut()) {
             todo.remove_dependent_files(path, should_write)?;
             if should_write {

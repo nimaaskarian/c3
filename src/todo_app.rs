@@ -2,8 +2,9 @@ use std::io;
 mod clipboard;
 use clipboard::Clipboard;
 mod todo_list;
+mod todo;
 pub use todo_list::TodoList;
-pub use todo_list::todo::Todo;
+pub use todo::Todo;
 use crate::Args;
 
 pub struct App {
