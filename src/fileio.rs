@@ -5,8 +5,14 @@ use std::path::PathBuf;
 use home::home_dir;
 
 #[inline(always)]
-pub fn append_home_dir(str:&str) -> PathBuf {
-    PathBuf::from(format!("{}/{}", home_dir().unwrap().to_str().unwrap(), str))
+pub fn append_home_dir(vec:[&str; 4]) -> PathBuf {
+    let mut path = PathBuf::from(format!("{}", home_dir().unwrap().to_str().unwrap()));
+    for item in vec {
+        path = path.join(item);
+    }
+
+    return path
+    // PathBuf::from(format!("{}/{}", home_dir().unwrap().to_str().unwrap(), str))
 }
 
 #[inline(always)]
@@ -17,7 +23,7 @@ pub fn note_path(hash:&String, parent_dir: Option<PathBuf>) -> io::Result<Option
     let parent_dir = match parent_dir {
         Some(value) => value,
         None => {
-            let dir = append_home_dir(".local/share/calcurse/notes");
+            let dir = append_home_dir([".local","share","calcurse","notes"]);
             if dir.is_file() {
                 remove_file(dir.clone())?;
             }
@@ -31,7 +37,7 @@ pub fn note_path(hash:&String, parent_dir: Option<PathBuf>) -> io::Result<Option
 
 #[inline(always)]
 pub fn get_todo_path() -> io::Result<PathBuf> {
-    let file = append_home_dir( ".local/share/calcurse/todo");
+    let file = append_home_dir([".local","share","calcurse","todo"]);
     if file.is_dir() {
         remove_dir(file.clone())?;
     }
