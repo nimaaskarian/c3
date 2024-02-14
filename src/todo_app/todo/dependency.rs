@@ -76,15 +76,17 @@ impl Dependency {
 
     #[inline]
     pub fn read(&mut self, path: &PathBuf)  -> io::Result<()> {
+        let file_path = path.join(&self.name);
+        let name_todo = format!("{}.todo", self.name);
         match self.mode {
             DependencyMode::Note if path.join(&self.name).is_file() => {
-                self.note = std::fs::read_to_string(path.join(&self.name))?;
+                self.note = std::fs::read_to_string(file_path)?;
             }
             DependencyMode::Note | DependencyMode::TodoList 
-                if path.join(&self.name).is_file() || path.join(format!("{}.todo", self.name)).is_file() => {
+                if file_path.is_file() || path.join(&name_todo).is_file() => {
 
                 if self.mode == DependencyMode::Note {
-                    self.name = format!("{}.todo", self.name);
+                    self.name = name_todo;
                     self.mode = DependencyMode::TodoList;
                 }
                 self.todo_list = TodoList::read(&path.join(&self.name), true, false);
