@@ -1,7 +1,7 @@
 use std::fs::{File, create_dir_all};
 use std::path::PathBuf;
 use std::ops::{Index, IndexMut};
-use std::io::{BufWriter, Write, stdout};
+use std::io::{stdout, BufWriter, Read, Write};
 use std::io;
 use std::fs::read_to_string;
 use super::Todo;
@@ -52,6 +52,14 @@ impl TodoArray {
         TodoArray {
             todos: Vec::new()
         }
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<Todo> {
+        self.todos.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<Todo> {
+        self.todos.iter_mut()
     }
 
     pub fn messages(&self) -> Vec<String> {
@@ -244,7 +252,7 @@ impl TodoList {
     }
 
     fn read_dependencies(&mut self, path: &PathBuf) -> io::Result<()>{
-        for todo in self.all_todos().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
             todo.dependency.read(&path)?;
         }
         Ok(())
@@ -266,9 +274,7 @@ impl TodoList {
 
     #[inline]
     pub fn all_dependent_files(&mut self, path: &PathBuf, output: &mut Vec<PathBuf>) -> Vec<PathBuf>{
-        let mut todos = [&mut self.undone.todos, &mut self.done.todos];
-
-        for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
             if todo.dependency.is_list() {
                 todo.dependency.todo_list.all_dependent_files(path, output);
             }
@@ -320,19 +326,19 @@ impl TodoList {
 
     #[inline]
     pub(super) fn remove_dependencies(&mut self) {
-        let mut todos = [&mut self.undone.todos, &mut self.done.todos];
-        for todo in todos.iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
             todo.remove_dependency();
         }
     }
 
-    fn all_todos(&mut self)  -> [&mut Vec<Todo>; 2] {
+    #[inline]
+    fn all_todos_mut(&mut self)  -> [&mut Vec<Todo>; 2] {
         [&mut self.undone.todos, &mut self.done.todos]
     }
 
     #[inline]
     pub(super) fn handle_dependent_files(&mut self, path: &PathBuf, should_write: bool) -> io::Result<()> {
-        for todo in self.all_todos().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
             todo.remove_dependent_files(path, should_write)?;
             if should_write {
                 todo.dependency.write(path, should_write)?;
@@ -343,11 +349,7 @@ impl TodoList {
 
     #[inline]
     pub fn write(&mut self, filename: &PathBuf, is_root: bool, should_write: bool) -> io::Result<()> {
-        let dependency_path = if is_root {
-            filename.parent().unwrap().to_path_buf().join("notes")
-        } else {
-            filename.parent().unwrap().to_path_buf()
-        };
+        let dependency_path = Self::dependency_parent(filename, is_root);
         create_dir_all(&dependency_path)?;
         let file = File::create(filename)?;
         let mut writer = BufWriter::new(file);

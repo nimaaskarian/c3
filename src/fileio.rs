@@ -1,4 +1,4 @@
-use std::fs::{File, remove_file, remove_dir};
+use std::fs::{File, remove_dir};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::io::{prelude::*, self};
 use std::path::PathBuf;
@@ -11,28 +11,7 @@ pub fn append_home_dir(vec:[&str; 4]) -> PathBuf {
         path = path.join(item);
     }
 
-    return path
-    // PathBuf::from(format!("{}/{}", home_dir().unwrap().to_str().unwrap(), str))
-}
-
-#[inline(always)]
-pub fn note_path(hash:&String, parent_dir: Option<PathBuf>) -> io::Result<Option<PathBuf>> {
-    if hash.is_empty() {
-        return Ok(None)
-    }
-    let parent_dir = match parent_dir {
-        Some(value) => value,
-        None => {
-            let dir = append_home_dir([".local","share","calcurse","notes"]);
-            if dir.is_file() {
-                remove_file(dir.clone())?;
-            }
-            dir
-        }
-    };
-    let _ = std::fs::create_dir_all(parent_dir.clone());
-    Ok(Some(parent_dir.join(hash)))
-
+    path
 }
 
 #[inline(always)]
