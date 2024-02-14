@@ -80,14 +80,16 @@ impl Dependency {
             DependencyMode::Note if path.join(&self.name).is_file() => {
                 self.note = std::fs::read_to_string(path.join(&self.name))?;
             }
-            DependencyMode::Note | DependencyMode::TodoList => {
+            DependencyMode::Note | DependencyMode::TodoList 
+                if path.join(&self.name).is_file() || path.join(format!("{}.todo", self.name)).is_file() => {
+
                 if self.mode == DependencyMode::Note {
                     self.name = format!("{}.todo", self.name);
                     self.mode = DependencyMode::TodoList;
                 }
                 self.todo_list = TodoList::read(&path.join(&self.name), true, false);
             }
-            DependencyMode::None => {}
+            _ => {}
         };
 
         Ok(())
