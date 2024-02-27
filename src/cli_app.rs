@@ -132,7 +132,7 @@ impl PrintTodoTree {
     #[inline]
     fn print_indention_with_depth(&self, depth: usize) {
         for i in 1..depth {
-            if self.was_last[i+1] {
+            if self.was_last[i] {
                 print!("    ")
             } else {
                 print!("│   ")
