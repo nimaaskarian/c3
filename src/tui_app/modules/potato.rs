@@ -125,12 +125,12 @@ impl<'a> Potato<'a> {
 
     #[inline]
     pub fn increase_timer(&self) {
-        self.run(vec![self.resolve_arg("a")])
+        self.run(vec![self.resolve_arg("i")])
     }
 
     #[inline]
     pub fn increase_pomodoro(&self) {
-        self.run(vec![self.resolve_arg("A")])
+        self.run(vec![self.resolve_arg("I")])
     }
 
     #[inline]
