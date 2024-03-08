@@ -26,7 +26,7 @@ pub struct Args {
 
     /// List todos (non interactive)
     #[arg(short='l', long)]
-    non_interactive: bool,
+    list: bool,
 
     /// Show done todos too
     #[arg(short='d', long)]
@@ -47,7 +47,7 @@ pub struct Args {
 
 impl Args {
     pub fn is_cli(&self) -> bool {
-        self.stdout || self.non_interactive
+        self.stdout || self.list
     }
 }
 
