@@ -34,7 +34,7 @@ impl <'a>CliApp <'a>{
             return Ok(())
         }
         if self.todo_app.is_tree() {
-            let mut print_todo = PrintTodoTree::new(self.todo_app.args.show_done);
+            let mut print_todo = PrintTodoTree::new(self.todo_app.args.show_done, self.todo_app.args.minimal_tree);
             print_todo.print_list(&self.todo_app.todo_list);
         } else {
             self.print_list()
@@ -46,6 +46,7 @@ impl <'a>CliApp <'a>{
 #[derive(Clone)]
 struct PrintTodoTree {
     was_last: Vec<bool>,
+    should_print_indention: bool,
     is_last: bool,
     depth: usize,
     show_done: bool,
@@ -53,12 +54,13 @@ struct PrintTodoTree {
 
 impl PrintTodoTree {
     #[inline]
-    pub fn new(show_done: bool) -> Self {
+    pub fn new(show_done: bool, should_print_indention:bool) -> Self {
         PrintTodoTree {
             was_last: vec![],
             is_last: false,
             depth: 0,
             show_done,
+            should_print_indention,
         }
     }
 
@@ -131,6 +133,9 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_indention_with_depth(&self, depth: usize) {
+        if self.should_print_indention {
+            return
+        }
         for i in 1..depth {
             if self.was_last[i] {
                 print!("    ")

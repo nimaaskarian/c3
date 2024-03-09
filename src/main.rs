@@ -24,6 +24,10 @@ pub struct Args {
     #[arg(short='n', long)]
     no_tree: bool,
 
+    /// Minimal tree with no tree graphics
+    #[arg(short='M', long)]
+    minimal_tree: bool,
+
     /// List todos (non interactive)
     #[arg(short='l', long)]
     list: bool,
