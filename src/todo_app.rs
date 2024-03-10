@@ -8,6 +8,7 @@ pub use todo::Todo;
 use crate::Args;
 
 pub struct App {
+    selected: Vec<usize>,
     clipboard: Clipboard,
     pub(super) todo_list: TodoList,
     index: usize,
@@ -23,8 +24,10 @@ pub struct App {
 impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
-        App {
-            todo_list: TodoList::read(&args.todo_path, !args.no_tree, true),
+        let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
+        let mut app = App {
+            selected: vec![],
+            todo_list,
             clipboard: Clipboard::new(),
             index: 0,
             prior_indexes: vec![],
@@ -34,7 +37,43 @@ impl App {
             last_query: String::new(),
             search_indexes: vec![],
             search_index: 0,
+        };
+        for str in app.args.search_and_select.clone() {
+            app.search(Some(str));
+            for index in app.search_indexes.clone() {
+                app.selected.push(index);
+            }
         }
+
+        app
+    }
+
+    pub fn do_commands_on_selected(&mut self) -> bool {
+        let mut should_write = false;
+        for (iter_index, sel_index) in self.selected.clone().iter().enumerate() {
+            if let Some(priority) = self.args.set_selected_priority {
+                self.todo_list[*sel_index].set_priority(priority as i8);
+            }
+            if let Some(message) = self.args.set_selected_message.clone() {
+                self.todo_list[*sel_index].set_message(message);
+            }
+            if self.args.delete_selected {
+                self.todo_list.remove(*sel_index);
+                self.selected.remove(iter_index);
+                should_write = true;
+            }
+            if self.args.done_selected {
+                self.todo_list[*sel_index].toggle_done();
+                if !self.args.show_done {
+                    self.selected.remove(iter_index);
+                }
+                should_write = true;
+            }
+        }
+        if !self.selected.is_empty() {
+            return true
+        }
+        return should_write
     }
 
     #[inline]
@@ -550,5 +589,12 @@ impl App {
     #[inline]
     pub fn print(&self) -> io::Result<()> {
         self.todo_list.print()
+    }
+
+    #[inline]
+    pub fn print_selected(&self) {
+        for index in self.selected.clone() {
+            println!("{}", self.todo_list[index].display(Some(self.args.show_done)));
+        }
     }
 }

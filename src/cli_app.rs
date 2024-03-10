@@ -2,7 +2,7 @@ use std::io;
 use super::todo_app::{App ,TodoList, Todo};
 
 #[inline]
-pub fn run(app: &App) -> io::Result<()>{
+pub fn run(app: &mut App) -> io::Result<()>{
     let app = CliApp::new(app);
     app.print()?;
     Ok(())
@@ -14,7 +14,17 @@ pub struct CliApp<'a> {
 
 impl <'a>CliApp <'a>{
     #[inline]
-    pub fn new(app: &'a App) -> Self {
+    pub fn new(app: &'a mut App) -> Self {
+        for message in app.args.append_todo.clone() {
+            app.append(message);
+        }
+        for message in app.args.prepend_todo.clone() {
+            app.prepend(message);
+        }
+        let should_write = app.do_commands_on_selected();
+        if !app.args.append_todo.is_empty() || !app.args.prepend_todo.is_empty() || should_write{
+            app.write();
+        }
         CliApp {
             todo_app: app,
         }
@@ -29,6 +39,10 @@ impl <'a>CliApp <'a>{
 
     #[inline]
     pub fn print(&self) -> io::Result<()>{
+        if !self.todo_app.args.search_and_select.is_empty() {
+            self.todo_app.print_selected();
+            return Ok(())
+        }
         if self.todo_app.args.stdout {
             self.todo_app.print()?;
             return Ok(())

@@ -135,19 +135,6 @@ impl TodoArray {
 
         }
         return j;
-        // if to == from {
-        //     return;
-        // }
-
-        // let tmp = std::mem::replace(&mut self.todos[from], Default::default());
-
-        // if to < from {
-        //     self.todos.insert(to, tmp);
-        //     self.todos.remove(from + 1);
-        // } else {
-        //     self.todos.insert(to + 1, tmp);
-        //     self.todos.remove(from);
-        // }
     }
 
     pub fn print (&self) {
