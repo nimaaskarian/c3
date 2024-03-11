@@ -50,20 +50,27 @@ impl App {
 
     pub fn do_commands_on_selected(&mut self) -> bool {
         let mut should_write = false;
+        let mut index_shift = 0;
         for (iter_index, sel_index) in self.selected.clone().iter().enumerate() {
+            if  index_shift > *sel_index  || index_shift > iter_index {
+                break
+            }
+            let sel_index = *sel_index - index_shift;
+            let iter_index = iter_index - iter_index;
             if let Some(priority) = self.args.set_selected_priority {
-                self.todo_list[*sel_index].set_priority(priority as i8);
+                self.todo_list[sel_index].set_priority(priority as i8);
             }
             if let Some(message) = self.args.set_selected_message.clone() {
-                self.todo_list[*sel_index].set_message(message);
+                self.todo_list[sel_index].set_message(message);
             }
             if self.args.delete_selected {
-                self.todo_list.remove(*sel_index);
+                self.todo_list.remove(sel_index);
                 self.selected.remove(iter_index);
+                index_shift += 1;
                 should_write = true;
             }
             if self.args.done_selected {
-                self.todo_list[*sel_index].toggle_done();
+                self.todo_list[sel_index].toggle_done();
                 if !self.args.show_done {
                     self.selected.remove(iter_index);
                 }

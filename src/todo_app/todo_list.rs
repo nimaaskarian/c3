@@ -176,7 +176,8 @@ impl TodoList {
         if index < size {
             self.undone.remove(index)
         } else {
-            self.done.remove(index - size)
+            let index = index - size;
+            self.done.remove(index)
         }
         
     }
