@@ -374,7 +374,6 @@ impl<'a>TuiApp<'a>{
                     Char('s') => self.module.on_s(),
                     Char('H') => self.module.on_capital_h(),
                     Char('c') => self.module.on_c(),
-                    Char('C') => self.module.on_capital_c(),
                     Char('L') => self.module.on_capital_l(),
                     Char('r') => self.module.on_r(),
                     Char('+') | Char('=') => self.module.on_plus(),

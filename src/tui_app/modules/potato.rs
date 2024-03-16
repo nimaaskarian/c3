@@ -53,11 +53,6 @@ impl <'a> Module <'a> for Potato <'a> {
     }
 
     #[inline]
-    fn on_capital_c(&mut self) {
-        self.run_deamon()
-    }
-
-    #[inline]
     fn on_r(&mut self) {
         self.restart()
     }
@@ -174,10 +169,5 @@ impl<'a> Potato<'a> {
     #[inline]
     pub fn quit(&mut self) {
         self.run(vec![self.resolve_arg("q")])
-    }
-
-    #[inline]
-    pub fn run_deamon(&mut self) {
-        let _ = Command::new("potd").status();
     }
 }

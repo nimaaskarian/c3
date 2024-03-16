@@ -14,5 +14,4 @@ pub trait Module <'a>{
     fn on_dot(&mut self);
     fn on_comma(&mut self);
     fn on_c(&mut self);
-    fn on_capital_c(&mut self);
 }
