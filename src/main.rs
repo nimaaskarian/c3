@@ -91,7 +91,6 @@ fn main() -> io::Result<()> {
     if is_cli {
         cli_app::run(&mut app)
     } else {
-        tui_app::startup()?;
         match tui_app::run(&mut app) {
             Ok(_)=>{Ok(())}
             err => {

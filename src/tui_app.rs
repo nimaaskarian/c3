@@ -71,6 +71,7 @@ pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Res
 /// Restart TUI app
 #[inline]
 pub fn run(app:&mut App) -> io::Result<()> {
+    startup()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut potato_module = Potato::new(None);
