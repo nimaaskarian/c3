@@ -79,7 +79,8 @@ pub struct Args {
 
 impl Args {
     pub fn is_cli(&self) -> bool {
-        self.stdout || self.list || !self.search_and_select.is_empty() || !self.prepend_todo.is_empty() || !self.append_todo.is_empty()
+        self.stdout || self.minimal_tree || self.list ||
+        !self.search_and_select.is_empty() || !self.prepend_todo.is_empty() || !self.append_todo.is_empty()
     }
 }
 
