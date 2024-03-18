@@ -570,9 +570,9 @@ impl App {
     pub fn paste_todo(&mut self) {
         match Todo::try_from(self.clipboard.get_text()) {
             Ok(mut todo) => {
-                let bottom = self.bottom();
                 let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
                 todo.dependency.read(&todo_parent);
+                let bottom = self.bottom()+1;
                 let list = &mut self.mut_current_list();
                 list.push(todo);
                 self.index = list.reorder(bottom);
