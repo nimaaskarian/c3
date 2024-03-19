@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf};
+use std::{io, path::PathBuf, fs::remove_file};
 mod clipboard;
 use clipboard::Clipboard;
 mod todo_list;
@@ -15,6 +15,7 @@ pub struct App {
     prior_indexes: Vec<usize>,
     pub changed:bool,
     pub(super) args: Args,
+    removed_dependencies: Vec<String>,
     // search:
     search_indexes: Vec<usize>,
     search_index: usize,
@@ -26,6 +27,7 @@ impl App {
     pub fn new(args: Args) -> Self {
         let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
         let mut app = App {
+            removed_dependencies: vec![],
             selected: vec![],
             todo_list,
             clipboard: Clipboard::new(),
@@ -430,7 +432,14 @@ impl App {
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
         self.changed = false;
-        self.todo_list.write(&self.args.todo_path, true, self.is_tree())?;
+        let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
+        for name in &self.removed_dependencies {
+            let _ = remove_file(dependency_path.join(name));
+        }
+        self.removed_dependencies = vec![];
+        if self.is_tree() {
+            self.todo_list.write_dependencies(&dependency_path)?;
+        }
         Ok(())
     }
 
@@ -512,7 +521,10 @@ impl App {
     pub fn delete_todo(&mut self) {
         if !self.is_todos_empty() {
             let index = self.index;
-            self.mut_current_list().remove(index);
+            let mut todo = self.mut_current_list().remove(index);
+            for name in todo.remove_dependency() {
+                self.removed_dependencies.push(name);
+            }
         }
     }
 

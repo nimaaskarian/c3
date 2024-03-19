@@ -48,7 +48,7 @@ pub enum TodoError {
 impl TryFrom<String> for Todo {
     type Error = TodoError;
 
-    fn try_from(s:String) -> Result<Todo, TodoError>{
+    fn try_from(s:String) -> Result<Todo, Self::Error>{
         Todo::try_from(s.as_str())
     }
 }
@@ -56,7 +56,7 @@ impl TryFrom<String> for Todo {
 impl TryFrom<&str> for Todo {
     type Error = TodoError;
 
-    fn try_from(input:&str) -> Result<Todo, TodoError>{
+    fn try_from(input:&str) -> Result<Todo, Self::Error>{
         let mut message = String::new();
         let mut priority_string:String = String::new();
         let mut dependency_string = String::new();
@@ -67,7 +67,7 @@ impl TryFrom<&str> for Todo {
             _ if sscanf!(input, "[{}] {}", priority_string, message).is_ok() => {
                 dependency_string = String::new();
             }
-            _ => return Err(TodoError::ReadFailed),
+            _ => return Err(Self::Error::ReadFailed),
         }
         let dependency = Dependency::from(dependency_string.as_str());
 
@@ -140,17 +140,17 @@ impl Todo {
 
     #[inline]
     pub fn add_todo_dependency(&mut self) -> Result<(), TodoError>{
-        if !self.dependency.is_none() {
-            return Err(TodoError::AlreadyExists)
+        if self.dependency.is_none() {
+            self.dependency = Dependency::new_todo_list(self.hash());
+            Ok(())
+        } else {
+            Err(TodoError::AlreadyExists)
         }
-        self.dependency = Dependency::new_todo_list(self.hash());
-
-        Ok(())
     }
 
     #[inline]
-    pub fn remove_dependent_files(&mut self, path: &PathBuf, should_write:bool) -> io::Result<()>{
-        self.dependency.todo_list.handle_dependent_files(path, should_write)?;
+    pub fn remove_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
+        self.dependency.todo_list.write_dependencies(path)?;
 
         for name in &self.removed_names {
             let _ = remove_file(path.join(name));
@@ -161,7 +161,7 @@ impl Todo {
 
     #[inline]
     pub fn done(&self) -> bool {
-        return self.done
+        self.done
     }
 
     #[inline]
@@ -186,12 +186,13 @@ impl Todo {
     }
 
     #[inline]
-    pub fn remove_dependency(&mut self) {
+    pub fn remove_dependency(&mut self) -> Vec<String>{
         if let Some(name) = self.dependency.remove() {
             self.removed_names.push(name);
         }
 
         self.dependency.todo_list.remove_dependencies();
+        self.removed_names.clone()
     }
 
     #[inline]

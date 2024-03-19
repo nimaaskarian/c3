@@ -325,25 +325,22 @@ impl TodoList {
     }
 
     #[inline]
-    pub(super) fn handle_dependent_files(&mut self, path: &PathBuf, should_write: bool) -> io::Result<()> {
+    pub(super) fn write_dependencies(&mut self, filename: &PathBuf) -> io::Result<()> {
         for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
-            todo.remove_dependent_files(path, should_write)?;
-            if should_write {
-                todo.dependency.write(path, should_write)?;
-            }
+            todo.remove_dependent_files(filename)?;
+            todo.dependency.write(filename)?;
         }
         Ok(())
     }
 
     #[inline]
-    pub fn write(&mut self, filename: &PathBuf, is_root: bool, should_write: bool) -> io::Result<()> {
+    pub fn write(&mut self, filename: &PathBuf, is_root: bool) -> io::Result<PathBuf> {
         let dependency_path = Self::dependency_parent(filename, is_root);
         create_dir_all(&dependency_path)?;
         let file = File::create(filename)?;
         let mut writer = BufWriter::new(file);
         self.write_to_buf(&mut writer)?;
-        self.handle_dependent_files(&dependency_path, should_write)?;
-        Ok(())
+        Ok(dependency_path)
     }
 
     #[inline]
@@ -389,7 +386,7 @@ mod tests {
     fn test_write() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("tests/tmplist");
-        let _ = todo_list.write(&path, true, true);
+        let _ = todo_list.write(&path, true);
 
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
         let expected = "[1] this todo has prio 1
@@ -407,7 +404,7 @@ mod tests {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("tests/tmplist");
         todo_list.push(Todo::default("Show me your warface".to_string(), 0));
-        todo_list.write(&path, true, true);
+        todo_list.write(&path, true);
 
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
         let expected = "[1] this todo has prio 1
@@ -432,12 +429,13 @@ mod tests {
     }
 
     #[test]
-    fn test_write_dependencies() {
+    fn test_write_dependencies() -> io::Result<()>{
         let mut todo_list = get_todo_list();
         todo_list[0].add_todo_dependency();
         let path = PathBuf::from("tests/tmplist");
         todo_list[0].dependency.push(Todo::try_from("[0] Some dependency").unwrap());
-        todo_list.write(&path, true, true);
+        let dependency_path = todo_list.write(&path, true)?;
+        todo_list.write_dependencies(&dependency_path);
 
         let todo_dependency_path = PathBuf::from(format!("tests/notes/{}.todo", todo_list[0].hash()));
         let contents = fs::read_to_string(&todo_dependency_path).expect("Reading file failed :(");
@@ -445,7 +443,10 @@ mod tests {
         assert_eq!(contents, expected);
 
         todo_list[0].remove_dependency();
-        todo_list.write(&path, true, true);
-        remove_file(path);
+        let dependency_path = todo_list.write(&path, true)?;
+        todo_list.write_dependencies(&dependency_path);
+        remove_file(&dependency_path);
+        remove_file(&path);
+        Ok(())
     }
 }
