@@ -23,7 +23,7 @@ impl <'a>CliApp <'a>{
         }
         let should_write = app.do_commands_on_selected();
         if !app.args.append_todo.is_empty() || !app.args.prepend_todo.is_empty() || should_write{
-            app.write();
+            let _ = app.write();
         }
         CliApp {
             todo_app: app,

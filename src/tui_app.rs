@@ -211,7 +211,7 @@ impl<'a>TuiApp<'a>{
         if self.todo_app.is_changed() {
             self.set_text_mode(Self::on_save_prompt, "You have done changes. You wanna save? [n: no, y: yes, c: cancel] (default: n)", "N/y/c");
         } else {
-            self.quit();
+            let _ = self.quit();
         }
     }
 
@@ -219,11 +219,11 @@ impl<'a>TuiApp<'a>{
     fn on_save_prompt(app:&mut TuiApp, str:String) {
         let lower = str.to_lowercase();
         if lower.starts_with("y") {
-            app.todo_app.write();
+            let _ = app.todo_app.write();
         } else if lower.starts_with("c") {
             return;
         }
-        app.quit();
+        let _ = app.quit();
     }
 
     #[inline]

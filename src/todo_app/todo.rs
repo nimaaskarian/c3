@@ -186,13 +186,12 @@ impl Todo {
     }
 
     #[inline]
-    pub fn remove_dependency(&mut self) -> Vec<String>{
+    pub fn remove_dependency(&mut self) {
         if let Some(name) = self.dependency.remove() {
             self.removed_names.push(name);
         }
 
         self.dependency.todo_list.remove_dependencies();
-        self.removed_names.clone()
     }
 
     #[inline]
@@ -318,7 +317,7 @@ mod tests {
     #[test]
     fn test_todo_into_string() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        todo.set_note("Note".to_string());
+        let _ = todo.set_note("Note".to_string());
 
         let expected = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let result: String = (&todo).into();
@@ -412,7 +411,7 @@ mod tests {
     fn test_add_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
 
-        todo.add_todo_dependency();
+        let _ = todo.add_todo_dependency();
 
         assert!(todo.dependency.is_list());
     }
@@ -420,7 +419,7 @@ mod tests {
     #[test]
     fn test_remove_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        todo.add_todo_dependency();
+        let _ = todo.add_todo_dependency();
 
         todo.remove_dependency();
 

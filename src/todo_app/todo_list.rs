@@ -1,7 +1,7 @@
 use std::fs::{File, create_dir_all};
 use std::path::PathBuf;
 use std::ops::{Index, IndexMut};
-use std::io::{stdout, BufWriter, Read, Write};
+use std::io::{stdout, BufWriter, Write};
 use std::io;
 use std::fs::read_to_string;
 use super::Todo;

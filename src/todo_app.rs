@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf, fs::remove_file};
+use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
 mod todo_list;
@@ -15,7 +15,7 @@ pub struct App {
     prior_indexes: Vec<usize>,
     pub changed:bool,
     pub(super) args: Args,
-    removed_dependencies: Vec<String>,
+    removed_todos: Vec<Todo>,
     // search:
     search_indexes: Vec<usize>,
     search_index: usize,
@@ -27,7 +27,7 @@ impl App {
     pub fn new(args: Args) -> Self {
         let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
         let mut app = App {
-            removed_dependencies: vec![],
+            removed_todos: vec![],
             selected: vec![],
             todo_list,
             clipboard: Clipboard::new(),
@@ -79,10 +79,7 @@ impl App {
                 should_write = true;
             }
         }
-        if !self.selected.is_empty() {
-            return true
-        }
-        return should_write
+        !self.selected.is_empty() || should_write
     }
 
     #[inline]
@@ -97,14 +94,14 @@ impl App {
 
     #[inline]
     pub fn increase_day_done(&mut self) {
-        if let Some(mut todo) = self.mut_todo() {
+        if let Some(todo) = self.mut_todo() {
             todo.schedule.add_days_to_done_date(-1)
         }
     }
 
     #[inline]
     pub fn decrease_day_done(&mut self) {
-        if let Some(mut todo) = self.mut_todo() {
+        if let Some(todo) = self.mut_todo() {
             todo.schedule.add_days_to_done_date(1)
         }
     }
@@ -428,15 +425,20 @@ impl App {
         list
     }
 
+    #[inline]
+    pub fn handle_removed_dependency_files(&mut self, dependency_path:&PathBuf) {
+        for todo in &mut self.removed_todos {
+            let _ = todo.remove_dependent_files(dependency_path);
+        }
+        self.removed_todos = vec![];
+    }
+
 
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
         self.changed = false;
         let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
-        for name in &self.removed_dependencies {
-            let _ = remove_file(dependency_path.join(name));
-        }
-        self.removed_dependencies = vec![];
+        self.handle_removed_dependency_files(&dependency_path);
         if self.is_tree() {
             self.todo_list.write_dependencies(&dependency_path)?;
         }
@@ -522,9 +524,8 @@ impl App {
         if !self.is_todos_empty() {
             let index = self.index;
             let mut todo = self.mut_current_list().remove(index);
-            for name in todo.remove_dependency() {
-                self.removed_dependencies.push(name);
-            }
+            todo.remove_dependency();
+            self.removed_todos.push(todo);
         }
     }
 
@@ -543,7 +544,7 @@ impl App {
     #[inline]
     pub fn add_dependency(&mut self) {
         if let Some(todo) = self.mut_todo() {
-            todo.add_todo_dependency();
+            let _ = todo.add_todo_dependency();
         }
     }
 
@@ -551,7 +552,7 @@ impl App {
     pub fn edit_or_add_note(&mut self) {
         if self.is_tree() {
             if let Some(todo) = self.mut_todo() {
-                todo.edit_note();
+                let _ = todo.edit_note();
             }
         }
     }
@@ -583,7 +584,7 @@ impl App {
         match Todo::try_from(self.clipboard.get_text()) {
             Ok(mut todo) => {
                 let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
-                todo.dependency.read(&todo_parent);
+                let _ = todo.dependency.read(&todo_parent);
                 let bottom = self.bottom()+1;
                 let list = &mut self.mut_current_list();
                 list.push(todo);
@@ -598,7 +599,7 @@ impl App {
         if self.is_tree() {
             if let Some(todo) = self.todo() {
                 if todo.dependency.is_none() {
-                    self.mut_todo().unwrap().add_todo_dependency();
+                    let _ = self.mut_todo().unwrap().add_todo_dependency();
                 }
             }
             self.traverse_down()
