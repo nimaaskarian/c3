@@ -426,19 +426,19 @@ impl App {
     }
 
     #[inline]
-    pub fn handle_removed_dependency_files(&mut self, dependency_path:&PathBuf) {
+    pub fn handle_removed_todo_dependency_files(&mut self, dependency_path:&PathBuf) {
         for todo in &mut self.removed_todos {
-            let _ = todo.remove_dependent_files(dependency_path);
+            let _ = todo.delete_dependency_file(dependency_path);
         }
         self.removed_todos = vec![];
     }
-
 
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
         self.changed = false;
         let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
-        self.handle_removed_dependency_files(&dependency_path);
+        self.handle_removed_todo_dependency_files(&dependency_path);
+        let _ = self.todo_list.delete_removed_dependent_files(&dependency_path);
         if self.is_tree() {
             self.todo_list.write_dependencies(&dependency_path)?;
         }
@@ -523,8 +523,7 @@ impl App {
     pub fn delete_todo(&mut self) {
         if !self.is_todos_empty() {
             let index = self.index;
-            let mut todo = self.mut_current_list().remove(index);
-            todo.remove_dependency();
+            let todo = self.mut_current_list().remove(index);
             self.removed_todos.push(todo);
         }
     }
@@ -616,5 +615,20 @@ impl App {
         for index in self.selected.clone() {
             println!("{}", self.todo_list[index].display(Some(self.args.show_done)));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+    use crate::Args;
+
+    use super::*;
+
+    #[test]
+    fn test_delete_todo() {
+        let args = Args::parse();
+        let app = App::new(args);
+        // assert_eq!(contents, expected);
     }
 }

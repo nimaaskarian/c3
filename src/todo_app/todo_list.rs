@@ -327,11 +327,28 @@ impl TodoList {
     #[inline]
     pub(super) fn write_dependencies(&mut self, filename: &PathBuf) -> io::Result<()> {
         for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
-            todo.remove_dependent_files(filename)?;
+            todo.dependency.todo_list.write_dependencies(filename)?;
             todo.dependency.write(filename)?;
         }
         Ok(())
     }
+
+    #[inline]
+    pub(super) fn remove_dependency_files(&mut self, filename: &PathBuf) -> io::Result<()> {
+        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+            todo.delete_dependency_file(filename)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub(super) fn delete_removed_dependent_files(&mut self, filename: &PathBuf) -> io::Result<()> {
+        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+            todo.delete_removed_dependent_files(filename)?;
+        }
+        Ok(())
+    }
+    
 
     #[inline]
     pub fn write(&mut self, filename: &PathBuf, is_root: bool) -> io::Result<PathBuf> {

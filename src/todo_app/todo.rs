@@ -21,8 +21,8 @@ pub struct Todo {
     pub message: String,
     priority: i8,
     pub dependency: Dependency,
+    removed_dependencies: Vec<Dependency>,
     done:bool,
-    removed_names: Vec<String>,
     pub schedule: Schedule,
 }
 
@@ -89,8 +89,8 @@ impl TryFrom<&str> for Todo {
         }
         Ok(Todo {
             dependency,
+            removed_dependencies: vec![],
             schedule,
-            removed_names: Vec::new(),
             message,
             priority,
             done,
@@ -108,8 +108,8 @@ impl Todo {
     pub fn new(message:String, priority:i8, done: bool) -> Self {
         Todo {
             schedule: Schedule::new(),
-            removed_names: Vec::new(),
             dependency: Dependency::default(),
+            removed_dependencies: vec![],
             message,
             priority: Todo::fixed_priority(priority),
             done,
@@ -149,13 +149,18 @@ impl Todo {
     }
 
     #[inline]
-    pub fn remove_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
-        self.dependency.todo_list.write_dependencies(path)?;
+    pub fn delete_dependency_file(&mut self, path: &PathBuf) -> io::Result<()> {
+        self.dependency.todo_list.remove_dependency_files(path)?;
+        let _ = remove_file(path.join(self.dependency.get_name()));
+        Ok(())
+    }
 
-        for name in &self.removed_names {
-            let _ = remove_file(path.join(name));
+    #[inline]
+    pub fn delete_removed_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
+        for dependency in &mut self.removed_dependencies {
+            let _ = dependency.todo_list.remove_dependency_files(path);
+            let _ = remove_file(path.join(dependency.get_name()));
         }
-        self.removed_names = Vec::new();
         Ok(())
     }
 
@@ -187,11 +192,8 @@ impl Todo {
 
     #[inline]
     pub fn remove_dependency(&mut self) {
-        if let Some(name) = self.dependency.remove() {
-            self.removed_names.push(name);
-        }
-
-        self.dependency.todo_list.remove_dependencies();
+        self.removed_dependencies.push(self.dependency.clone());
+        self.dependency.remove();
     }
 
     #[inline]
@@ -329,8 +331,8 @@ mod tests {
     fn test_try_from_string() {
         let input = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let expected = Ok(Todo {
+            removed_dependencies: vec![],
             schedule: Schedule::new(),
-            removed_names: Vec::new(),
             dependency:Dependency::new_note("2c924e3088204ee77ba681f72be3444357932fca".to_string(), "".to_string()),
             message: "Test".to_string(),
             priority: 1,
@@ -443,8 +445,8 @@ mod tests {
         let todo = Todo::try_from(input1).unwrap();
 
         let expected = Todo {
+            removed_dependencies: vec![],
             schedule: Schedule::new(),
-            removed_names: Vec::new(),
             dependency: Dependency::new_todo_list( "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c".to_string()),
             message: "Read for exams".to_string(),
             priority: 1,
@@ -458,8 +460,8 @@ mod tests {
         let input = "[-2] this one should be daily [D1(2023-09-05)]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
+            removed_dependencies: vec![],
             schedule: Schedule::from("D1(2023-09-05)"),
-            removed_names: Vec::new(),
             dependency: Dependency::default(),
             message: "this one should be daily".to_string(),
             priority: 2,
@@ -474,9 +476,9 @@ mod tests {
     #[test]
     fn test_daily_display() {
         let test = Todo {
+            removed_dependencies: vec![],
             dependency: Dependency::default(),
             schedule: Schedule::from("D1()"),
-            removed_names: Vec::new(),
             message: "this one should be daily".to_string(),
             priority: 2,
             done: false,
@@ -491,9 +493,9 @@ mod tests {
         let input = "[-2] this one should be daily [D7(2023-09-05)]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
+            removed_dependencies: vec![],
             dependency: Dependency::default(),
             schedule: Schedule::from("D7(2023-09-05)"),
-            removed_names: Vec::new(),
             message: "this one should be daily".to_string(),
             priority: 2,
             done: false,

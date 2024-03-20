@@ -155,14 +155,8 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn remove(&mut self) -> Option<String> {
-        let name = match self.mode {
-            DependencyMode::None => None,
-            _ => Some(self.name.clone()),
-        };
+    pub fn remove(&mut self) {
         *self = Self::default();
-
-        return name
     }
 }
 
