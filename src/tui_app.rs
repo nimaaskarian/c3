@@ -417,7 +417,7 @@ impl<'a>TuiApp<'a>{
                 frame.render_widget(note_widget, dependency_layout);
             } 
             if let Some(todo_list) = todo.dependency.todo_list() {
-                match create_todo_widget(&todo_list.display(self.todo_app.show_done()), String::from("Todo dependencies")) {
+                match create_todo_widget(&todo_list.display(self.todo_app.show_done(),self.todo_app.args.done_string.as_str(), self.todo_app.args.undone_string.as_str()), String::from("Todo dependencies")) {
                     TodoWidget::List(widget) => frame.render_widget(widget, dependency_layout),
                     TodoWidget::Paragraph(widget) => frame.render_widget(widget, dependency_layout),
                 }

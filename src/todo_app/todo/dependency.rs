@@ -16,6 +16,7 @@ pub struct Dependency {
     name: String,
     mode: DependencyMode,
     note: String,
+    written: bool,
     pub(crate) todo_list: TodoList,
 }
 
@@ -23,6 +24,7 @@ impl Dependency {
     #[inline]
     pub fn default() -> Self {
         Dependency {
+            written: false,
             mode: DependencyMode::None,
             name: String::new(),
             note: String::new(),
@@ -33,11 +35,17 @@ impl Dependency {
     #[inline]
     fn new(name: String, mode: DependencyMode) -> Self {
         Dependency {
+            written: false,
             mode,
             name,
             note: String::new(),
             todo_list: TodoList::new(),
         }
+    }
+
+    #[inline]
+    pub fn is_written(&self) -> bool {
+        self.written
     }
 
     #[inline]
@@ -93,6 +101,7 @@ impl Dependency {
             }
             _ => {}
         };
+        self.written = true;
 
         Ok(())
     }
@@ -119,6 +128,7 @@ impl Dependency {
             }
             _ => {}
         };
+        self.written = true;
         Ok(())
     }
 

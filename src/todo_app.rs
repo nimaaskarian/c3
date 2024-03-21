@@ -530,7 +530,7 @@ impl App {
 
     #[inline]
     pub fn display(&self) -> Vec<String> {
-        self.current_list().display(self.args.show_done)
+        self.current_list().display(self.args.show_done, self.args.done_string.as_str(), self.args.undone_string.as_str())
     }
 
     #[inline]
@@ -613,7 +613,7 @@ impl App {
     #[inline]
     pub fn print_selected(&self) {
         for index in self.selected.clone() {
-            println!("{}", self.todo_list[index].display(Some(self.args.show_done)));
+            println!("{}", self.todo_list[index].display(Some(self.args.show_done), self.args.done_string.as_str(), self.args.undone_string.as_str()));
         }
     }
 }
@@ -627,10 +627,14 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_delete_todo() -> io::Result<()> {
+    fn dir() -> PathBuf {
+        PathBuf::from("test-results")
+    }
+
+    fn write_test_todos() -> io::Result<App>{
         let mut args = Args::parse();
-        let dir = PathBuf::from("test-results");
+        let dir = dir();
+        fs::create_dir_all(dir.join("notes"))?;
         args.todo_path = dir.join("todo");
         let mut app = App::new(args);
         app.append(String::from("Hello"));
@@ -640,10 +644,19 @@ mod tests {
             app.append(String::from(dependency));
         }
         app.write()?;
+        for _ in 0..3 {
+            app.traverse_up();
+        }
+        Ok(app)
+    }
+
+    #[test]
+    fn test_write() -> io::Result<()> {
+        let dir = dir();
+        write_test_todos()?;
         let mut names = fs::read_dir(dir.join("notes"))?
             .map(|res| res.map(|e| e.file_name().to_str().unwrap().to_string()))
             .collect::<Result<Vec<_>, io::Error>>()?;
-
 
         let expected_names = vec!["275549796be6d9a9c6b45d71df4714bfd934c0ba.todo", "560b05afe5e03eae9f8ad475b0b8b73ea6911272.todo", "b3942ad1c555625b7f60649fe50853830b6cdb04.todo"];
         let mut expected_names : Vec<String> = expected_names.iter()
@@ -652,17 +665,38 @@ mod tests {
         expected_names.sort();
 
         assert_eq!(names, expected_names);
-        for _ in 0..3 {
-            app.traverse_up();
-        }
-        app.delete_todo();
-        app.write();
+        fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
 
+    #[test]
+    fn test_delete_todo() -> io::Result<()> {
+        let mut app = write_test_todos()?;
+        app.delete_todo();
+        app.write()?;
+
+        let dir = dir();
         let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))?
             .map(|res| res.map(|e|e.path())).collect();
         assert!(names?.is_empty());
         fs::remove_dir_all(&dir)?;
         Ok(())
-        // assert_eq!(contents, expected);
+    }
+
+    #[test]
+    fn test_remove_current_dependency() -> io::Result<()> {
+        let mut app = write_test_todos()?;
+        app.remove_current_dependent();
+        app.write()?;
+
+        let dir = dir();
+        let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))?
+            .map(|res| res.map(|e|e.path())).collect();
+        assert!(names?.is_empty());
+        let string = fs::read_to_string(&dir.join("todo"))?;
+        let expected_string = String::from("[0] Hello\n");
+        assert_eq!(string, expected_string);
+        fs::remove_dir_all(&dir)?;
+        Ok(())
     }
 }

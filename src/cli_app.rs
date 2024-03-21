@@ -49,7 +49,7 @@ impl <'a>CliApp <'a>{
         }
         if self.todo_app.is_tree() {
             let mut print_todo = PrintTodoTree::new(self.todo_app.args.show_done, self.todo_app.args.minimal_tree);
-            print_todo.print_list(&self.todo_app.todo_list);
+            print_todo.print_list(&self.todo_app.todo_list, self.todo_app.args.done_string.as_str(), self.todo_app.args.undone_string.as_str());
         } else {
             self.print_list()
         }
@@ -88,7 +88,7 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    pub fn print_list(&mut self, todo_list: &TodoList) {
+    pub fn print_list(&mut self, todo_list: &TodoList, done_str: &str, undone_str: &str) {
         let mut todos = todo_list.undone.todos.clone();
         if self.show_done {
             todos.extend(todo_list.done.todos.clone())
@@ -99,11 +99,11 @@ impl PrintTodoTree {
             if self.depth > 0 {
                 self.print_indention();
             }
-            self.print_todo(todo);
+            self.print_todo(todo, done_str, undone_str);
 
             if let Some(todo_list) = todo.dependency.todo_list() {
                 let mut tree_child = self.tree_child();
-                tree_child.print_list(todo_list);
+                tree_child.print_list(todo_list, done_str, undone_str);
             }
 
             if let Some(note) = todo.dependency.note() {
@@ -113,8 +113,8 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    fn print_todo(&self, todo: &Todo) {
-        println!("{}", todo.display(Some(self.show_done)));
+    fn print_todo(&self, todo: &Todo,done_str: &str, undone_str: &str) {
+        println!("{}", todo.display(Some(self.show_done), done_str, undone_str));
     }
 
     #[inline]

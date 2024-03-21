@@ -44,6 +44,14 @@ pub struct Args {
     #[arg(long)]
     done_selected: bool,
 
+    /// String before done todos
+    #[arg(long, default_value_t=String::from("[x] "))]
+    done_string: String,
+
+    /// String before undone todos
+    #[arg(long, default_value_t=String::from("[ ] "))]
+    undone_string: String,
+
     /// Append todo
     #[arg(short='a', long)]
     append_todo: Vec<String>,

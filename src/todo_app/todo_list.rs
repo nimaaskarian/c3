@@ -66,8 +66,8 @@ impl TodoArray {
         self.todos.iter().map(|todo| todo.message.clone()).collect()
     }
 
-    pub fn display(&self, show_done: Option<bool>) -> Vec<String> {
-        self.todos.iter().map(|todo| todo.display(show_done)).collect()
+    pub fn display(&self, show_done: Option<bool>, done_str: &str, undone_str: &str) -> Vec<String> {
+        self.todos.iter().map(|todo| todo.display(show_done, done_str, undone_str)).collect()
     }
 
     pub fn len(&self) -> usize {
@@ -114,27 +114,27 @@ impl TodoArray {
                 return self.move_index(index, middle, 0);
             }
         }
-        return self.move_index(index, high, 0);
+        self.move_index(index, high, 0)
     }
 
     #[inline(always)]
     fn move_index(&mut self, from: usize, to: usize, shift:usize) -> usize{
 
-        let mut j = from;
+        let mut i = from;
         if from < to
         {
-            for i in from..to {
-                self.todos.swap(i, i+1);
-                j = i+1;
+            for j in from..to {
+                self.todos.swap(j, j+1);
+                i = j+1;
             }
         } else {
-            for i in (to+1-shift..from).rev() {
-                self.todos.swap(i, i+1);
-                j = i;
+            for j in (to+1-shift..from).rev() {
+                self.todos.swap(j, j+1);
+                i = j;
             }
 
         }
-        return j;
+        i
     }
 
     pub fn print (&self) {
@@ -200,12 +200,12 @@ impl TodoList {
         self.undone.len() + self.done.len()
     }
 
-    pub fn display(&self, show_done: bool) -> Vec<String> {
+    pub fn display(&self, show_done: bool, done_str: &str, undone_str: &str) -> Vec<String> {
         let arg = Some(show_done);
-        let mut display_list = self.undone.display(arg);
+        let mut display_list = self.undone.display(arg, done_str, undone_str);
 
         if show_done {
-            display_list.extend(self.done.display(arg));
+            display_list.extend(self.done.display(arg, done_str, undone_str));
         }
         display_list
     }
@@ -218,7 +218,7 @@ impl TodoList {
         }
     }
 
-    pub fn read (filename: &PathBuf, read_dependencies: bool, is_root: bool) -> Self{
+    pub fn read(filename: &PathBuf, read_dependencies: bool, is_root: bool) -> Self{
         let mut todo_list = Self::new();
         if !filename.is_file() {
             return todo_list
@@ -236,7 +236,7 @@ impl TodoList {
             let dependency_path = Self::dependency_parent(filename, is_root);
             let _ = todo_list.read_dependencies(&dependency_path);
         }
-        return todo_list
+        todo_list
     }
 
     fn read_dependencies(&mut self, path: &PathBuf) -> io::Result<()>{
@@ -381,8 +381,9 @@ mod tests {
     #[test]
     fn test_todolist_read_undone() {
         let todo_list = get_todo_list();
-        let expected_undone = vec![Todo::new("this todo has prio 1".to_string(), 1,false)
+        let mut expected_undone = vec![Todo::new("this todo has prio 1".to_string(), 1,false)
             ,Todo::new("this one has prio 2".to_string(), 2, false)];
+
         assert_eq!(expected_undone, todo_list.undone.todos);
     }
 

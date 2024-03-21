@@ -21,7 +21,7 @@ pub struct Todo {
     pub message: String,
     priority: i8,
     pub dependency: Dependency,
-    removed_dependencies: Vec<Dependency>,
+    removed_dependency: Option<Dependency>,
     done:bool,
     pub schedule: Schedule,
 }
@@ -89,7 +89,7 @@ impl TryFrom<&str> for Todo {
         }
         Ok(Todo {
             dependency,
-            removed_dependencies: vec![],
+            removed_dependency: None,
             schedule,
             message,
             priority,
@@ -109,7 +109,7 @@ impl Todo {
         Todo {
             schedule: Schedule::new(),
             dependency: Dependency::default(),
-            removed_dependencies: vec![],
+            removed_dependency: None,
             message,
             priority: Todo::fixed_priority(priority),
             done,
@@ -157,7 +157,7 @@ impl Todo {
 
     #[inline]
     pub fn delete_removed_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
-        for dependency in &mut self.removed_dependencies {
+        if let Some(dependency) = &mut self.removed_dependency {
             let _ = dependency.todo_list.remove_dependency_files(path);
             let _ = remove_file(path.join(dependency.get_name()));
         }
@@ -170,20 +170,19 @@ impl Todo {
     }
 
     #[inline]
-    pub fn display(&self, show_done: Option<bool>) -> String {
+    pub fn display(&self, show_done: Option<bool>, done_str: &str, undone_str: &str) -> String {
         let show_done = match show_done {
             None => true,
             Some(value) => value,
         };
         let done_string = if show_done {
-            let inside_str = if self.done() {
-                "x"
+            if self.done() {
+                done_str
             } else {
-                " "
-            };
-            format!("[{inside_str}] ")
+                undone_str
+            }
         } else {
-            String::new()
+            ""
         };
         let note_string = self.dependency.display();
         let daily_str = self.schedule.display();
@@ -192,7 +191,9 @@ impl Todo {
 
     #[inline]
     pub fn remove_dependency(&mut self) {
-        self.removed_dependencies.push(self.dependency.clone());
+        if self.dependency.is_written() {
+            self.removed_dependency = Some(self.dependency.clone());
+        }
         self.dependency.remove();
     }
 
@@ -331,7 +332,7 @@ mod tests {
     fn test_try_from_string() {
         let input = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let expected = Ok(Todo {
-            removed_dependencies: vec![],
+            removed_dependency: None,
             schedule: Schedule::new(),
             dependency:Dependency::new_note("2c924e3088204ee77ba681f72be3444357932fca".to_string(), "".to_string()),
             message: "Test".to_string(),
@@ -445,7 +446,7 @@ mod tests {
         let todo = Todo::try_from(input1).unwrap();
 
         let expected = Todo {
-            removed_dependencies: vec![],
+            removed_dependency: None,
             schedule: Schedule::new(),
             dependency: Dependency::new_todo_list( "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c".to_string()),
             message: "Read for exams".to_string(),
@@ -460,7 +461,7 @@ mod tests {
         let input = "[-2] this one should be daily [D1(2023-09-05)]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
-            removed_dependencies: vec![],
+            removed_dependency: None,
             schedule: Schedule::from("D1(2023-09-05)"),
             dependency: Dependency::default(),
             message: "this one should be daily".to_string(),
@@ -476,7 +477,7 @@ mod tests {
     #[test]
     fn test_daily_display() {
         let test = Todo {
-            removed_dependencies: vec![],
+            removed_dependency: None,
             dependency: Dependency::default(),
             schedule: Schedule::from("D1()"),
             message: "this one should be daily".to_string(),
@@ -485,7 +486,7 @@ mod tests {
         };
         let expected = "2. this one should be daily (Daily)";
 
-        assert_eq!(test.display(Some(false)), expected)
+        assert_eq!(test.display(Some(false), "[x]", "[ ]"), expected)
     }
 
     #[test]
@@ -493,7 +494,7 @@ mod tests {
         let input = "[-2] this one should be daily [D7(2023-09-05)]";
         let todo = Todo::try_from(input).unwrap();
         let expected = Todo {
-            removed_dependencies: vec![],
+            removed_dependency: None,
             dependency: Dependency::default(),
             schedule: Schedule::from("D7(2023-09-05)"),
             message: "this one should be daily".to_string(),
