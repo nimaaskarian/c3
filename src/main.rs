@@ -15,6 +15,21 @@ use todo_app::App;
 use fileio::get_todo_path;
 //}}}
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct DisplayArgs{
+    /// Show done todos too
+    #[arg(short='d', long, default_value_t=false)]
+    show_done: bool,
+
+    /// String before done todos
+    #[arg(long, default_value_t=String::from("[x] "))]
+    done_string: String,
+
+    /// String before undone todos
+    #[arg(long, default_value_t=String::from("[ ] "))]
+    undone_string: String,
+}
 
 /// A tree-like todo application that makes you smile
 #[derive(Parser, Debug)]
@@ -44,13 +59,8 @@ pub struct Args {
     #[arg(long)]
     done_selected: bool,
 
-    /// String before done todos
-    #[arg(long, default_value_t=String::from("[x] "))]
-    done_string: String,
-
-    /// String before undone todos
-    #[arg(long, default_value_t=String::from("[ ] "))]
-    undone_string: String,
+    #[command(flatten)]
+    display_args: DisplayArgs,
 
     /// Append todo
     #[arg(short='a', long)]
@@ -67,10 +77,6 @@ pub struct Args {
     /// List todos (non interactive)
     #[arg(short='l', long)]
     list: bool,
-
-    /// Show done todos too
-    #[arg(short='d', long)]
-    show_done: bool,
 
     /// Enable TUI module at startup
     #[arg(short='m', long)]

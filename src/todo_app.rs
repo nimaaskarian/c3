@@ -73,7 +73,7 @@ impl App {
             }
             if self.args.done_selected {
                 self.todo_list[sel_index].toggle_done();
-                if !self.args.show_done {
+                if !self.args.display_args.show_done {
                     self.selected.remove(iter_index);
                 }
                 should_write = true;
@@ -108,7 +108,7 @@ impl App {
 
     #[inline]
     pub fn show_done(&self) -> bool {
-        self.args.show_done
+        self.args.display_args.show_done
     }
 
     #[inline]
@@ -128,9 +128,10 @@ impl App {
     }
 
     #[inline]
+    /// fix done and undone lists of current list
     pub fn fix_done_undone(&mut self) {
         self.fix_dependency_done_undone();
-        let show_done = self.args.show_done;
+        let show_done = self.args.display_args.show_done;
         let current_list = self.mut_current_list();
         current_list.fix_undone();
         if show_done {
@@ -141,8 +142,9 @@ impl App {
     }
 
     #[inline]
+    /// fix done and undone lists of current todo's dependency
     fn fix_dependency_done_undone(&mut self) {
-        let show_done = self.args.show_done;
+        let show_done = self.args.display_args.show_done;
         if let Some(todo) = self.mut_todo() {
 
             let dep_list = &mut todo.dependency.todo_list;
@@ -156,8 +158,8 @@ impl App {
 
     }
 
-
     #[inline]
+    /// traverses up and fixes the undone todo, if the dependencies are done, recursively
     fn traverse_up_and_fix(&mut self) {
         while self.only_undone_empty() && !self.is_root() {
             self.traverse_up();
@@ -168,7 +170,7 @@ impl App {
                 _ => {}
             }
             self.mut_current_list().fix_undone();
-            if self.args.show_done {
+            if self.args.display_args.show_done {
                 self.mut_current_list().fix_done();
             }
         }
@@ -183,7 +185,7 @@ impl App {
             return;
         }
         let mut todo_messages = self.current_list().undone.messages();
-        if self.args.show_done {
+        if self.args.display_args.show_done {
             todo_messages.extend(self.current_list().done.messages());
         }
         self.search_indexes = Vec::new();
@@ -213,10 +215,7 @@ impl App {
 
     #[inline]
     pub fn toggle_show_done(&mut self) {
-        self.args.show_done = !self.args.show_done;
-        // while self.only_undone_empty() && !self.prior_indexes.is_empty() {
-        //     self.traverse_up()
-        // }
+        self.args.display_args.show_done = !self.args.display_args.show_done;
         self.search(None);
     }
 
@@ -251,7 +250,7 @@ impl App {
         let was_done = self.todo().unwrap().done();
         self.mut_todo().unwrap().toggle_done();
         self.fix_done_undone();
-        if self.args.show_done {
+        if self.args.display_args.show_done {
             let index = if was_done {
                 self.current_list().undone.len()-1
             } else {
@@ -354,7 +353,7 @@ impl App {
 
     #[inline]
     pub fn is_todos_empty(&self) -> bool{
-        if self.args.show_done {
+        if self.args.display_args.show_done {
             self.current_list().is_empty()
         } else {
             self.is_undone_empty()
@@ -388,7 +387,7 @@ impl App {
 
     #[inline]
     pub fn len(&self) -> usize {
-        if self.args.show_done {
+        if self.args.display_args.show_done {
             self.current_list().len()
         } else {
             self.current_list().undone.len()
@@ -529,8 +528,13 @@ impl App {
     }
 
     #[inline]
-    pub fn display(&self) -> Vec<String> {
-        self.current_list().display(self.args.show_done, self.args.done_string.as_str(), self.args.undone_string.as_str())
+    pub fn display_current(&self) -> Vec<String> {
+        self.display_list(self.current_list())
+    }
+
+    #[inline]
+    pub fn display_list(&self, todo_list: &TodoList) -> Vec<String> {
+        todo_list.display(&self.args.display_args)
     }
 
     #[inline]
@@ -580,6 +584,7 @@ impl App {
 
     #[inline]
     pub fn paste_todo(&mut self) {
+        let todos_count = self.len();
         match Todo::try_from(self.clipboard.get_text()) {
             Ok(mut todo) => {
                 let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
@@ -587,7 +592,9 @@ impl App {
                 let bottom = self.bottom()+1;
                 let list = &mut self.mut_current_list();
                 list.push(todo);
-                self.index = list.reorder(bottom);
+                if todos_count != 0 {
+                    self.index = list.reorder(bottom);
+                }
             },
             _ => {},
         };
@@ -613,7 +620,7 @@ impl App {
     #[inline]
     pub fn print_selected(&self) {
         for index in self.selected.clone() {
-            println!("{}", self.todo_list[index].display(Some(self.args.show_done), self.args.done_string.as_str(), self.args.undone_string.as_str()));
+            println!("{}", self.todo_list[index].display(&self.args.display_args));
         }
     }
 }

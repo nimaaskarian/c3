@@ -14,6 +14,7 @@ use schedule::Schedule;
 use note::{sha1, open_temp_editor};
 
 use super::TodoList;
+use crate::DisplayArgs;
 //}}}
 
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -170,16 +171,12 @@ impl Todo {
     }
 
     #[inline]
-    pub fn display(&self, show_done: Option<bool>, done_str: &str, undone_str: &str) -> String {
-        let show_done = match show_done {
-            None => true,
-            Some(value) => value,
-        };
-        let done_string = if show_done {
+    pub fn display(&self, args: &DisplayArgs) -> String {
+        let done_string = if args.show_done {
             if self.done() {
-                done_str
+                args.done_string.as_str()
             } else {
-                undone_str
+                args.undone_string.as_str()
             }
         } else {
             ""
@@ -315,6 +312,8 @@ impl Todo {
 
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
+
     use super::*;
 
     #[test]
@@ -486,7 +485,7 @@ mod tests {
         };
         let expected = "2. this one should be daily (Daily)";
 
-        assert_eq!(test.display(Some(false), "[x]", "[ ]"), expected)
+        assert_eq!(test.display(&DisplayArgs::parse()), expected)
     }
 
     #[test]

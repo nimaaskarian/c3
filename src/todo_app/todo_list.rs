@@ -4,7 +4,9 @@ use std::ops::{Index, IndexMut};
 use std::io::{stdout, BufWriter, Write};
 use std::io;
 use std::fs::read_to_string;
+
 use super::Todo;
+use crate::DisplayArgs;
 
 #[derive(Debug,PartialEq, Clone, Default)]
 pub struct TodoArray {
@@ -66,8 +68,8 @@ impl TodoArray {
         self.todos.iter().map(|todo| todo.message.clone()).collect()
     }
 
-    pub fn display(&self, show_done: Option<bool>, done_str: &str, undone_str: &str) -> Vec<String> {
-        self.todos.iter().map(|todo| todo.display(show_done, done_str, undone_str)).collect()
+    pub fn display(&self, args: &DisplayArgs) -> Vec<String> {
+        self.todos.iter().map(|todo| todo.display(&args)).collect()
     }
 
     pub fn len(&self) -> usize {
@@ -200,12 +202,11 @@ impl TodoList {
         self.undone.len() + self.done.len()
     }
 
-    pub fn display(&self, show_done: bool, done_str: &str, undone_str: &str) -> Vec<String> {
-        let arg = Some(show_done);
-        let mut display_list = self.undone.display(arg, done_str, undone_str);
+    pub fn display(&self, display_args:&DisplayArgs) -> Vec<String> {
+        let mut display_list = self.undone.display(display_args);
 
-        if show_done {
-            display_list.extend(self.done.display(arg, done_str, undone_str));
+        if display_args.show_done {
+            display_list.extend(self.done.display(display_args));
         }
         display_list
     }
@@ -268,7 +269,7 @@ impl TodoList {
             }
         }
 
-        return output.clone();
+        output.clone()
     }
 
     #[inline]
