@@ -438,7 +438,7 @@ impl App {
         self.changed = false;
         let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
         self.handle_removed_todo_dependency_files(&dependency_path);
-        let _ = self.todo_list.delete_removed_dependent_files(&dependency_path);
+        self.todo_list.delete_removed_dependent_files(&dependency_path)?;
         if self.is_tree() {
             self.todo_list.write_dependencies(&dependency_path)?;
         }
@@ -620,15 +620,49 @@ impl App {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use clap::Parser;
     use crate::Args;
 
     use super::*;
 
     #[test]
-    fn test_delete_todo() {
-        let args = Args::parse();
-        let app = App::new(args);
+    fn test_delete_todo() -> io::Result<()> {
+        let mut args = Args::parse();
+        let dir = PathBuf::from("test-results");
+        args.todo_path = dir.join("todo");
+        let mut app = App::new(args);
+        app.append(String::from("Hello"));
+        let dependencies = vec!["Is there anybody outthere?", "Just nod if you can here me", "Is there anyone home"];
+        for dependency in dependencies {
+            app.add_dependency_traverse_down();
+            app.append(String::from(dependency));
+        }
+        app.write()?;
+        let mut names = fs::read_dir(dir.join("notes"))?
+            .map(|res| res.map(|e| e.file_name().to_str().unwrap().to_string()))
+            .collect::<Result<Vec<_>, io::Error>>()?;
+
+
+        let expected_names = vec!["275549796be6d9a9c6b45d71df4714bfd934c0ba.todo", "560b05afe5e03eae9f8ad475b0b8b73ea6911272.todo", "b3942ad1c555625b7f60649fe50853830b6cdb04.todo"];
+        let mut expected_names : Vec<String> = expected_names.iter()
+            .map(|s|s.to_string()).collect();
+        names.sort();
+        expected_names.sort();
+
+        assert_eq!(names, expected_names);
+        for _ in 0..3 {
+            app.traverse_up();
+        }
+        app.delete_todo();
+        app.write();
+
+        let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))?
+            .map(|res| res.map(|e|e.path())).collect();
+        assert!(names?.is_empty());
+        fs::remove_dir_all(&dir)?;
+        Ok(())
         // assert_eq!(contents, expected);
     }
 }

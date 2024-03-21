@@ -369,7 +369,7 @@ impl TodoList {
 }
 #[cfg(test)]
 mod tests {
-    use std::fs::{self, remove_file};
+    use std::fs::{self, remove_dir_all, remove_file};
 
     use super::*;
 
@@ -461,8 +461,7 @@ mod tests {
 
         todo_list[0].remove_dependency();
         let dependency_path = todo_list.write(&path, true)?;
-        todo_list.write_dependencies(&dependency_path);
-        remove_file(&dependency_path);
+        remove_dir_all(&dependency_path);
         remove_file(&path);
         Ok(())
     }
