@@ -107,11 +107,6 @@ impl App {
     }
 
     #[inline]
-    pub fn show_done(&self) -> bool {
-        self.args.display_args.show_done
-    }
-
-    #[inline]
     pub fn prepend(&mut self, message:String) {
         self.mut_current_list().prepend(Todo::default(message, 1));
         self.index = 0;

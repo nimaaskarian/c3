@@ -37,12 +37,11 @@ pub fn create_todo_widget(display_list:&Vec<String>, title:String) ->  TodoWidge
     if display_list.is_empty() {
         return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
     }
-    return TodoWidget::List(List::new((*display_list).clone())
+    TodoWidget::List(List::new((*display_list).clone())
         .block(default_block(title))
         .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
         .highlight_symbol(">>")
-        .repeat_highlight_symbol(true));
-
+        .repeat_highlight_symbol(true))
 }
 
 /// Shutdown TUI app (undo everything did in startup, and show cursor)
