@@ -102,14 +102,18 @@ impl TryFrom<&str> for Todo {
 impl Todo {
     #[inline]
     pub fn default(message:String, priority:i8) -> Self {
-        Self::new(message, priority, false)
+        Self::new(message, priority, false, Dependency::default())
+    }
+
+    pub fn written(message:String, priority:i8, done:bool) -> Self {
+        Self::new(message, priority, done, Dependency::written())
     }
 
     #[inline]
-    pub fn new(message:String, priority:i8, done: bool) -> Self {
+    pub fn new(message:String, priority:i8, done: bool, dependency: Dependency) -> Self {
         Todo {
             schedule: Schedule::new(),
-            dependency: Dependency::default(),
+            dependency,
             removed_dependency: None,
             message,
             priority: Todo::fixed_priority(priority),

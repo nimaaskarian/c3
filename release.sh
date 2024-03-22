@@ -1,37 +1,19 @@
-#!/bin/bash
-echo_exit() {
- echo Error: $*
- exit 1 
-}
-
-if [ "$#" -ne 1 ]; then
-  echo Usage: ./release.sh tag_name
-  exit 1
-fi
+#!/usr/bin/env sh
+. ./.shell-methods.sh
 
 LAST_TAG=$(git tag | tail -n 1)
 
 PACKAGE_NAME=c3
 USERNAME=nimaaskarian
 TAG="$1"
-update_cargo_toml() {
-  sed -i "s/^version = .*/version = \"$TAG\"/" Cargo.toml
-  git add Cargo.toml
-}
 
 push_tag() {
-  git push
   git tag "$TAG" || {
     echo List of existing tags:
     git tag
     echo_exit tag exists.
   }
   git push --tags
-}
-
-build_package() {
-  cargo build --release || echo_exit linux build failed
-  cargo build --release --target x86_64-pc-windows-gnu || echo_exit windows build failed
 }
 
 release_package() {
@@ -72,10 +54,6 @@ release_c3_bin() {
   cd ../..
 }
 
-update_cargo_toml
-build_package
-git add Cargo.lock
-git commit -m "Bumped version $TAG"
 push_tag
 release_package
 release_c3

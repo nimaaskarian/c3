@@ -375,8 +375,8 @@ mod tests {
     #[test]
     fn test_todolist_read_undone() {
         let todo_list = get_todo_list();
-        let expected_undone = vec![Todo::new("this todo has prio 1".to_string(), 1,false)
-            ,Todo::new("this one has prio 2".to_string(), 2, false)];
+        let expected_undone = vec![Todo::written("this todo has prio 1".to_string(), 1, false)
+            ,Todo::written("this one has prio 2".to_string(), 2, false)];
 
         assert_eq!(expected_undone, todo_list.undone.todos);
     }
@@ -384,7 +384,7 @@ mod tests {
     #[test]
     fn test_todolist_read_done() {
         let todo_list = get_todo_list();
-        let expected_done = vec![Todo::new("this one is 2 and done".to_string(), 2, true),Todo::new("this one is 0 and done".to_string(), 0, true)];
+        let expected_done = vec![Todo::written("this one is 2 and done".to_string(), 2, true),Todo::written("this one is 0 and done".to_string(), 0, true)];
         assert_eq!(expected_done, todo_list.done.todos);
     }
 

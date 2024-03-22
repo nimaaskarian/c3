@@ -622,15 +622,17 @@ impl App {
 
 #[cfg(test)]
 mod tests {
+    use std::process::Command;
     use std::fs;
 
     use clap::Parser;
     use crate::Args;
 
     use super::*;
+    const DIR_NAME : &str = "test-results";
 
     fn dir() -> PathBuf {
-        PathBuf::from("test-results")
+        PathBuf::from(DIR_NAME)
     }
 
     fn write_test_todos() -> io::Result<App>{
@@ -645,11 +647,15 @@ mod tests {
             app.add_dependency_traverse_down();
             app.append(String::from(dependency));
         }
-        app.write()?;
         for _ in 0..3 {
             app.traverse_up();
         }
+        app.write()?;
         Ok(app)
+    }
+
+    fn remove_test() {
+        let _ = Command::new("rm").args(vec!["-f","-r", DIR_NAME]).spawn();
     }
 
     #[test]
@@ -666,8 +672,8 @@ mod tests {
         names.sort();
         expected_names.sort();
 
+        remove_test();
         assert_eq!(names, expected_names);
-        fs::remove_dir_all(&dir)?;
         Ok(())
     }
 
@@ -675,13 +681,14 @@ mod tests {
     fn test_delete_todo() -> io::Result<()> {
         let mut app = write_test_todos()?;
         app.delete_todo();
-        app.write()?;
+        app.write().expect("App writing failed");
 
         let dir = dir();
-        let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))?
+        let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes")).expect("Reading names failed")
             .map(|res| res.map(|e|e.path())).collect();
+
+        remove_test();
         assert!(names?.is_empty());
-        fs::remove_dir_all(&dir)?;
         Ok(())
     }
 
@@ -692,13 +699,15 @@ mod tests {
         app.write()?;
 
         let dir = dir();
-        let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))?
-            .map(|res| res.map(|e|e.path())).collect();
-        assert!(names?.is_empty());
+        let names : io::Result<Vec<PathBuf>> = match fs::read_dir(dir.join("notes")) {
+            Ok(value) => value.map(|res| res.map(|e|e.path())).collect(),
+            _ => Ok(vec![]),
+        };
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n");
+        remove_test();
+        assert!(names?.is_empty());
         assert_eq!(string, expected_string);
-        fs::remove_dir_all(&dir)?;
         Ok(())
     }
 }
