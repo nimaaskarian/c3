@@ -623,7 +623,7 @@ impl App {
 #[cfg(test)]
 mod tests {
     use std::process::Command;
-    use std::fs;
+    use std::fs::{self, remove_dir_all};
 
     use clap::Parser;
     use crate::Args;
@@ -631,13 +631,14 @@ mod tests {
     use super::*;
     const DIR_NAME : &str = "test-results";
 
-    fn dir() -> PathBuf {
-        PathBuf::from(DIR_NAME)
+    fn dir(dir_name: &str) -> PathBuf {
+        let path = PathBuf::from(dir_name);
+        fs::create_dir_all(path.join("notes"));
+        path
     }
 
-    fn write_test_todos() -> io::Result<App>{
+    fn write_test_todos(dir: &PathBuf) -> io::Result<App>{
         let mut args = Args::parse();
-        let dir = dir();
         fs::create_dir_all(dir.join("notes"))?;
         args.todo_path = dir.join("todo");
         let mut app = App::new(args);
@@ -654,14 +655,14 @@ mod tests {
         Ok(app)
     }
 
-    fn remove_test() {
-        let _ = Command::new("rm").args(vec!["-f","-r", DIR_NAME]).spawn();
-    }
+    // fn remove_test() {
+    //     // let _ = Command::new("rm").args(vec!["-f","-r", DIR_NAME]).spawn();
+    // }
 
     #[test]
     fn test_write() -> io::Result<()> {
-        let dir = dir();
-        write_test_todos()?;
+        let dir = dir("test-write");
+        write_test_todos(&dir)?;
         let mut names = fs::read_dir(dir.join("notes"))?
             .map(|res| res.map(|e| e.file_name().to_str().unwrap().to_string()))
             .collect::<Result<Vec<_>, io::Error>>()?;
@@ -672,40 +673,40 @@ mod tests {
         names.sort();
         expected_names.sort();
 
-        remove_test();
+        remove_dir_all(dir);
         assert_eq!(names, expected_names);
         Ok(())
     }
 
     #[test]
     fn test_delete_todo() -> io::Result<()> {
-        let mut app = write_test_todos()?;
+        let dir = dir("test-delete-todo") ;
+        let mut app = write_test_todos(&dir)?;
         app.delete_todo();
         app.write().expect("App writing failed");
 
-        let dir = dir();
         let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes")).expect("Reading names failed")
             .map(|res| res.map(|e|e.path())).collect();
 
-        remove_test();
+        remove_dir_all(dir);
         assert!(names?.is_empty());
         Ok(())
     }
 
     #[test]
     fn test_remove_current_dependency() -> io::Result<()> {
-        let mut app = write_test_todos()?;
+        let dir = dir("test-remove-current-dependency") ;
+        let mut app = write_test_todos(&dir)?;
         app.remove_current_dependent();
         app.write()?;
 
-        let dir = dir();
         let names : io::Result<Vec<PathBuf>> = match fs::read_dir(dir.join("notes")) {
             Ok(value) => value.map(|res| res.map(|e|e.path())).collect(),
             _ => Ok(vec![]),
         };
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n");
-        remove_test();
+        remove_dir_all(dir);
         assert!(names?.is_empty());
         assert_eq!(string, expected_string);
         Ok(())
