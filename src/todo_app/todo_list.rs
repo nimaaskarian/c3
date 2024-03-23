@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn test_write() {
         let mut todo_list = get_todo_list();
-        let path = PathBuf::from("tests/tmplist");
+        let path = PathBuf::from("todo-list-test-write/tmplist");
         let _ = todo_list.write(&path, true);
 
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
@@ -414,7 +414,7 @@ mod tests {
     #[test]
     fn test_push() {
         let mut todo_list = get_todo_list();
-        let path = PathBuf::from("tests/tmplist");
+        let path = PathBuf::from("todo-list-test-push/tmplist");
         todo_list.push(Todo::default("Show me your warface".to_string(), 0));
         let _ = todo_list.write(&path, true);
 
@@ -444,12 +444,12 @@ mod tests {
     fn test_write_dependencies() -> io::Result<()>{
         let mut todo_list = get_todo_list();
         let _ = todo_list[0].add_todo_dependency();
-        let path = PathBuf::from("tests/tmplist");
+        let path = PathBuf::from("test-write-dependency/tmplist");
         todo_list[0].dependency.push(Todo::try_from("[0] Some dependency").unwrap());
         let dependency_path = todo_list.write(&path, true)?;
         todo_list.write_dependencies(&dependency_path)?;
 
-        let todo_dependency_path = PathBuf::from(format!("tests/notes/{}.todo", todo_list[0].hash()));
+        let todo_dependency_path = PathBuf::from(format!("test-write-dependency/notes/{}.todo", todo_list[0].hash()));
         let contents = fs::read_to_string(&todo_dependency_path).expect("Reading file failed :(");
         let expected = "[0] Some dependency\n";
         assert_eq!(contents, expected);
