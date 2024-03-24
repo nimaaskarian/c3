@@ -16,7 +16,7 @@ use super::TodoList;
 use crate::DisplayArgs;
 //}}}
 
-pub type PriorityType = i8;
+pub type PriorityType = usize;
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Todo {
     pub message: String,
@@ -73,18 +73,16 @@ impl TryFrom<&str> for Todo {
         }
         let dependency = Dependency::from(dependency_string.as_str());
 
-        let priority:PriorityType = match priority_string.parse() {
-            Ok(value) => {
-                match value {
-                    0.. => value,
-                    any => any*-1,
-                }
+        let mut done = priority_string.chars().nth(0).unwrap() == '-';
+
+        let priority:PriorityType = match priority_string.chars().nth(done as usize){
+            Some(value) if value.is_digit(10) => {
+                value.to_digit(10).unwrap() as PriorityType
             }
-            Err(_) => 0
+            _ => 0
         };
         
         let schedule = Schedule::match_message(&mut message);
-        let mut done = priority_string.chars().nth(0).unwrap() == '-';
 
         if schedule.should_undone() {
             done = false;
@@ -311,7 +309,6 @@ impl Todo {
         match priority {
             10.. => 0,
             0 => 0,
-            ..=0 => 1,
             _ => priority
         }
     }
