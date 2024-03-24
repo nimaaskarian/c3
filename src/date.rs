@@ -28,5 +28,4 @@ pub fn diff_days(first: Option<Type>, next: Option<Type>) -> i64 {
     } else {
         0
     }
-
 }

@@ -1,4 +1,3 @@
-use chrono::NaiveDate;
 use chrono::Duration;
 use scanf::sscanf;
 
@@ -16,7 +15,7 @@ type Type = ScheduleType;
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Schedule {
     day: i64,
-    date: Option<NaiveDate>,
+    date: Option<date::Type>,
     pub _type: Type,
     pub last_type: Type,
 }
