@@ -7,12 +7,11 @@ use scanf::sscanf;
 // }}}
 // mod{{{
 mod note;
-mod schedule;
+pub mod schedule;
 mod dependency;
 use dependency::Dependency;
 use schedule::Schedule;
 use note::{sha1, open_temp_editor};
-
 use super::TodoList;
 use crate::DisplayArgs;
 //}}}
@@ -87,6 +86,9 @@ impl TryFrom<&str> for Todo {
 
         if schedule.should_undone() {
             done = false;
+        }
+        if schedule.should_done() {
+            done = true;
         }
         Ok(Todo {
             dependency,
@@ -249,17 +251,12 @@ impl Todo {
 
     #[inline]
     pub fn enable_day(&mut self, day: i64) {
-        self.schedule.enable();
+        self.schedule.enable_schedule();
         self.schedule.set_day(day);
     }
 
     #[inline]
     pub fn set_done(&mut self, done:bool) {
-        if done {
-            self.schedule.current_date()
-        } else {
-            self.schedule.none_date()
-        }
         self.done = done;
     }
 
