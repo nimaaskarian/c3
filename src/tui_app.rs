@@ -12,12 +12,14 @@ use tui_textarea::{Input, TextArea, CursorMove};
 use ratatui::{prelude::*, widgets::*};
 // }}}
 // mod {{{
+
 mod modules;
 use modules::{
     Module,
     potato::Potato,
 };
 use super::todo_app::{App, Todo};
+use crate::date;
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
@@ -172,8 +174,25 @@ impl<'a>TuiApp<'a>{
     #[inline]
     fn on_schedule(&mut self,str:String) {
         let day = str.parse::<u64>().ok();
-        if let Some(todo) = self.todo_app.mut_todo() {
+        if day.is_none() {
+            return;
+        }
+        if let Some(todo) = self.todo_app.mut_todo(){
             todo.enable_day(day.unwrap() as i64);
+        }
+    }
+
+    #[inline]
+    pub fn reminder_prompt(&mut self) {
+        self.set_text_mode(Self::on_reminder, "Date reminder", "");
+    }
+
+    #[inline]
+    fn on_reminder(&mut self,str:String) {
+        if let Ok(date) = date::parse(&str) {
+            if let Some(todo) = self.todo_app.mut_todo() {
+                todo.schedule.enable_reminder(date);
+            }
         }
     }
 
@@ -334,6 +353,7 @@ impl<'a>TuiApp<'a>{
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
                     Char('S') => self.schedule_prompt(),
+                    Char('m') => self.reminder_prompt(),
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('y') => self.todo_app.yank_todo(),
                     Char('p') => self.todo_app.paste_todo(),

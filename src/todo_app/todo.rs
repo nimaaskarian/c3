@@ -7,12 +7,11 @@ use scanf::sscanf;
 // }}}
 // mod{{{
 mod note;
-mod schedule;
+pub mod schedule;
 mod dependency;
 use dependency::Dependency;
 use schedule::Schedule;
 use note::{sha1, open_temp_editor};
-
 use super::TodoList;
 use crate::DisplayArgs;
 //}}}
@@ -249,7 +248,7 @@ impl Todo {
 
     #[inline]
     pub fn enable_day(&mut self, day: i64) {
-        self.schedule.enable();
+        self.schedule.enable_schedule();
         self.schedule.set_day(day);
     }
 
