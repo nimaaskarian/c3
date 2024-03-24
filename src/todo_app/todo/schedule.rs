@@ -1,4 +1,3 @@
-use chrono::Duration;
 use scanf::sscanf;
 
 use crate::date;
@@ -121,7 +120,7 @@ impl Schedule {
     #[inline(always)]
     fn display_scheduled(&self) -> String {
         let inner_str = match self.current_date_diff_days() {
-            0 => String::new(),
+            ..=0 => String::new(),
             1 => String::from(", last done yesterday"),
             any => format!(", last done {} days ago", any)
         };
@@ -141,12 +140,10 @@ impl Schedule {
         }
     }
 
-    pub fn add_days_to_done_date(&mut self, days:i64) {
+    pub fn add_days_to_date(&mut self, days:i64) {
         if let Some(date) = self.date {
-            if days <= self.current_date_diff_days() {
-                self.date = Some(date+Duration::days(days));
-            }
-        }
+            self.date = Some(date::add_days(date, days))
+        } 
     }
 
     pub fn set_daily(&mut self) {
