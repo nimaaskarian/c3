@@ -196,9 +196,14 @@ impl Schedule {
         schedule
     }
 
+    #[inline(always)]
+    fn reminder_should_undone(&self) -> bool {
+        self.date == Some(date::current())
+    }
+
     pub fn should_undone(&self) -> bool {
         match self._type {
-            Type::Reminder => self.date <= Some(date::current()),
+            Type::Reminder => self.reminder_should_undone(),
             Type::Scheduled => self.current_date_diff_days() >= self.day,
             Type::None => false,
         }
@@ -206,7 +211,7 @@ impl Schedule {
 
     pub fn should_done(&self) -> bool {
         match self._type {
-            Type::Reminder => self.date > Some(date::current()),
+            Type::Reminder => !self.reminder_should_undone(),
             _ => false
         }
     }
