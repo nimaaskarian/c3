@@ -196,4 +196,11 @@ impl Schedule {
             Type::None => false,
         }
     }
+
+    pub fn should_done(&self) -> bool {
+        match self._type {
+            Type::Reminder => self.date != Some(date::current()),
+            _ => false
+        }
+    }
 }

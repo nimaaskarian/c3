@@ -87,6 +87,9 @@ impl TryFrom<&str> for Todo {
         if schedule.should_undone() {
             done = false;
         }
+        if schedule.should_done() {
+            done = true;
+        }
         Ok(Todo {
             dependency,
             removed_dependency: None,
