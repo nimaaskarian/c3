@@ -21,3 +21,12 @@ pub fn format(input: Option<Type>) -> String {
         None => String::new(),
     }
 }
+
+pub fn diff_days(first: Option<Type>, next: Option<Type>) -> i64 {
+    if first.is_some() && next.is_some() {
+        (first.unwrap() - next.unwrap()).num_days()
+    } else {
+        0
+    }
+
+}
