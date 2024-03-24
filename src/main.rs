@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use clap::Parser;
 // }}}
 //mod{{{
-pub mod fileio;
+pub(crate) mod fileio;
+pub(crate) mod date;
 pub(crate) mod todo_app;
 pub(crate) mod cli_app;
 pub(crate) mod tui_app;
