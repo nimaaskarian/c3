@@ -318,6 +318,14 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
+    fn write(&mut self) -> io::Result<()>{
+        if !self.todo_app.write()? {
+            self.todo_app.read();
+        }
+        Ok(())
+    }
+
+    #[inline]
     fn read_keys(&mut self)  -> io::Result<Operation> {
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
@@ -337,7 +345,7 @@ impl<'a>TuiApp<'a>{
                     KeyCode::Left | Char('h') => self.todo_app.traverse_up(),
                     KeyCode::Home | Char('g') => self.todo_app.go_top(),
                     KeyCode::End | Char('G') => self.todo_app.go_bottom(),
-                    Char('w') => self.todo_app.write()?,
+                    Char('w') => self.write()?,
                     Char('J') => self.todo_app.decrease_current_priority(),
                     Char('K') => self.todo_app.increase_current_priority(),
                     Char(']') => {

@@ -391,7 +391,7 @@ impl App {
     }
 
     #[inline]
-    pub fn write(&mut self) -> io::Result<()> {
+    pub fn write(&mut self) -> io::Result<bool> {
         if self.changed {
             self.changed = false;
             let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
@@ -400,8 +400,10 @@ impl App {
             if self.is_tree() {
                 self.todo_list.write_dependencies(&dependency_path)?;
             }
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 
     #[inline]
