@@ -163,7 +163,7 @@ impl<'a>TuiApp<'a>{
     #[inline]
     fn on_search(&mut self, str:String) {
         self.todo_app.search(Some(str));
-        self.todo_app.search_next_index();
+        self.todo_app.search_init();
     }
 
 

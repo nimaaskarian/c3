@@ -3,6 +3,8 @@ mod clipboard;
 use clipboard::Clipboard;
 mod todo_list;
 mod todo;
+mod search;
+use search::Search;
 pub use todo_list::TodoList;
 pub use todo::Todo;
 use crate::Args;
@@ -16,10 +18,7 @@ pub struct App {
     pub changed:bool,
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
-    // search:
-    search_indexes: Vec<usize>,
-    search_index: usize,
-    last_query: String,
+    search: Search,
 }
 
 impl App {
@@ -35,14 +34,11 @@ impl App {
             prior_indexes: vec![],
             changed: false,
             args,
-
-            last_query: String::new(),
-            search_indexes: vec![],
-            search_index: 0,
+            search: Search::new(),
         };
         for str in app.args.search_and_select.clone() {
             app.search(Some(str));
-            for index in app.search_indexes.clone() {
+            for index in app.search.indices() {
                 app.selected.push(index);
             }
         }
@@ -173,40 +169,19 @@ impl App {
     
     #[inline]
     pub fn search(&mut self, query:Option<String>) {
-        if let Some(query) = query {
-            self.last_query = query;
-        }
-        if self.last_query.is_empty() {
-            return;
-        }
         let mut todo_messages = self.current_list().undone.messages();
         if self.args.display_args.show_done {
             todo_messages.extend(self.current_list().done.messages());
         }
-        self.search_indexes = Vec::new();
-
-        for i in 0..todo_messages.len() {
-            if todo_messages[i].to_lowercase().contains(self.last_query.to_lowercase().as_str()) {
-                self.search_indexes.push(i);
-            }
-        }
+        self.search.search(query, todo_messages);
     }
 
     #[inline]
-    pub fn search_next_index(&mut self) {
-        if self.search_indexes.is_empty() {
-            return;
+    pub fn search_init(&mut self) {
+        if let Some(index) = self.search.first_greater_than(self.index) {
+            self.index = index;
         }
-        for index in &self.search_indexes {
-            if *index > self.index{
-                self.index = *index;
-                return;
-            }
-        }
-
-        self.index = self.search_indexes[0];
     }
-
 
     #[inline]
     pub fn toggle_show_done(&mut self) {
@@ -216,28 +191,16 @@ impl App {
 
     #[inline]
     pub fn search_next(&mut self) {
-        if self.search_indexes.is_empty() {
-            return;
+        if let Some(index) = self.search.next() {
+            self.index = index
         }
-        if self.search_index+1 < self.search_indexes.len() {
-            self.search_index+=1
-        } else {
-            self.search_index=0
-        }
-        self.index = self.search_indexes[self.search_index]
     }
 
     #[inline]
     pub fn search_prev(&mut self) {
-        if self.search_indexes.is_empty() {
-            return;
+        if let Some(index) = self.search.prev() {
+            self.index = index
         }
-        if self.search_index != 0 {
-            self.search_index-=1
-        } else {
-            self.search_index=self.search_indexes.len()-1
-        }
-        self.index = self.search_indexes[self.search_index]
     }
 
     #[inline]
