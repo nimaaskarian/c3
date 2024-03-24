@@ -97,17 +97,24 @@ impl Schedule {
         }
     }
 
+    #[inline(always)]
     fn current_date_diff_days(&self) -> i64 {
         date::diff_days(Some(date::current()), self.date)
     }
 
     #[inline(always)]
+    fn date_diff_days(&self) -> i64 {
+        date::diff_days(self.date, Some(date::current()))
+    }
+
+    #[inline(always)]
     fn display_reminder(&self) -> String {
         let date_str = date::format(self.date);
-        match self.current_date_diff_days() {
+        match self.date_diff_days() {
+            any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str,-1*any),
             0 => format!(" (Reminder for today [{}])", date_str),
-            -1 => format!(" (Reminder for tomorrow [{}])", date_str),
-            any => format!(" (Reminder for {} [{} days])", date_str, -1*any),
+            1 => format!(" (Reminder for tomorrow [{}])", date_str),
+            any => format!(" (Reminder for {date_str} [{any} days])"),
         }
     }
 
@@ -191,7 +198,7 @@ impl Schedule {
 
     pub fn should_undone(&self) -> bool {
         match self._type {
-            Type::Reminder => self.date == Some(date::current()),
+            Type::Reminder => self.date <= Some(date::current()),
             Type::Scheduled => self.current_date_diff_days() >= self.day,
             Type::None => false,
         }
@@ -199,7 +206,7 @@ impl Schedule {
 
     pub fn should_done(&self) -> bool {
         match self._type {
-            Type::Reminder => self.date != Some(date::current()),
+            Type::Reminder => self.date > Some(date::current()),
             _ => false
         }
     }

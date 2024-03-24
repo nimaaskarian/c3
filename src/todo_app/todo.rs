@@ -257,11 +257,6 @@ impl Todo {
 
     #[inline]
     pub fn set_done(&mut self, done:bool) {
-        if done {
-            self.schedule.current_date()
-        } else {
-            self.schedule.none_date()
-        }
         self.done = done;
     }
 
