@@ -3,6 +3,8 @@ mod clipboard;
 use clipboard::Clipboard;
 mod todo_list;
 mod todo;
+mod search;
+use search::Search;
 pub use todo_list::TodoList;
 pub use todo::Todo;
 use crate::Args;
@@ -16,10 +18,7 @@ pub struct App {
     pub changed:bool,
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
-    // search:
-    search_indexes: Vec<usize>,
-    search_index: usize,
-    last_query: String,
+    search: Search,
 }
 
 impl App {
@@ -35,14 +34,11 @@ impl App {
             prior_indexes: vec![],
             changed: false,
             args,
-
-            last_query: String::new(),
-            search_indexes: vec![],
-            search_index: 0,
+            search: Search::new(),
         };
         for str in app.args.search_and_select.clone() {
             app.search(Some(str));
-            for index in app.search_indexes.clone() {
+            for index in app.search.indices() {
                 app.selected.push(index);
             }
         }
@@ -104,11 +100,6 @@ impl App {
         if let Some(todo) = self.mut_todo() {
             todo.schedule.add_days_to_done_date(1)
         }
-    }
-
-    #[inline]
-    pub fn show_done(&self) -> bool {
-        self.args.display_args.show_done
     }
 
     #[inline]
@@ -178,40 +169,19 @@ impl App {
     
     #[inline]
     pub fn search(&mut self, query:Option<String>) {
-        if let Some(query) = query {
-            self.last_query = query;
-        }
-        if self.last_query.is_empty() {
-            return;
-        }
         let mut todo_messages = self.current_list().undone.messages();
         if self.args.display_args.show_done {
             todo_messages.extend(self.current_list().done.messages());
         }
-        self.search_indexes = Vec::new();
-
-        for i in 0..todo_messages.len() {
-            if todo_messages[i].to_lowercase().contains(self.last_query.to_lowercase().as_str()) {
-                self.search_indexes.push(i);
-            }
-        }
+        self.search.search(query, todo_messages);
     }
 
     #[inline]
-    pub fn search_next_index(&mut self) {
-        if self.search_indexes.is_empty() {
-            return;
+    pub fn search_init(&mut self) {
+        if let Some(index) = self.search.first_greater_than(self.index) {
+            self.index = index;
         }
-        for index in &self.search_indexes {
-            if *index > self.index{
-                self.index = *index;
-                return;
-            }
-        }
-
-        self.index = self.search_indexes[0];
     }
-
 
     #[inline]
     pub fn toggle_show_done(&mut self) {
@@ -221,28 +191,16 @@ impl App {
 
     #[inline]
     pub fn search_next(&mut self) {
-        if self.search_indexes.is_empty() {
-            return;
+        if let Some(index) = self.search.next() {
+            self.index = index
         }
-        if self.search_index+1 < self.search_indexes.len() {
-            self.search_index+=1
-        } else {
-            self.search_index=0
-        }
-        self.index = self.search_indexes[self.search_index]
     }
 
     #[inline]
     pub fn search_prev(&mut self) {
-        if self.search_indexes.is_empty() {
-            return;
+        if let Some(index) = self.search.prev() {
+            self.index = index
         }
-        if self.search_index != 0 {
-            self.search_index-=1
-        } else {
-            self.search_index=self.search_indexes.len()-1
-        }
-        self.index = self.search_indexes[self.search_index]
     }
 
     #[inline]
@@ -433,22 +391,25 @@ impl App {
     }
 
     #[inline]
-    pub fn write(&mut self) -> io::Result<()> {
-        self.changed = false;
-        let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
-        self.handle_removed_todo_dependency_files(&dependency_path);
-        self.todo_list.delete_removed_dependent_files(&dependency_path)?;
-        if self.is_tree() {
-            self.todo_list.write_dependencies(&dependency_path)?;
+    pub fn write(&mut self) -> io::Result<bool> {
+        if self.changed {
+            self.changed = false;
+            let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
+            self.handle_removed_todo_dependency_files(&dependency_path);
+            self.todo_list.delete_removed_dependent_files(&dependency_path)?;
+            if self.is_tree() {
+                self.todo_list.write_dependencies(&dependency_path)?;
+            }
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 
     #[inline]
     pub fn is_root(&self) -> bool {
         self.prior_indexes.is_empty()
     }
-
     
     #[inline]
     pub fn only_undone_empty(&self) -> bool {
@@ -627,20 +588,21 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::fs::{self, remove_dir_all};
 
     use clap::Parser;
     use crate::Args;
 
     use super::*;
 
-    fn dir() -> PathBuf {
-        PathBuf::from("test-results")
+    fn dir(dir_name: &str) -> io::Result<PathBuf >{
+        let path = PathBuf::from(dir_name);
+        fs::create_dir_all(path.join("notes"))?;
+        Ok(path)
     }
 
-    fn write_test_todos() -> io::Result<App>{
+    fn write_test_todos(dir: &PathBuf) -> io::Result<App>{
         let mut args = Args::parse();
-        let dir = dir();
         fs::create_dir_all(dir.join("notes"))?;
         args.todo_path = dir.join("todo");
         let mut app = App::new(args);
@@ -650,17 +612,21 @@ mod tests {
             app.add_dependency_traverse_down();
             app.append(String::from(dependency));
         }
-        app.write()?;
         for _ in 0..3 {
             app.traverse_up();
         }
+        app.write()?;
         Ok(app)
     }
 
+    // fn remove_test() {
+    //     // let _ = Command::new("rm").args(vec!["-f","-r", DIR_NAME]).spawn();
+    // }
+
     #[test]
     fn test_write() -> io::Result<()> {
-        let dir = dir();
-        write_test_todos()?;
+        let dir = dir("test-write")?;
+        write_test_todos(&dir)?;
         let mut names = fs::read_dir(dir.join("notes"))?
             .map(|res| res.map(|e| e.file_name().to_str().unwrap().to_string()))
             .collect::<Result<Vec<_>, io::Error>>()?;
@@ -671,39 +637,42 @@ mod tests {
         names.sort();
         expected_names.sort();
 
+        remove_dir_all(dir)?;
         assert_eq!(names, expected_names);
-        fs::remove_dir_all(&dir)?;
         Ok(())
     }
 
     #[test]
     fn test_delete_todo() -> io::Result<()> {
-        let mut app = write_test_todos()?;
+        let dir = dir("test-delete-todo")?;
+        let mut app = write_test_todos(&dir)?;
         app.delete_todo();
-        app.write()?;
+        app.write().expect("App writing failed");
 
-        let dir = dir();
-        let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))?
+        let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes")).expect("Reading names failed")
             .map(|res| res.map(|e|e.path())).collect();
+
+        remove_dir_all(dir)?;
         assert!(names?.is_empty());
-        fs::remove_dir_all(&dir)?;
         Ok(())
     }
 
     #[test]
     fn test_remove_current_dependency() -> io::Result<()> {
-        let mut app = write_test_todos()?;
+        let dir = dir("test-remove-current-dependency")?;
+        let mut app = write_test_todos(&dir)?;
         app.remove_current_dependent();
         app.write()?;
 
-        let dir = dir();
-        let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))?
-            .map(|res| res.map(|e|e.path())).collect();
-        assert!(names?.is_empty());
+        let names : io::Result<Vec<PathBuf>> = match fs::read_dir(dir.join("notes")) {
+            Ok(value) => value.map(|res| res.map(|e|e.path())).collect(),
+            _ => Ok(vec![]),
+        };
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n");
+        remove_dir_all(dir)?;
+        assert!(names?.is_empty());
         assert_eq!(string, expected_string);
-        fs::remove_dir_all(&dir)?;
         Ok(())
     }
 }

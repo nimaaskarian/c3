@@ -6,7 +6,7 @@ use home::home_dir;
 
 #[inline(always)]
 pub fn append_home_dir(vec:[&str; 4]) -> PathBuf {
-    let mut path = PathBuf::from(format!("{}", home_dir().unwrap().to_str().unwrap()));
+    let mut path = home_dir().unwrap().to_path_buf();
     for item in vec {
         path = path.join(item);
     }
@@ -18,10 +18,10 @@ pub fn append_home_dir(vec:[&str; 4]) -> PathBuf {
 pub fn get_todo_path() -> io::Result<PathBuf> {
     let file = append_home_dir([".local","share","calcurse","todo"]);
     if file.is_dir() {
-        remove_dir(file.clone())?;
+        remove_dir(&file)?;
     }
     let parentdir = file.parent().unwrap();
-    let _ = std::fs::create_dir_all(parentdir)?;
+    std::fs::create_dir_all(parentdir)?;
     Ok(file)
 }
 
@@ -39,7 +39,7 @@ pub fn temp_note_path() -> PathBuf{
 #[inline(always)]
 pub fn file_content(path:&PathBuf) -> io::Result<String> {
     let mut content = String::new();
-    let mut file = File::open(path.as_os_str())?;
+    let mut file = File::open(path)?;
     file.read_to_string(&mut content)?;
     Ok(content)
 }

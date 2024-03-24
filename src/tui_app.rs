@@ -37,12 +37,11 @@ pub fn create_todo_widget(display_list:&Vec<String>, title:String) ->  TodoWidge
     if display_list.is_empty() {
         return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
     }
-    return TodoWidget::List(List::new((*display_list).clone())
+    TodoWidget::List(List::new((*display_list).clone())
         .block(default_block(title))
         .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
         .highlight_symbol(">>")
-        .repeat_highlight_symbol(true));
-
+        .repeat_highlight_symbol(true))
 }
 
 /// Shutdown TUI app (undo everything did in startup, and show cursor)
@@ -108,7 +107,6 @@ pub struct TuiApp<'a>{
 }
 
 impl<'a>TuiApp<'a>{
-
     #[inline]
     pub fn new(app:&'a mut App,module: &'a mut dyn Module<'a>, module_enabled:bool) -> Self {
         let mut textarea = TextArea::default();
@@ -123,7 +121,6 @@ impl<'a>TuiApp<'a>{
             module_enabled,
         }
     }
-
 
     #[inline]
     pub fn title(&self) -> String { 
@@ -164,9 +161,8 @@ impl<'a>TuiApp<'a>{
     #[inline]
     fn on_search(&mut self, str:String) {
         self.todo_app.search(Some(str));
-        self.todo_app.search_next_index();
+        self.todo_app.search_init();
     }
-
 
     #[inline]
     pub fn schedule_prompt(&mut self) {
@@ -180,7 +176,6 @@ impl<'a>TuiApp<'a>{
             todo.enable_day(day.unwrap() as i64);
         }
     }
-
 
     #[inline]
     pub fn edit_prompt(&mut self, start: bool) {
@@ -323,6 +318,14 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
+    fn write(&mut self) -> io::Result<()>{
+        if !self.todo_app.write()? {
+            self.todo_app.read();
+        }
+        Ok(())
+    }
+
+    #[inline]
     fn read_keys(&mut self)  -> io::Result<Operation> {
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
@@ -342,7 +345,7 @@ impl<'a>TuiApp<'a>{
                     KeyCode::Left | Char('h') => self.todo_app.traverse_up(),
                     KeyCode::Home | Char('g') => self.todo_app.go_top(),
                     KeyCode::End | Char('G') => self.todo_app.go_bottom(),
-                    Char('w') => self.todo_app.write()?,
+                    Char('w') => self.write()?,
                     Char('J') => self.todo_app.decrease_current_priority(),
                     Char('K') => self.todo_app.increase_current_priority(),
                     Char(']') => {
