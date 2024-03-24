@@ -622,19 +622,17 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
     use std::fs::{self, remove_dir_all};
 
     use clap::Parser;
     use crate::Args;
 
     use super::*;
-    const DIR_NAME : &str = "test-results";
 
-    fn dir(dir_name: &str) -> PathBuf {
+    fn dir(dir_name: &str) -> io::Result<PathBuf >{
         let path = PathBuf::from(dir_name);
-        fs::create_dir_all(path.join("notes"));
-        path
+        fs::create_dir_all(path.join("notes"))?;
+        Ok(path)
     }
 
     fn write_test_todos(dir: &PathBuf) -> io::Result<App>{
@@ -661,7 +659,7 @@ mod tests {
 
     #[test]
     fn test_write() -> io::Result<()> {
-        let dir = dir("test-write");
+        let dir = dir("test-write")?;
         write_test_todos(&dir)?;
         let mut names = fs::read_dir(dir.join("notes"))?
             .map(|res| res.map(|e| e.file_name().to_str().unwrap().to_string()))
@@ -673,14 +671,14 @@ mod tests {
         names.sort();
         expected_names.sort();
 
-        remove_dir_all(dir);
+        remove_dir_all(dir)?;
         assert_eq!(names, expected_names);
         Ok(())
     }
 
     #[test]
     fn test_delete_todo() -> io::Result<()> {
-        let dir = dir("test-delete-todo") ;
+        let dir = dir("test-delete-todo")?;
         let mut app = write_test_todos(&dir)?;
         app.delete_todo();
         app.write().expect("App writing failed");
@@ -688,14 +686,14 @@ mod tests {
         let names : io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes")).expect("Reading names failed")
             .map(|res| res.map(|e|e.path())).collect();
 
-        remove_dir_all(dir);
+        remove_dir_all(dir)?;
         assert!(names?.is_empty());
         Ok(())
     }
 
     #[test]
     fn test_remove_current_dependency() -> io::Result<()> {
-        let dir = dir("test-remove-current-dependency") ;
+        let dir = dir("test-remove-current-dependency")?;
         let mut app = write_test_todos(&dir)?;
         app.remove_current_dependent();
         app.write()?;
@@ -706,7 +704,7 @@ mod tests {
         };
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n");
-        remove_dir_all(dir);
+        remove_dir_all(dir)?;
         assert!(names?.is_empty());
         assert_eq!(string, expected_string);
         Ok(())
