@@ -18,7 +18,7 @@ pub fn append_home_dir(vec:[&str; 4]) -> PathBuf {
 pub fn get_todo_path() -> io::Result<PathBuf> {
     let file = append_home_dir([".local","share","calcurse","todo"]);
     if file.is_dir() {
-        remove_dir(file.clone())?;
+        remove_dir(&file)?;
     }
     let parentdir = file.parent().unwrap();
     let _ = std::fs::create_dir_all(parentdir)?;

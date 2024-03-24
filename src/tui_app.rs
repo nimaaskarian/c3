@@ -107,7 +107,6 @@ pub struct TuiApp<'a>{
 }
 
 impl<'a>TuiApp<'a>{
-
     #[inline]
     pub fn new(app:&'a mut App,module: &'a mut dyn Module<'a>, module_enabled:bool) -> Self {
         let mut textarea = TextArea::default();
@@ -122,7 +121,6 @@ impl<'a>TuiApp<'a>{
             module_enabled,
         }
     }
-
 
     #[inline]
     pub fn title(&self) -> String { 
@@ -166,7 +164,6 @@ impl<'a>TuiApp<'a>{
         self.todo_app.search_init();
     }
 
-
     #[inline]
     pub fn schedule_prompt(&mut self) {
         self.set_text_mode(Self::on_schedule, "Change schedule day", "");
@@ -179,7 +176,6 @@ impl<'a>TuiApp<'a>{
             todo.enable_day(day.unwrap() as i64);
         }
     }
-
 
     #[inline]
     pub fn edit_prompt(&mut self, start: bool) {

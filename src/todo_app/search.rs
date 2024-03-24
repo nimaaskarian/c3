@@ -77,5 +77,4 @@ impl Search {
         }
         Some(self.indices[self.search_index])
     }
-
 }

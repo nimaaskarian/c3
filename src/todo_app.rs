@@ -392,12 +392,14 @@ impl App {
 
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
-        self.changed = false;
-        let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
-        self.handle_removed_todo_dependency_files(&dependency_path);
-        self.todo_list.delete_removed_dependent_files(&dependency_path)?;
-        if self.is_tree() {
-            self.todo_list.write_dependencies(&dependency_path)?;
+        if self.changed {
+            self.changed = false;
+            let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
+            self.handle_removed_todo_dependency_files(&dependency_path);
+            self.todo_list.delete_removed_dependent_files(&dependency_path)?;
+            if self.is_tree() {
+                self.todo_list.write_dependencies(&dependency_path)?;
+            }
         }
         Ok(())
     }
@@ -406,7 +408,6 @@ impl App {
     pub fn is_root(&self) -> bool {
         self.prior_indexes.is_empty()
     }
-
     
     #[inline]
     pub fn only_undone_empty(&self) -> bool {
