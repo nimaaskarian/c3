@@ -16,7 +16,7 @@ type Type = ScheduleType;
 pub struct Schedule {
     day: i64,
     date: Option<date::Type>,
-    pub _type: Type,
+    _type: Type,
     pub last_type: Type,
 }
 
@@ -194,6 +194,11 @@ impl Schedule {
         let ScheduleRest { schedule, rest } = ScheduleRest::from(input.clone());
         *input = rest;
         schedule
+    }
+
+    #[inline(always)]
+    pub fn is_reminder(&self) -> bool {
+        self._type == Type::Reminder
     }
 
     #[inline(always)]

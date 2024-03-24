@@ -292,7 +292,16 @@ impl Todo {
 
     #[inline(always)]
     pub fn comparison_priority(&self) -> i8{
-        if self.priority == 0 {10} else {self.priority}
+        let priority = if self.priority == 0 {
+            10
+        } else {
+            self.priority
+        };
+        if self.schedule.is_reminder() {
+            priority*10-5
+        } else {
+            priority*10
+        }
     }
 
     #[inline]
