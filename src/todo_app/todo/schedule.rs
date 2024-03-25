@@ -163,8 +163,10 @@ impl Schedule {
         self.date = None
     }
 
-    pub fn current_date(&mut self) {
-        self.date = Some(date::current())
+    pub fn set_current_date(&mut self) {
+        if self._type == Type::Scheduled {
+            self.date = Some(date::current())
+        }
     }
 
     pub fn toggle(&mut self) {
