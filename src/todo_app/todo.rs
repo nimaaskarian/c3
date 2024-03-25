@@ -16,15 +16,17 @@ use super::TodoList;
 use crate::DisplayArgs;
 //}}}
 
+pub type PriorityType = usize;
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Todo {
     pub message: String,
-    priority: i8,
+    priority: PriorityType,
     pub dependency: Dependency,
     removed_dependency: Option<Dependency>,
     done:bool,
     pub schedule: Schedule,
 }
+
 
 impl Into<String> for &Todo {
     fn into(self) -> String{
@@ -71,18 +73,16 @@ impl TryFrom<&str> for Todo {
         }
         let dependency = Dependency::from(dependency_string.as_str());
 
-        let priority:i8 = match priority_string.parse() {
-            Ok(value) => {
-                match value {
-                    0.. => value,
-                    any => any*-1,
-                }
+        let mut done = priority_string.chars().nth(0).unwrap() == '-';
+
+        let priority:PriorityType = match priority_string.chars().nth(done as usize){
+            Some(value) if value.is_digit(10) => {
+                value.to_digit(10).unwrap() as PriorityType
             }
-            Err(_) => 0
+            _ => 0
         };
         
         let schedule = Schedule::match_message(&mut message);
-        let mut done = priority_string.chars().nth(0).unwrap() == '-';
 
         if schedule.should_undone() {
             done = false;
@@ -103,16 +103,16 @@ impl TryFrom<&str> for Todo {
 
 impl Todo {
     #[inline]
-    pub fn default(message:String, priority:i8) -> Self {
+    pub fn default(message:String, priority:PriorityType) -> Self {
         Self::new(message, priority, false, Dependency::default())
     }
 
-    pub fn written(message:String, priority:i8, done:bool) -> Self {
+    pub fn written(message:String, priority:PriorityType, done:bool) -> Self {
         Self::new(message, priority, done, Dependency::written())
     }
 
     #[inline]
-    pub fn new(message:String, priority:i8, done: bool, dependency: Dependency) -> Self {
+    pub fn new(message:String, priority:PriorityType, done: bool, dependency: Dependency) -> Self {
         Todo {
             schedule: Schedule::new(),
             dependency,
@@ -257,6 +257,7 @@ impl Todo {
 
     #[inline]
     pub fn set_done(&mut self, done:bool) {
+        self.schedule.set_current_date();
         self.done = done;
     }
 
@@ -280,7 +281,7 @@ impl Todo {
     }
 
     #[inline]
-    pub fn set_priority(&mut self, priority:i8) {
+    pub fn set_priority(&mut self, priority:PriorityType) {
         self.priority = priority;
         self.fix_priority();
     }
@@ -291,16 +292,24 @@ impl Todo {
     }
 
     #[inline(always)]
-    pub fn comparison_priority(&self) -> i8{
-        if self.priority == 0 {10} else {self.priority}
+    pub fn comparison_priority(&self) -> PriorityType{
+        let priority = if self.priority == 0 {
+            10
+        } else {
+            self.priority
+        };
+        if self.schedule.is_reminder() {
+            priority*10-5
+        } else {
+            priority*10
+        }
     }
 
     #[inline]
-    fn fixed_priority(priority: i8) -> i8 {
+    fn fixed_priority(priority: PriorityType) -> PriorityType {
         match priority {
             10.. => 0,
             0 => 0,
-            ..=0 => 1,
             _ => priority
         }
     }

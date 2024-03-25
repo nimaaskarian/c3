@@ -1,4 +1,3 @@
-use chrono::Duration;
 use scanf::sscanf;
 
 use crate::date;
@@ -16,7 +15,7 @@ type Type = ScheduleType;
 pub struct Schedule {
     day: i64,
     date: Option<date::Type>,
-    pub _type: Type,
+    _type: Type,
     pub last_type: Type,
 }
 
@@ -121,7 +120,7 @@ impl Schedule {
     #[inline(always)]
     fn display_scheduled(&self) -> String {
         let inner_str = match self.current_date_diff_days() {
-            0 => String::new(),
+            ..=0 => String::new(),
             1 => String::from(", last done yesterday"),
             any => format!(", last done {} days ago", any)
         };
@@ -141,12 +140,10 @@ impl Schedule {
         }
     }
 
-    pub fn add_days_to_done_date(&mut self, days:i64) {
+    pub fn add_days_to_date(&mut self, days:i64) {
         if let Some(date) = self.date {
-            if days <= self.current_date_diff_days() {
-                self.date = Some(date+Duration::days(days));
-            }
-        }
+            self.date = Some(date::add_days(date, days))
+        } 
     }
 
     pub fn set_daily(&mut self) {
@@ -166,8 +163,10 @@ impl Schedule {
         self.date = None
     }
 
-    pub fn current_date(&mut self) {
-        self.date = Some(date::current())
+    pub fn set_current_date(&mut self) {
+        if self._type == Type::Scheduled {
+            self.date = Some(date::current())
+        }
     }
 
     pub fn toggle(&mut self) {
@@ -194,6 +193,11 @@ impl Schedule {
         let ScheduleRest { schedule, rest } = ScheduleRest::from(input.clone());
         *input = rest;
         schedule
+    }
+
+    #[inline(always)]
+    pub fn is_reminder(&self) -> bool {
+        self._type == Type::Reminder
     }
 
     #[inline(always)]

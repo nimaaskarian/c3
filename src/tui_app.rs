@@ -19,7 +19,7 @@ use modules::{
     potato::Potato,
 };
 use super::todo_app::{App, Todo};
-use crate::date;
+use crate::{date, todo_app::PriorityType};
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
@@ -392,7 +392,11 @@ impl<'a>TuiApp<'a>{
                     Char('A') => self.append_prompt(),
                     Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
                     Char('q') => self.quit_save_prompt(),
-                    Char(c) if c.is_digit(10) => self.todo_app.set_current_priority(c.to_digit(10).unwrap() as i8),
+                    Char(c) if c.is_digit(10) => {
+                        let priority = c.to_digit(10).unwrap();
+                        self.todo_app.set_current_priority(priority as PriorityType);
+                    }
+                    
 
                     Char(' ') => self.module.on_space(),
                     Char('s') => self.module.on_s(),

@@ -9,6 +9,8 @@ pub use todo_list::TodoList;
 pub use todo::Todo;
 use crate::Args;
 
+pub use self::todo::PriorityType;
+
 pub struct App {
     selected: Vec<usize>,
     clipboard: Clipboard,
@@ -56,7 +58,7 @@ impl App {
             let sel_index = *sel_index - index_shift;
             let iter_index = iter_index - iter_index;
             if let Some(priority) = self.args.set_selected_priority {
-                self.todo_list[sel_index].set_priority(priority as i8);
+                self.todo_list[sel_index].set_priority(priority as PriorityType);
             }
             if let Some(message) = self.args.set_selected_message.clone() {
                 self.todo_list[sel_index].set_message(message);
@@ -91,14 +93,14 @@ impl App {
     #[inline]
     pub fn increase_day_done(&mut self) {
         if let Some(todo) = self.mut_todo() {
-            todo.schedule.add_days_to_done_date(-1)
+            todo.schedule.add_days_to_date(-1)
         }
     }
 
     #[inline]
     pub fn decrease_day_done(&mut self) {
         if let Some(todo) = self.mut_todo() {
-            todo.schedule.add_days_to_done_date(1)
+            todo.schedule.add_days_to_date(1)
         }
     }
 
@@ -441,7 +443,7 @@ impl App {
     }
 
     #[inline]
-    pub fn set_current_priority(&mut self, priority:i8) {
+    pub fn set_current_priority(&mut self, priority:PriorityType) {
         if let Some(todo) = self.mut_todo() {
             todo.set_priority(priority);
             self.reorder_current();
