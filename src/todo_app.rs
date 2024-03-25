@@ -17,7 +17,7 @@ pub struct App {
     pub(super) todo_list: TodoList,
     index: usize,
     prior_indexes: Vec<usize>,
-    pub changed:bool,
+    changed:bool,
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
     search: Search,
