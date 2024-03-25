@@ -16,7 +16,7 @@ use super::TodoList;
 use crate::DisplayArgs;
 //}}}
 
-pub type PriorityType = usize;
+pub type PriorityType = u8;
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Todo {
     pub message: String,
