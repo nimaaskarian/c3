@@ -15,3 +15,5 @@ complete -f -c c3 -l "set-selected-message" -d "Set selected todo message" -r
 complete -x -c c3 -l "delete-selected" -d "Delete selected todos"
 complete -x -c c3 -l "done-selected" -d "Done selected todos"
 complete -c c3 -f
+complete -x -c c3 -l "done-string" -d 'String before done todos [default: "[x] "]'
+complete -x -c c3 -l "undone-string" -d 'String before undone todos [default: "[ ] "]'
