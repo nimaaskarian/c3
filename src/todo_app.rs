@@ -52,6 +52,7 @@ impl App {
         let mut should_write = false;
         let mut index_shift = 0;
         for (iter_index, sel_index) in self.selected.clone().iter().enumerate() {
+            self.changed = true;
             if  index_shift > *sel_index  || index_shift > iter_index {
                 break
             }
