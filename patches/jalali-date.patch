@@ -36,7 +36,7 @@ index dc3fbce..d4ddba8 100644
  [profile.release]
  codegen-units = 1
 diff --git a/src/date.rs b/src/date.rs
-index ffc7343..3cd19f7 100644
+index ffc7343..3e32c87 100644
 --- a/src/date.rs
 +++ b/src/date.rs
 @@ -1,5 +1,7 @@
@@ -81,7 +81,7 @@ index ffc7343..3cd19f7 100644
 +            }
 +        }
 +        _ if sscanf!(date_string,"{}-{}", j_month, j_day).is_ok() => {
-+            
++
 +            let current_j_date = naive_to_jalali(current());
 +            if let Some(date) = jalali_to_georgian_naive(current_j_date.year as i32, j_month, j_day) {
 +                return Ok(date)
