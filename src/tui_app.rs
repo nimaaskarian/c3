@@ -35,14 +35,14 @@ pub enum TodoWidget<'a> {
     Paragraph(ratatui::widgets::Paragraph<'a>),
 }
 
-pub fn create_todo_widget(display_list:&Vec<String>, title:String) ->  TodoWidget {
+pub fn create_todo_widget<'a>(display_list:&Vec<String>, title:String, highlight_symbol: &'a str) ->  TodoWidget<'a> {
     if display_list.is_empty() {
         return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
     }
     TodoWidget::List(List::new((*display_list).clone())
         .block(default_block(title))
         .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-        .highlight_symbol(">>")
+        .highlight_symbol(highlight_symbol)
         .repeat_highlight_symbol(true))
 }
 
@@ -435,6 +435,11 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
+    fn highlight_string(&self) -> &str {
+        self.todo_app.args.highlight_string.as_str()
+    }
+
+    #[inline]
     fn render_dependency_widget(&self, frame: &mut Frame, todo: Option<&Todo>, dependency_layout: Rect) {
         if let Some(todo) = todo {
             if let Some(note) = todo.dependency.note() {
@@ -444,7 +449,7 @@ impl<'a>TuiApp<'a>{
                 frame.render_widget(note_widget, dependency_layout);
             } 
             if let Some(todo_list) = todo.dependency.todo_list() {
-                match create_todo_widget(&self.todo_app.display_list(todo_list), String::from("Todo dependencies")) {
+                match create_todo_widget(&self.todo_app.display_list(todo_list), String::from("Todo dependencies"), self.highlight_string()) {
                     TodoWidget::List(widget) => frame.render_widget(widget, dependency_layout),
                     TodoWidget::Paragraph(widget) => frame.render_widget(widget, dependency_layout),
                 }
@@ -454,7 +459,7 @@ impl<'a>TuiApp<'a>{
 
     #[inline]
     fn render_todos_widget(&self, frame: &mut Frame, list_state: &mut ListState, todo_layout: &Rc<[Rect]>) {
-        match create_todo_widget(&self.todo_app.display_current(), self.title()) {
+        match create_todo_widget(&self.todo_app.display_current(), self.title(), self.highlight_string()) {
             TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout[1]),
             TodoWidget::List(widget) => frame.render_stateful_widget(widget, todo_layout[1], list_state),
         }
