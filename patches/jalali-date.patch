@@ -36,7 +36,7 @@ index dc3fbce..d4ddba8 100644
  [profile.release]
  codegen-units = 1
 diff --git a/src/date.rs b/src/date.rs
-index ffc7343..3e32c87 100644
+index 16c5eda..8d89a33 100644
 --- a/src/date.rs
 +++ b/src/date.rs
 @@ -1,5 +1,7 @@
@@ -94,15 +94,24 @@ index ffc7343..3e32c87 100644
  }
  
  #[inline]
-@@ -22,7 +58,10 @@ pub fn current() -> Type {
- #[inline]
- pub fn format(input: Option<Type>) -> String {
-     match input {
--        Some(date)=> date.format(FORMAT).to_string(),
+@@ -27,11 +63,18 @@ pub fn format(input: Option<Type>) -> String {
+     }
+ }
+ 
+-#[inline(always)]
++#[inline]
+ pub fn display(input: Option<Type>) -> String {
+-    format(input)
++    match input {
 +        Some(date)=> {
 +            let j_date = naive_to_jalali(date);
 +            format!("{}-{:0>2}-{:0>2}", j_date.year, j_date.month, j_date.day)
 +        },
-         None => String::new(),
-     }
++        None => String::new(),
++    }
  }
+ 
++
+ #[inline]
+ pub fn diff_days(first: Option<Type>, next: Option<Type>) -> i64 {
+     if first.is_some() && next.is_some() {
