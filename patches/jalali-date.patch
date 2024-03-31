@@ -1,0 +1,95 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 71501d1..b96b543 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -124,6 +124,7 @@ dependencies = [
+  "clap",
+  "crossterm",
+  "home",
++ "jalali-date",
+  "ratatui",
+  "scanf",
+  "sha1",
+@@ -350,6 +351,12 @@ dependencies = [
+  "either",
+ ]
+ 
++[[package]]
++name = "jalali-date"
++version = "0.2.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "d4de89bd2cecffc3235b702c93c504136ef8ebf3c2a934d34297032fb83dec07"
++
+ [[package]]
+ name = "js-sys"
+ version = "0.3.67"
+diff --git a/Cargo.toml b/Cargo.toml
+index 4bc6bd5..dec0986 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -12,6 +12,7 @@ crossterm = "0.27.0"
+ tui-textarea = "0.4.0"
+ chrono = "0.4.31"
+ clap = { version = "4.4.18", features = ["derive", "string"] }
++jalali-date = "0.2.0"
+ 
+ [profile.release]
+ codegen-units = 1
+diff --git a/src/date.rs b/src/date.rs
+index ffc7343..51aa610 100644
+--- a/src/date.rs
++++ b/src/date.rs
+@@ -1,5 +1,7 @@
+-use chrono::{Local ,NaiveDate, Duration};
++use chrono::{Datelike, Duration, Local, NaiveDate};
+ use chrono::format::ParseError;
++use jalali_date::{jalali_to_gregorian, to_jalali};
++use scanf::sscanf;
+ const FORMAT: &str = "%Y-%m-%d";
+ 
+ pub type Type = NaiveDate;
+@@ -9,9 +11,27 @@ pub fn parse(date_string: &String) -> Result<Type, ParseError> {
+     NaiveDate::parse_from_str(date_string.as_str(), FORMAT)
+ }
+ 
++fn jalali_to_georgian_naive(j_year: i32, j_month: i32, j_day: i32) -> Option<Type> {
++
++    let g_date = jalali_to_gregorian(j_year, j_month, j_day);
++    NaiveDate::from_ymd_opt(g_date.year , g_date.month as u32, g_date.day as u32)
++}
++
++#[derive(Debug)]
++pub enum Error {
++    ParseFailed,
++}
+ #[inline(always)]
+-pub fn parse_user_input(date_string: &String) -> Result<Type, ParseError> {
+-    parse(date_string)
++pub fn parse_user_input(date_string: &String) -> Result<Type, Error> {
++    let mut j_year = 0;
++    let mut j_month = 0;
++    let mut j_day = 0;
++    if sscanf!(date_string,"{}-{}-{}", j_year, j_month, j_day).is_ok() {
++        if let Some(date) = jalali_to_georgian_naive(j_year, j_month, j_day) {
++            return Ok(date)
++        }
++    }
++    Err(Error::ParseFailed)
+ }
+ 
+ #[inline]
+@@ -22,7 +42,13 @@ pub fn current() -> Type {
+ #[inline]
+ pub fn format(input: Option<Type>) -> String {
+     match input {
+-        Some(date)=> date.format(FORMAT).to_string(),
++        Some(date)=> {
++            if let Ok(j_date) = to_jalali(date.day() as u16, date.month() as u16, date.year() as u16) {
++                format!("{}-{:0>2}-{:0>2}", j_date.year, j_date.month, j_date.day)
++            } else {
++                String::new()
++            }
++        },
+         None => String::new(),
+     }
+ }
