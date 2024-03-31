@@ -44,6 +44,10 @@ pub struct Args {
     #[arg(short='S', long)]
     search_and_select: Vec<String>,
 
+    /// String behind highlighted todo in TUI mode
+    #[arg(short='H', long, default_value_t=String::from(">>"))]
+    highlight_string: String,
+
     /// Set selected todo priority
     #[arg(long)]
     set_selected_priority: Option<u8>,
