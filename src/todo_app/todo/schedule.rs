@@ -142,6 +142,9 @@ impl Schedule {
 
     pub fn add_days_to_date(&mut self, days:i64) {
         if let Some(date) = self.date {
+            if days > 0 && self._type == Type::Scheduled && self.current_date_diff_days() <= 0 {
+                return
+            }
             self.date = Some(date::add_days(date, days))
         } 
     }
@@ -157,7 +160,6 @@ impl Schedule {
     pub fn set_weekly(&mut self) {
         self.set_day(7)
     }
-
 
     pub fn none_date(&mut self) {
         self.date = None
