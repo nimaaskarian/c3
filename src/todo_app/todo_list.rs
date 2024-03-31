@@ -400,6 +400,7 @@ mod tests {
         let path = PathBuf::from("todo-list-test-write/tmplist");
         let _ = todo_list.write(&path, true);
 
+
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
         let expected = "[1] this todo has prio 1
 [2] this one has prio 2
@@ -407,6 +408,7 @@ mod tests {
 [-0] this one is 0 and done
 ";
 
+        remove_dir_all(&path.parent().unwrap());
         let _ = remove_file(path);
         assert_eq!(contents, expected)
     }
@@ -426,6 +428,7 @@ mod tests {
 [-0] this one is 0 and done
 ";
 
+        remove_dir_all(&path.parent().unwrap());
         let _ = remove_file(path);
         assert_eq!(contents, expected);
     }
@@ -456,8 +459,7 @@ mod tests {
 
         todo_list[0].remove_dependency();
         let dependency_path = todo_list.write(&path, true)?;
-        remove_dir_all(&dependency_path)?;
-        remove_file(&path)?;
+        remove_dir_all(&path.parent().unwrap())?;
         Ok(())
     }
 }
