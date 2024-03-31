@@ -262,23 +262,6 @@ impl TodoList {
     }
 
     #[inline]
-    pub fn all_dependent_files(&mut self, path: &PathBuf, output: &mut Vec<PathBuf>) -> Vec<PathBuf>{
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
-            if todo.dependency.is_list() {
-                todo.dependency.todo_list.all_dependent_files(path, output);
-            }
-        }
-
-        output.clone()
-    }
-
-    #[inline]
-    pub fn todos_with_dependency<'a>() -> Vec<&'a Todo> {
-        let output = vec![];
-        output
-    }
-
-    #[inline]
     pub fn fix_undone(&mut self) {
         for index in 0..self.undone.todos.len() {
             if self.undone.todos[index].done() {
@@ -408,7 +391,7 @@ mod tests {
 [-0] this one is 0 and done
 ";
 
-        remove_dir_all(&path.parent().unwrap());
+        remove_dir_all(&path.parent().unwrap()).expect("Remove test failed");
         let _ = remove_file(path);
         assert_eq!(contents, expected)
     }
@@ -428,7 +411,7 @@ mod tests {
 [-0] this one is 0 and done
 ";
 
-        remove_dir_all(&path.parent().unwrap());
+        remove_dir_all(&path.parent().unwrap()).expect("Remove test failed");
         let _ = remove_file(path);
         assert_eq!(contents, expected);
     }
@@ -458,7 +441,7 @@ mod tests {
         assert_eq!(contents, expected);
 
         todo_list[0].remove_dependency();
-        let dependency_path = todo_list.write(&path, true)?;
+        todo_list.write(&path, true)?;
         remove_dir_all(&path.parent().unwrap())?;
         Ok(())
     }

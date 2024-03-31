@@ -9,6 +9,11 @@ pub fn parse(date_string: &String) -> Result<Type, ParseError> {
     NaiveDate::parse_from_str(date_string.as_str(), FORMAT)
 }
 
+#[inline(always)]
+pub fn parse_user_input(date_string: &String) -> Result<Type, ParseError> {
+    parse(date_string)
+}
+
 #[inline]
 pub fn current() -> Type {
     NaiveDate::from(Local::now().naive_local())
