@@ -1,5 +1,5 @@
 use chrono::{Local ,NaiveDate, Duration};
-use chrono::format::{ParseError};
+use chrono::format::ParseError;
 const FORMAT: &str = "%Y-%m-%d";
 
 pub type Type = NaiveDate;
