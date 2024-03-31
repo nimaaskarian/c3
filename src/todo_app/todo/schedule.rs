@@ -108,7 +108,7 @@ impl Schedule {
 
     #[inline(always)]
     fn display_reminder(&self) -> String {
-        let date_str = date::format(self.date);
+        let date_str = date::display(self.date);
         match self.date_diff_days() {
             any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str,-1*any),
             0 => format!(" (Reminder for today [{}])", date_str),

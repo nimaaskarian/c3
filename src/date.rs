@@ -27,6 +27,11 @@ pub fn format(input: Option<Type>) -> String {
     }
 }
 
+#[inline(always)]
+pub fn display(input: Option<Type>) -> String {
+    format(input)
+}
+
 #[inline]
 pub fn diff_days(first: Option<Type>, next: Option<Type>) -> i64 {
     if first.is_some() && next.is_some() {
