@@ -189,7 +189,7 @@ impl<'a>TuiApp<'a>{
 
     #[inline]
     fn on_reminder(&mut self,str:String) {
-        if let Ok(date) = date::parse(&str) {
+        if let Ok(date) = date::parse_user_input(&str) {
             if let Some(todo) = self.todo_app.mut_todo() {
                 todo.schedule.enable_reminder(date);
             }

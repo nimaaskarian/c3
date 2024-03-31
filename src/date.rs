@@ -1,5 +1,5 @@
 use chrono::{Local ,NaiveDate, Duration};
-use chrono::format::ParseError;
+use chrono::format::{ParseError};
 const FORMAT: &str = "%Y-%m-%d";
 
 pub type Type = NaiveDate;
@@ -7,6 +7,11 @@ pub type Type = NaiveDate;
 #[inline]
 pub fn parse(date_string: &String) -> Result<Type, ParseError> {
     NaiveDate::parse_from_str(date_string.as_str(), FORMAT)
+}
+
+#[inline(always)]
+pub fn parse_user_input(date_string: &String) -> Result<Type, ParseError> {
+    parse(date_string)
 }
 
 #[inline]
