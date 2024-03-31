@@ -6,7 +6,7 @@ LAST_TAG=$(git tag | tail -n 1)
 PACKAGE_NAME=c3
 USERNAME=nimaaskarian
 TAG="$1"
-MD5=""
+SOURCE_MD5=""
 
 push_tag() {
   git tag "$TAG" || {
@@ -22,40 +22,29 @@ release_package() {
   cp target/x86_64-pc-windows-gnu/release/c3.exe c3.x86_64.windows.exe || echo_exit copy windows binary failed
   SOURCE=source.tar.gz
   git archive --output=$SOURCE --prefix=c3-$TAG/ $TAG -9
-  MD5=$(md5sum $SOURCE | cut -f 1 -d ' ')
+  SOURCE_MD5=$(md5sum $SOURCE | cut -f 1 -d ' ')
   FILES="c3.x86.linux c3.x86_64.windows.exe $SOURCE"
   gh release create "$TAG" $FILES --title "$TAG" --notes "**Full Changelog**: https://github.com/$USERNAME/$PACKAGE_NAME/compare/$LAST_TAG...$TAG" --repo $USERNAME/$PACKAGE_NAME
   rm $FILES
 }
 
-release_c3() {
-  cd aur || echo_exit cd to aur directory failed.
-  sed -i "s/pkgver=$LAST_TAG/pkgver=$TAG/" c3/PKGBUILD
-  sed -i "s/md5sums=('.*')/md5sums=('$MD5')/" c3/PKGBUILD
+release() {
+  WD=$PWD
+  FOLDER=$1
+  MD5=$2
+  sed -i "s/pkgver=$LAST_TAG/pkgver=$TAG/" $FOLDER/PKGBUILD || echo_exit changing version of $FOLDER/PKGBUILD failed
+  sed -i "s/md5sums=('.*')/md5sums=('$MD5')/" $FOLDER/PKGBUILD || echo_exit changing md5sum of $FOLDER/PKGBUILD failed
 
-  cd c3 || echo_exit cd to c3 failed
+  cd $FOLDER || echo_exit cd to $FOLDER failed
   makepkg --printsrcinfo > .SRCINFO
   git add .
   git commit -m "Bumped version $TAG"
   git push
-  cd ../..
+  cd "$WD"
 }
 
-release_c3_bin() {
-  MD5=$(md5sum target/release/$PACKAGE_NAME | cut -f 1 -d ' ')
-  cd aur || echo_exit cd to aur directory failed.
-  sed -i "s/pkgver=$LAST_TAG/pkgver=$TAG/" c3-bin/PKGBUILD
-  sed -i "s/md5sums=('.*')/md5sums=('$MD5')/" c3-bin/PKGBUILD
-
-  cd c3-bin || echo_exit cd to c3 failed
-  makepkg --printsrcinfo > .SRCINFO
-  git add .
-  git commit -m "Bumped version $TAG"
-  git push
-  cd ../..
-}
-
+BIN_MD5=$(md5sum target/release/$PACKAGE_NAME | cut -f 1 -d ' ')
 push_tag
 release_package
-release_c3
-release_c3_bin
+release ./aur/c3 "$SOURCE_MD5"
+release ./aur/c3-bin "$BIN_MD5"
