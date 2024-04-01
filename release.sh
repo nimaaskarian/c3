@@ -44,7 +44,7 @@ release() {
 }
 
 BIN_MD5=$(md5sum target/release/$PACKAGE_NAME | cut -f 1 -d ' ')
-push_tag
+# push_tag
 release_package
 release ./aur/c3 "$SOURCE_MD5"
 release ./aur/c3-bin "$BIN_MD5"
