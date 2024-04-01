@@ -40,11 +40,10 @@ release() {
   git add .
   git commit -m "Bumped version $TAG"
   git push
-  cd "$WD"
+  cd "$WD" || echo_exit "cding back to previous working directory in release() failed"
 }
 
 BIN_MD5=$(md5sum target/release/$PACKAGE_NAME | cut -f 1 -d ' ')
-# push_tag
 release_package
 release ./aur/c3 "$SOURCE_MD5"
 release ./aur/c3-bin "$BIN_MD5"
