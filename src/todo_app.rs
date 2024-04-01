@@ -48,11 +48,9 @@ impl App {
         app
     }
 
-    pub fn do_commands_on_selected(&mut self) -> bool {
-        let mut should_write = false;
+    pub fn do_commands_on_selected(&mut self) {
         let mut index_shift = 0;
         for (iter_index, sel_index) in self.selected.clone().iter().enumerate() {
-            self.changed = true;
             if  index_shift > *sel_index  || index_shift > iter_index {
                 break
             }
@@ -68,17 +66,16 @@ impl App {
                 self.todo_list.remove(sel_index);
                 self.selected.remove(iter_index);
                 index_shift += 1;
-                should_write = true;
+                self.changed = true;
             }
             if self.args.done_selected {
                 self.todo_list[sel_index].toggle_done();
                 if !self.args.display_args.show_done {
                     self.selected.remove(iter_index);
                 }
-                should_write = true;
+                self.changed = true;
             }
         }
-        !self.selected.is_empty() || should_write
     }
 
     #[inline]

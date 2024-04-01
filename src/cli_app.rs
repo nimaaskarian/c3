@@ -23,8 +23,8 @@ impl <'a>CliApp <'a>{
         for message in app.args.prepend_todo.clone() {
             app.prepend(message);
         }
-        let should_write = app.do_commands_on_selected();
-        if !app.args.append_todo.is_empty() || !app.args.prepend_todo.is_empty() || should_write{
+        app.do_commands_on_selected();
+        if !app.args.append_todo.is_empty() || !app.args.prepend_todo.is_empty() || app.is_changed(){
             let _ = app.write();
         }
         CliApp {
