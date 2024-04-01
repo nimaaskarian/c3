@@ -41,7 +41,7 @@ impl Search {
 
         // TODO: implement fuzzy matching 
         for i in 0..haystack.len() {
-            if haystack[i].to_lowercase().contains(self.last_query.to_lowercase().as_str()) {
+            if haystack[i].contains(self.last_query.as_str()) || haystack[i].to_lowercase().contains(self.last_query.as_str()) {
                 self.indices.push(i);
             }
         }
