@@ -1,5 +1,6 @@
 use std::{io, path::PathBuf};
 mod clipboard;
+use std::cell::RefCell;
 use clipboard::Clipboard;
 mod todo_list;
 mod todo;
@@ -11,6 +12,11 @@ use crate::Args;
 
 pub use self::todo::PriorityType;
 
+struct SearchPosition {
+    prior_indices: Vec<usize>,
+    indices: Vec<usize>,
+}
+
 pub struct App {
     selected: Vec<usize>,
     clipboard: Clipboard,
@@ -21,6 +27,8 @@ pub struct App {
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
     search: Search,
+    tree_search_positions: Vec<SearchPosition>,
+    last_query: String,
 }
 
 impl App {
@@ -28,6 +36,8 @@ impl App {
     pub fn new(args: Args) -> Self {
         let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
         let mut app = App {
+            last_query: String::new(),
+            tree_search_positions: vec![],
             removed_todos: vec![],
             selected: vec![],
             todo_list,
@@ -78,8 +88,43 @@ impl App {
         }
     }
 
-    pub fn traverse_parents(&self, callback: fn(&TodoList,&[usize])) {
-        self.current_list().traverse_tree(callback, None)
+    // pub fn traverse_parents<F>(&self, callback: F) where 
+    // F: Fn(&TodoList, &[usize]){
+    //     self.current_list().traverse_tree(callback, None)
+    // }
+
+    fn traverse_parents_from_root(&mut self, callback: fn(&mut App, &TodoList, &[usize])) {
+        self.todo_list.clone().traverse_tree(callback, None, self)
+    }
+
+    fn add_to_tree_positions(&mut self, list: &TodoList, prior_indices: &[usize]) {
+        let mut indices : Vec<usize> = vec![];
+        for (i, todo) in todo_list::all_todos!(list).enumerate() {
+            if todo.matches(self.last_query.as_str()) {
+                indices.push(i)
+            }
+        }
+        if !indices.is_empty() {
+            self.tree_search_positions.push(SearchPosition {
+                prior_indices: prior_indices.to_vec(),
+                indices,
+            })
+        }
+    }
+
+    pub fn tree_search(&mut self, query:String) {
+        self.last_query = query;
+        self.traverse_parents_from_root(Self::add_to_tree_positions)
+    }
+
+    pub fn print_searched(&mut self) {
+        for position in self.tree_search_positions.iter() {
+            self.prior_indexes = position.prior_indices.clone();
+            let list = self.current_list();
+            for index in position.indices.clone() {
+                println!("{}",list[index].display(&self.args.display_args));
+            }
+        }
     }
 
     #[inline]

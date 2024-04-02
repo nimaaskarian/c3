@@ -5,7 +5,7 @@ use std::io::{stdout, BufWriter, Write};
 use std::io;
 use std::fs::read_to_string;
 
-use super::Todo;
+use super::{App, Todo};
 use crate::DisplayArgs;
 
 macro_rules! all_todos {
@@ -13,6 +13,7 @@ macro_rules! all_todos {
         [&$self.undone.todos, &$self.done.todos].iter().flat_map(|v| v.iter())
     };
 }
+pub(crate) use all_todos;
 
 macro_rules! all_todos_mut {
     ($self:ident) => {
@@ -196,14 +197,14 @@ impl TodoList {
         
     }
 
-    pub fn traverse_tree(&self,callback: fn(&TodoList, &[usize]), prior_indices: Option<Vec<usize>>) {
+    pub fn traverse_tree(&self,callback: fn(&mut App, &TodoList, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
         let prior_indices = prior_indices.unwrap_or(vec![]);
-        callback(self, prior_indices.as_slice());
+        callback(app, self, prior_indices.as_slice());
         for (i, todo) in all_todos!(self).enumerate() {
             if let Some(todo_list) = todo.dependency.todo_list() {
                 let mut prior_indices = prior_indices.clone();
                 prior_indices.push(i);
-                todo_list.traverse_tree(callback, Some(prior_indices));
+                todo_list.traverse_tree(callback, Some(prior_indices), app);
             }
         }
     }

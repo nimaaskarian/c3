@@ -112,6 +112,11 @@ impl Todo {
     }
 
     #[inline]
+    pub fn matches(&self, query: &str) -> bool {
+        self.message.contains(query) || self.message.to_lowercase().contains(query)
+    }
+
+    #[inline]
     pub fn new(message:String, priority:PriorityType, done: bool, dependency: Dependency) -> Self {
         Todo {
             schedule: Schedule::new(),
