@@ -8,6 +8,18 @@ use std::fs::read_to_string;
 use super::Todo;
 use crate::DisplayArgs;
 
+macro_rules! all_todos {
+    ($self:ident) => {
+        [&$self.undone.todos, &$self.done.todos].iter_mut().flat_map(|v| v.iter_mut())
+    };
+}
+
+macro_rules! all_todos_mut {
+    ($self:ident) => {
+        [&mut $self.undone.todos, &mut $self.done.todos].iter_mut().flat_map(|v| v.iter_mut())
+    };
+}
+
 #[derive(Debug,PartialEq, Clone, Default)]
 pub struct TodoArray {
     pub todos: Vec<Todo>
@@ -241,7 +253,7 @@ impl TodoList {
     }
 
     fn read_dependencies(&mut self, path: &PathBuf) -> io::Result<()>{
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in all_todos_mut!(self) {
             todo.dependency.read(&path)?;
         }
         Ok(())
@@ -297,13 +309,8 @@ impl TodoList {
     }
 
     #[inline]
-    fn all_todos_mut(&mut self)  -> [&mut Vec<Todo>; 2] {
-        [&mut self.undone.todos, &mut self.done.todos]
-    }
-
-    #[inline]
     pub(super) fn write_dependencies(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in all_todos_mut!(self) {
             todo.dependency.todo_list.write_dependencies(filename)?;
             todo.dependency.write(filename)?;
         }
@@ -312,7 +319,7 @@ impl TodoList {
 
     #[inline]
     pub(super) fn remove_dependency_files(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in all_todos_mut!(self) {
             todo.delete_dependency_file(filename)?;
         }
         Ok(())
@@ -320,7 +327,7 @@ impl TodoList {
 
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in all_todos_mut!(self) {
             todo.delete_removed_dependent_files(filename)?;
         }
         Ok(())
