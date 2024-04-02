@@ -10,7 +10,7 @@ use crate::DisplayArgs;
 
 macro_rules! all_todos {
     ($self:ident) => {
-        [&$self.undone.todos, &$self.done.todos].iter_mut().flat_map(|v| v.iter_mut())
+        [&$self.undone.todos, &$self.done.todos].iter().flat_map(|v| v.iter())
     };
 }
 
@@ -194,6 +194,18 @@ impl TodoList {
             self.done.remove(index)
         }
         
+    }
+
+    pub fn traverse_tree(&self,callback: fn(&TodoList, &[usize]), prior_indices: Option<Vec<usize>>) {
+        let prior_indices = prior_indices.unwrap_or(vec![]);
+        callback(self, prior_indices.as_slice());
+        for (i, todo) in all_todos!(self).enumerate() {
+            if let Some(todo_list) = todo.dependency.todo_list() {
+                let mut prior_indices = prior_indices.clone();
+                prior_indices.push(i);
+                todo_list.traverse_tree(callback, Some(prior_indices));
+            }
+        }
     }
 
     pub fn reorder(&mut self, index: usize) -> usize {

@@ -114,6 +114,15 @@ impl Dependency {
     }
 
     #[inline]
+    pub fn todo_list_mut(&mut self) -> Option<&mut TodoList> {
+        if self.mode == DependencyMode::TodoList {
+            Some(&mut self.todo_list)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
     pub fn write(&mut self, path: &PathBuf) -> io::Result<()> {
         let name = self.name.clone();
         match self.mode.clone() {

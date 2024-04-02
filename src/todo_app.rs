@@ -78,6 +78,10 @@ impl App {
         }
     }
 
+    pub fn traverse_parents(&self, callback: fn(&TodoList,&[usize])) {
+        self.current_list().traverse_tree(callback, None)
+    }
+
     #[inline]
     pub fn is_tree(&self) -> bool {
         !self.args.no_tree
