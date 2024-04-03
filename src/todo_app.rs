@@ -11,6 +11,7 @@ use crate::Args;
 
 pub use self::todo::PriorityType;
 
+#[derive(Clone)]
 struct SearchPosition {
     prior_indices: Vec<usize>,
     matching_indices: Vec<usize>,
@@ -28,6 +29,8 @@ pub struct App {
     search: Search,
     tree_search_positions: Vec<SearchPosition>,
     last_query: String,
+    x_index: usize,
+    y_index: usize
 }
 
 impl App {
@@ -35,6 +38,8 @@ impl App {
     pub fn new(args: Args) -> Self {
         let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
         let mut app = App {
+            x_index: 0,
+            y_index: 0,
             last_query: String::new(),
             tree_search_positions: vec![],
             removed_todos: vec![],
@@ -120,7 +125,19 @@ impl App {
 
     pub fn tree_search(&mut self, query:String) {
         self.last_query = query;
-        self.traverse_parents_from_root(Self::add_to_tree_positions)
+        self.tree_search_positions = vec![];
+        self.y_index = 0;
+        self.x_index = 0;
+        if self.last_query.is_empty() {
+            return;
+        }
+        let before_position = SearchPosition {
+            prior_indices: self.prior_indexes.clone(),
+            matching_indices: vec![self.index],
+        };
+        self.tree_search_positions.push(before_position);
+        self.traverse_parents_from_root(Self::add_to_tree_positions);
+        self.search_next();
     }
 
     pub fn print_searched(&mut self) {
@@ -251,9 +268,30 @@ impl App {
 
     #[inline]
     pub fn search_next(&mut self) {
-        if let Some(index) = self.search.next() {
-            self.index = index
+        if self.tree_search_positions.is_empty() {
+            if let Some(index) = self.search.next() {
+                self.index = index
+            }
+        } else {
+            let x_size = self.tree_search_positions.len();
+            let y_size = self.tree_search_positions[self.x_index].matching_indices.len();
+            if self.x_index + 1 < x_size {
+                self.x_index += 1
+            } else if self.y_index + 1 < y_size {
+                self.y_index += 1
+            } else {
+                self.y_index = 0;
+                self.x_index = 0;
+            }
+            self.set_tree_search_position();
         }
+    }
+
+    #[inline]
+    fn set_tree_search_position(&mut self) {
+        let item = self.tree_search_positions[self.x_index].clone();
+        self.prior_indexes = item.prior_indices;
+        self.index = item.matching_indices[self.y_index];
     }
 
     #[inline]
