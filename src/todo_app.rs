@@ -123,8 +123,10 @@ impl App {
         }
     }
 
-    pub fn tree_search(&mut self, query:String) {
-        self.last_query = query;
+    pub fn tree_search(&mut self, query:Option<String>) {
+        if let Some(query) = query {
+            self.last_query = query;
+        }
         self.tree_search_positions = vec![];
         self.y_index = 0;
         self.x_index = 0;
@@ -264,6 +266,9 @@ impl App {
     pub fn toggle_show_done(&mut self) {
         self.args.display_args.show_done = !self.show_done();
         self.search(None);
+        if !self.tree_search_positions.is_empty() {
+            self.tree_search(None)
+        }
     }
 
     #[inline]
@@ -381,6 +386,7 @@ impl App {
                 Some(todo) if todo.dependency.is_list() => {
                     self.prior_indexes.push(self.index);
                     self.index = 0;
+                    self.search(None);
                 }
                 _ => {},
             }
@@ -391,6 +397,7 @@ impl App {
     pub fn traverse_up(&mut self) {
         if !self.is_root() {
             self.index = self.prior_indexes.remove(self.prior_indexes.len()-1);
+            self.search(None);
         }
     }
 

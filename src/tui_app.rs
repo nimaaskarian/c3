@@ -173,7 +173,7 @@ impl<'a>TuiApp<'a>{
 
     #[inline]
     fn on_tree_search(&mut self, str:String) {
-        self.todo_app.tree_search(str);
+        self.todo_app.tree_search(Some(str));
     }
 
     #[inline]
