@@ -4,8 +4,29 @@ use std::ops::{Index, IndexMut};
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::io;
 
-use super::Todo;
+use super::{App, Todo};
 use crate::DisplayArgs;
+
+macro_rules! all_todos {
+    ($self:ident) => {
+        [&$self.undone.todos, &$self.done.todos].iter().flat_map(|v| v.iter())
+    };
+}
+
+macro_rules! undone_todos {
+    ($self:ident) => {
+        [&$self.undone.todos].iter().flat_map(|v| v.iter())
+    };
+}
+
+pub(crate) use all_todos;
+pub(crate) use undone_todos;
+
+macro_rules! all_todos_mut {
+    ($self:ident) => {
+        [&mut $self.undone.todos, &mut $self.done.todos].iter_mut().flat_map(|v| v.iter_mut())
+    };
+}
 
 #[derive(Debug,PartialEq, Clone, Default)]
 pub struct TodoArray {
@@ -189,6 +210,30 @@ impl TodoList {
         
     }
 
+    pub fn traverse_tree(&self,callback: fn(&mut App, &TodoList, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
+        let prior_indices = prior_indices.unwrap_or(vec![]);
+        callback(app, self, prior_indices.as_slice());
+        for (i, todo) in all_todos!(self).enumerate() {
+            if let Some(todo_list) = todo.dependency.todo_list() {
+                let mut prior_indices = prior_indices.clone();
+                prior_indices.push(i);
+                todo_list.traverse_tree(callback, Some(prior_indices), app);
+            }
+        }
+    }
+
+    pub fn traverse_tree_undone(&self,callback: fn(&mut App, &TodoList, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
+        let prior_indices = prior_indices.unwrap_or(vec![]);
+        callback(app, self, prior_indices.as_slice());
+        for (i, todo) in undone_todos!(self).enumerate() {
+            if let Some(todo_list) = todo.dependency.todo_list() {
+                let mut prior_indices = prior_indices.clone();
+                prior_indices.push(i);
+                todo_list.traverse_tree(callback, Some(prior_indices), app);
+            }
+        }
+    }
+
     pub fn reorder(&mut self, index: usize) -> usize {
         let size = self.undone.len();
 
@@ -248,7 +293,7 @@ impl TodoList {
     }
 
     fn read_dependencies(&mut self, path: &PathBuf) -> io::Result<()>{
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in all_todos_mut!(self) {
             todo.dependency.read(&path)?;
         }
         Ok(())
@@ -304,13 +349,8 @@ impl TodoList {
     }
 
     #[inline]
-    fn all_todos_mut(&mut self)  -> [&mut Vec<Todo>; 2] {
-        [&mut self.undone.todos, &mut self.done.todos]
-    }
-
-    #[inline]
     pub(super) fn write_dependencies(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in all_todos_mut!(self) {
             todo.dependency.todo_list.write_dependencies(filename)?;
             todo.dependency.write(filename)?;
         }
@@ -319,7 +359,7 @@ impl TodoList {
 
     #[inline]
     pub(super) fn remove_dependency_files(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in all_todos_mut!(self) {
             todo.delete_dependency_file(filename)?;
         }
         Ok(())
@@ -327,7 +367,7 @@ impl TodoList {
 
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in self.all_todos_mut().iter_mut().flat_map(|v| v.iter_mut()) {
+        for todo in all_todos_mut!(self) {
             todo.delete_removed_dependent_files(filename)?;
         }
         Ok(())
