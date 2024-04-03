@@ -1,10 +1,8 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
 use std::{io, path::PathBuf, fs::remove_file};
+use std::str;
 //}}}
-// lib{{{
-use scanf::sscanf;
-// }}}
 // mod{{{
 mod note;
 pub mod schedule;
@@ -55,34 +53,71 @@ impl TryFrom<String> for Todo {
     }
 }
 
+#[derive(Default)]
+enum State {
+    #[default]
+    Priority,
+    Dependency,
+    Message,
+    End,
+}
+
 impl TryFrom<&str> for Todo {
     type Error = TodoError;
 
     fn try_from(input:&str) -> Result<Todo, Self::Error>{
-        let mut message = String::new();
-        let mut priority_string:String = String::new();
+        let mut state = State::default();
+        let mut priority: u8 = 0;
+        let mut done = false;
         let mut dependency_string = String::new();
-
-        match input {
-            _ if sscanf!(input, "[{}]>{} {}", priority_string, dependency_string, message).is_ok() => {},
-
-            _ if sscanf!(input, "[{}] {}", priority_string, message).is_ok() => {
-                dependency_string = String::new();
+        let mut schedule_string = String::new();
+        let mut message = String::new();
+        let mut schedule_start_index: Option<usize> = None;
+        if input.chars().last() == Some(']') {
+            schedule_start_index = input.rfind('[');
+            if let Some(start) = schedule_start_index {
+                let end = input.chars().count();
+                schedule_string = input[start+1..end-1].chars().collect();
             }
-            _ => return Err(Self::Error::ReadFailed),
         }
-        let dependency = Dependency::from(dependency_string.as_str());
 
-        let mut done = priority_string.chars().nth(0).unwrap() == '-';
-
-        let priority:PriorityType = match priority_string.chars().nth(done as usize){
-            Some(value) if value.is_digit(10) => {
-                value.to_digit(10).unwrap() as PriorityType
+        for (i, c) in input.chars().enumerate() {
+            match state {
+                State::Priority => {
+                    if c == '-' {
+                        state = State::Priority;
+                        done = true;
+                    } else if c.is_digit(10) {
+                        priority = c.to_digit(10).unwrap() as u8;
+                    } else if c == ' ' {
+                        state = State::Message;
+                    } else if c == '>' {
+                        state = State::Dependency;
+                    }
+                }
+                State::Dependency => {
+                    if c == ' ' {
+                        state = State::Message;
+                    } else {
+                        dependency_string.push(c);
+                    }
+                }
+                State::Message if schedule_start_index.is_none() => {
+                    message.push(c);
+                }
+                State::Message => {
+                    if i == schedule_start_index.unwrap()-1 {
+                        state = State::End;
+                    } else {
+                        message.push(c);
+                    }
+                }
+                State::End => {
+                }
             }
-            _ => 0
-        };
-        
-        let schedule = Schedule::match_message(&mut message);
+        }
+
+        let schedule = Schedule::from(schedule_string);
 
         if schedule.should_undone() {
             done = false;
@@ -91,11 +126,11 @@ impl TryFrom<&str> for Todo {
             done = true;
         }
         Ok(Todo {
-            dependency,
+            dependency: Dependency::from(dependency_string.as_str()),
             removed_dependency: None,
             schedule,
             message,
-            priority,
+            priority: priority as u8,
             done,
         })
     }

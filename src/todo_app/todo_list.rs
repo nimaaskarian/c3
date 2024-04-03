@@ -1,9 +1,8 @@
-use std::fs::{File, create_dir_all};
+use std::fs::{create_dir_all, read, File};
 use std::path::PathBuf;
 use std::ops::{Index, IndexMut};
-use std::io::{stdout, BufWriter, Write};
+use std::io::{stdout, BufRead, BufWriter, Write};
 use std::io;
-use std::fs::read_to_string;
 
 use super::Todo;
 use crate::DisplayArgs;
@@ -53,6 +52,12 @@ impl TodoArray {
     pub fn new() -> Self{
         TodoArray {
             todos: Vec::new()
+        }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self{
+        TodoArray {
+            todos: Vec::with_capacity(capacity),
         }
     }
 
@@ -224,12 +229,14 @@ impl TodoList {
         if !filename.is_file() {
             return todo_list
         }
-        for line in read_to_string(filename).unwrap().lines() {
-            let todo = match Todo::try_from(line) {
+        let file_data = read(filename).unwrap();
+
+        for line in file_data.lines() {
+            let todo = match Todo::try_from(line.unwrap()) {
                 Ok(value) => value,
                 Err(..) => continue,
             };
-            todo_list.push(todo)
+            todo_list.push(todo);
         }
         todo_list.undone.sort();
         todo_list.done.sort();
