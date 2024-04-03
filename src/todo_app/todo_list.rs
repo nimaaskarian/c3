@@ -13,7 +13,15 @@ macro_rules! all_todos {
         [&$self.undone.todos, &$self.done.todos].iter().flat_map(|v| v.iter())
     };
 }
+
+macro_rules! undone_todos {
+    ($self:ident) => {
+        [&$self.undone.todos].iter().flat_map(|v| v.iter())
+    };
+}
+
 pub(crate) use all_todos;
+pub(crate) use undone_todos;
 
 macro_rules! all_todos_mut {
     ($self:ident) => {
@@ -201,6 +209,18 @@ impl TodoList {
         let prior_indices = prior_indices.unwrap_or(vec![]);
         callback(app, self, prior_indices.as_slice());
         for (i, todo) in all_todos!(self).enumerate() {
+            if let Some(todo_list) = todo.dependency.todo_list() {
+                let mut prior_indices = prior_indices.clone();
+                prior_indices.push(i);
+                todo_list.traverse_tree(callback, Some(prior_indices), app);
+            }
+        }
+    }
+
+    pub fn traverse_tree_undone(&self,callback: fn(&mut App, &TodoList, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
+        let prior_indices = prior_indices.unwrap_or(vec![]);
+        callback(app, self, prior_indices.as_slice());
+        for (i, todo) in undone_todos!(self).enumerate() {
             if let Some(todo_list) = todo.dependency.todo_list() {
                 let mut prior_indices = prior_indices.clone();
                 prior_indices.push(i);
