@@ -19,29 +19,6 @@ pub struct Schedule {
     pub last_type: Type,
 }
 
-struct ScheduleRest {
-    schedule: Schedule,
-    rest: String,
-}
-
-impl From<String> for ScheduleRest {
-
-    fn from(input:String) -> ScheduleRest {
-        let mut schedule_str = String::new();
-        let mut rest = String::new();
-        if sscanf!(input.as_str(), "{}[{}]", rest, schedule_str).is_ok() {
-        } else {
-            rest = input;
-        }
-
-        let schedule = Schedule::from(schedule_str);
-        ScheduleRest {
-            schedule,
-            rest
-        }
-    }
-}
-
 impl<T> From<T> for Schedule 
 where
 T: ToString,
@@ -161,6 +138,16 @@ impl Schedule {
         self.set_day(7)
     }
 
+    #[inline]
+    pub fn is_weekly(&self) -> bool {
+        self.is_scheduled() && self.day == 7
+    }
+
+    #[inline]
+    pub fn is_daily(&self) -> bool {
+        self.is_scheduled() && self.day == 1
+    }
+
     pub fn none_date(&mut self) {
         self.date = None
     }
@@ -191,15 +178,20 @@ impl Schedule {
     }
 
 
-    pub fn match_message(input: &mut String) -> Self {
-        let ScheduleRest { schedule, rest } = ScheduleRest::from(input.clone());
-        *input = rest;
-        schedule
-    }
+    // pub fn match_message(input: &mut String) -> Self {
+    //     let ScheduleRest { schedule, rest } = ScheduleRest::from(input);
+    //     *input = rest;
+    //     schedule
+    // }
 
     #[inline(always)]
     pub fn is_reminder(&self) -> bool {
         self._type == Type::Reminder
+    }
+
+    #[inline(always)]
+    pub fn is_scheduled(&self) -> bool {
+        self._type == Type::Scheduled
     }
 
     #[inline(always)]

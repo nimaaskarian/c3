@@ -11,6 +11,12 @@ use crate::Args;
 
 pub use self::todo::PriorityType;
 
+#[derive(Clone)]
+struct SearchPosition {
+    prior_indices: Vec<usize>,
+    matching_indices: Vec<usize>,
+}
+
 pub struct App {
     selected: Vec<usize>,
     clipboard: Clipboard,
@@ -21,6 +27,10 @@ pub struct App {
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
     search: Search,
+    tree_search_positions: Vec<SearchPosition>,
+    last_query: String,
+    x_index: usize,
+    y_index: usize
 }
 
 impl App {
@@ -28,6 +38,10 @@ impl App {
     pub fn new(args: Args) -> Self {
         let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
         let mut app = App {
+            x_index: 0,
+            y_index: 0,
+            last_query: String::new(),
+            tree_search_positions: vec![],
             removed_todos: vec![],
             selected: vec![],
             todo_list,
@@ -48,11 +62,9 @@ impl App {
         app
     }
 
-    pub fn do_commands_on_selected(&mut self) -> bool {
-        let mut should_write = false;
+    pub fn do_commands_on_selected(&mut self) {
         let mut index_shift = 0;
         for (iter_index, sel_index) in self.selected.clone().iter().enumerate() {
-            self.changed = true;
             if  index_shift > *sel_index  || index_shift > iter_index {
                 break
             }
@@ -68,17 +80,76 @@ impl App {
                 self.todo_list.remove(sel_index);
                 self.selected.remove(iter_index);
                 index_shift += 1;
-                should_write = true;
+                self.changed = true;
             }
             if self.args.done_selected {
                 self.todo_list[sel_index].toggle_done();
-                if !self.args.display_args.show_done {
+                if !self.show_done() {
                     self.selected.remove(iter_index);
                 }
-                should_write = true;
+                self.changed = true;
             }
         }
-        !self.selected.is_empty() || should_write
+    }
+
+    fn traverse_parents_from_root(&mut self, callback: fn(&mut App, &TodoList, &[usize])) {
+        if self.show_done() {
+            self.todo_list.clone().traverse_tree(callback, None, self)
+        } else {
+            self.todo_list.clone().traverse_tree_undone(callback, None, self)
+        }
+    }
+
+    fn add_to_tree_positions(&mut self, list: &TodoList, prior_indices: &[usize]) {
+        let mut matching_indices : Vec<usize> = vec![];
+        if self.show_done() {
+            for (i, todo) in todo_list::all_todos!(list).enumerate() {
+                if todo.matches(self.last_query.as_str()) {
+                    matching_indices.push(i)
+                }
+            }
+        } else {
+            for (i, todo) in todo_list::undone_todos!(list).enumerate() {
+                if todo.matches(self.last_query.as_str()) {
+                    matching_indices.push(i)
+                }
+            }
+        }
+        if !matching_indices.is_empty() {
+            self.tree_search_positions.push(SearchPosition {
+                prior_indices: prior_indices.to_vec(),
+                matching_indices,
+            })
+        }
+    }
+
+    pub fn tree_search(&mut self, query:Option<String>) {
+        if let Some(query) = query {
+            self.last_query = query;
+        }
+        self.tree_search_positions = vec![];
+        self.y_index = 0;
+        self.x_index = 0;
+        if self.last_query.is_empty() {
+            return;
+        }
+        let before_position = SearchPosition {
+            prior_indices: self.prior_indexes.clone(),
+            matching_indices: vec![self.index],
+        };
+        self.tree_search_positions.push(before_position);
+        self.traverse_parents_from_root(Self::add_to_tree_positions);
+        self.search_next();
+    }
+
+    pub fn print_searched(&mut self) {
+        for position in self.tree_search_positions.iter() {
+            self.prior_indexes = position.prior_indices.clone();
+            let list = self.current_list();
+            for index in position.matching_indices.clone() {
+                println!("{}",list[index].display(&self.args.display_args));
+            }
+        }
     }
 
     #[inline]
@@ -125,7 +196,7 @@ impl App {
     /// fix done and undone lists of current list
     pub fn fix_done_undone(&mut self) {
         self.fix_dependency_done_undone();
-        let show_done = self.args.display_args.show_done;
+        let show_done = self.show_done();
         let current_list = self.mut_current_list();
         current_list.fix_undone();
         if show_done {
@@ -138,7 +209,7 @@ impl App {
     #[inline]
     /// fix done and undone lists of current todo's dependency
     fn fix_dependency_done_undone(&mut self) {
-        let show_done = self.args.display_args.show_done;
+        let show_done = self.show_done();
         if let Some(todo) = self.mut_todo() {
 
             let dep_list = &mut todo.dependency.todo_list;
@@ -164,7 +235,7 @@ impl App {
                 _ => {}
             }
             self.mut_current_list().fix_undone();
-            if self.args.display_args.show_done {
+            if self.show_done() {
                 self.mut_current_list().fix_done();
             }
         }
@@ -173,7 +244,7 @@ impl App {
     #[inline]
     pub fn search(&mut self, query:Option<String>) {
         let mut todo_messages = self.current_list().undone.messages();
-        if self.args.display_args.show_done {
+        if self.show_done() {
             todo_messages.extend(self.current_list().done.messages());
         }
         self.search.search(query, todo_messages);
@@ -187,16 +258,45 @@ impl App {
     }
 
     #[inline]
+    pub fn show_done(&self) -> bool {
+        self.args.display_args.show_done
+    }
+
+    #[inline]
     pub fn toggle_show_done(&mut self) {
-        self.args.display_args.show_done = !self.args.display_args.show_done;
+        self.args.display_args.show_done = !self.show_done();
         self.search(None);
+        if !self.tree_search_positions.is_empty() {
+            self.tree_search(None)
+        }
     }
 
     #[inline]
     pub fn search_next(&mut self) {
-        if let Some(index) = self.search.next() {
-            self.index = index
+        if self.tree_search_positions.is_empty() {
+            if let Some(index) = self.search.next() {
+                self.index = index
+            }
+        } else {
+            let x_size = self.tree_search_positions.len();
+            let y_size = self.tree_search_positions[self.x_index].matching_indices.len();
+            if self.x_index + 1 < x_size {
+                self.x_index += 1
+            } else if self.y_index + 1 < y_size {
+                self.y_index += 1
+            } else {
+                self.y_index = 0;
+                self.x_index = 0;
+            }
+            self.set_tree_search_position();
         }
+    }
+
+    #[inline]
+    fn set_tree_search_position(&mut self) {
+        let item = self.tree_search_positions[self.x_index].clone();
+        self.prior_indexes = item.prior_indices;
+        self.index = item.matching_indices[self.y_index];
     }
 
     #[inline]
@@ -211,7 +311,7 @@ impl App {
         let was_done = self.todo().unwrap().done();
         self.mut_todo().unwrap().toggle_done();
         self.fix_done_undone();
-        if self.args.display_args.show_done {
+        if self.show_done() {
             let index = if was_done {
                 self.current_list().undone.len()-1
             } else {
@@ -286,6 +386,7 @@ impl App {
                 Some(todo) if todo.dependency.is_list() => {
                     self.prior_indexes.push(self.index);
                     self.index = 0;
+                    self.search(None);
                 }
                 _ => {},
             }
@@ -296,6 +397,7 @@ impl App {
     pub fn traverse_up(&mut self) {
         if !self.is_root() {
             self.index = self.prior_indexes.remove(self.prior_indexes.len()-1);
+            self.search(None);
         }
     }
 
@@ -314,7 +416,7 @@ impl App {
 
     #[inline]
     pub fn is_todos_empty(&self) -> bool{
-        if self.args.display_args.show_done {
+        if self.show_done() {
             self.current_list().is_empty()
         } else {
             self.is_undone_empty()
@@ -348,7 +450,7 @@ impl App {
 
     #[inline]
     pub fn len(&self) -> usize {
-        if self.args.display_args.show_done {
+        if self.show_done() {
             self.current_list().len()
         } else {
             self.current_list().undone.len()

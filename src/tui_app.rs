@@ -161,9 +161,19 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
+    pub fn tree_search_prompt(&mut self) {
+        self.set_text_mode(Self::on_tree_search, "Search the whole tree for todo", "Enter search query")
+    }
+
+    #[inline]
     fn on_search(&mut self, str:String) {
         self.todo_app.search(Some(str));
         self.todo_app.search_init();
+    }
+
+    #[inline]
+    fn on_tree_search(&mut self, str:String) {
+        self.todo_app.tree_search(Some(str));
     }
 
     #[inline]
@@ -389,6 +399,7 @@ impl<'a>TuiApp<'a>{
                     Char('N') => self.todo_app.search_prev(),
                     Char('a') => self.prepend_prompt(),
                     Char('/') => self.search_prompt(),
+                    Char('?') => self.tree_search_prompt(),
                     Char('A') => self.append_prompt(),
                     Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
                     Char('q') => self.quit_save_prompt(),
