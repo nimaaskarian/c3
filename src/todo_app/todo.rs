@@ -279,13 +279,21 @@ impl Todo {
 
     #[inline]
     pub fn toggle_daily(&mut self) {
-        self.schedule.toggle();
+        if self.schedule.is_daily() {
+            self.schedule.toggle();
+        } else {
+            self.schedule.enable_schedule();
+        }
         self.schedule.set_daily();
     }
 
     #[inline]
     pub fn toggle_weekly(&mut self) {
-        self.schedule.toggle();
+        if self.schedule.is_weekly() {
+            self.schedule.toggle();
+        } else {
+            self.schedule.enable_schedule();
+        }
         self.schedule.set_weekly();
     }
 

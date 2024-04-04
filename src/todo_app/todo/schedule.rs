@@ -138,6 +138,16 @@ impl Schedule {
         self.set_day(7)
     }
 
+    #[inline]
+    pub fn is_weekly(&self) -> bool {
+        self.is_scheduled() && self.day == 7
+    }
+
+    #[inline]
+    pub fn is_daily(&self) -> bool {
+        self.is_scheduled() && self.day == 1
+    }
+
     pub fn none_date(&mut self) {
         self.date = None
     }
@@ -177,6 +187,11 @@ impl Schedule {
     #[inline(always)]
     pub fn is_reminder(&self) -> bool {
         self._type == Type::Reminder
+    }
+
+    #[inline(always)]
+    pub fn is_scheduled(&self) -> bool {
+        self._type == Type::Scheduled
     }
 
     #[inline(always)]
