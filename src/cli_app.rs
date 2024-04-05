@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf};
+use std::io;
 use crate::DisplayArgs;
 
 use super::todo_app::{App ,TodoList, Todo};
