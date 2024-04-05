@@ -54,6 +54,7 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | d | toggle daily |
 | W | toggle weekly |
 | S | set custom schedule |
+| m | Set todo as a reminder
 | D | delete todo |
 | > | add todo note |
 | i | increase day done |
