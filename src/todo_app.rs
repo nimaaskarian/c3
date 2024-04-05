@@ -62,6 +62,17 @@ impl App {
         app
     }
 
+    #[inline]
+    pub fn append_list_from_path(&mut self, path: PathBuf) {
+        let todo_list = TodoList::read(&path, !self.args.no_tree, true);
+        self.append_list(todo_list)
+    }
+
+    #[inline]
+    pub fn append_list(&mut self, todo_list: TodoList) {
+        self.mut_current_list().append_list(todo_list)
+    }
+
     pub fn do_commands_on_selected(&mut self) {
         let mut index_shift = 0;
         for (iter_index, sel_index) in self.selected.clone().iter().enumerate() {

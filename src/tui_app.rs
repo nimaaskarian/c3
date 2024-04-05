@@ -1,6 +1,7 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std {{{
-use std::{io::{self, stdout}, rc::Rc};
+use std::{fs::read_to_string, io::{self, stdout}, path::PathBuf, rc::Rc};
+use std::process::Command;
 // }}}
 // lib {{{
 use crossterm::{
@@ -19,7 +20,7 @@ use modules::{
     potato::Potato,
 };
 use super::todo_app::{App, Todo};
-use crate::{date, todo_app::PriorityType};
+use crate::{date, fileio::temp_path, todo_app::{PriorityType, TodoList}};
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
@@ -198,6 +199,15 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
+    pub fn nnn_append_todo(&mut self) {
+        let name = temp_path("nnn-file-picker");
+        Command::new("nnn").args(["-p", name.to_str().unwrap_or("")]).status();
+        let mut output_str = read_to_string(name).unwrap();
+        output_str.pop();
+        self.todo_app.append_list_from_path(PathBuf::from(output_str))
+    }
+
+    #[inline]
     fn on_reminder(&mut self,str:String) {
         if let Ok(date) = date::parse_user_input(&str) {
             if let Some(todo) = self.todo_app.mut_todo() {
@@ -369,6 +379,10 @@ impl<'a>TuiApp<'a>{
                     Char('p') => self.todo_app.paste_todo(),
                     Char('i') => self.todo_app.increase_day_done(),
                     Char('o') => self.todo_app.decrease_day_done(),
+                    Char('O') => {
+                        self.nnn_append_todo();
+                        return Ok(Operation::Restart)
+                    }
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up |Char('k') => self.todo_app.decrement(),
                     KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),
