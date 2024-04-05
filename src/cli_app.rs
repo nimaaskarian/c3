@@ -23,6 +23,9 @@ impl <'a>CliApp <'a>{
         for message in app.args.prepend_todo.clone() {
             app.prepend(message);
         }
+        if let Some(path) = app.args.append_file.clone() {
+            app.append_list_from_path(path)
+        }
         app.do_commands_on_selected();
         if !app.args.append_todo.is_empty() || !app.args.prepend_todo.is_empty() || app.is_changed(){
             let _ = app.write();

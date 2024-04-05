@@ -198,6 +198,13 @@ impl TodoList {
         }
     }
 
+    pub fn append_list(&mut self, mut todo_list: TodoList) {
+        self.undone.todos.append(&mut todo_list.undone.todos);
+        self.done.todos.append(&mut todo_list.done.todos);
+        self.done.sort();
+        self.undone.sort();
+    }
+
     pub fn remove(&mut self, index: usize) -> Todo {
         let size = self.undone.len();
 

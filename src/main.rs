@@ -67,13 +67,17 @@ pub struct Args {
     #[command(flatten)]
     display_args: DisplayArgs,
 
-    /// Append todo
+    /// A todo message to append
     #[arg(short='a', long)]
     append_todo: Vec<String>,
 
-    /// Prepend todo
+    /// A todo message to prepend
     #[arg(short='A', long)]
     prepend_todo: Vec<String>,
+
+    /// A todo file to append to current list
+    #[arg(long)]
+    append_file: Option<PathBuf>,
 
     /// Minimal tree with no tree graphics
     #[arg(short='M', long)]
@@ -99,7 +103,7 @@ pub struct Args {
 impl Args {
     pub fn is_cli(&self) -> bool {
         self.stdout || self.minimal_tree || self.list ||
-        !self.search_and_select.is_empty() || !self.prepend_todo.is_empty() || !self.append_todo.is_empty()
+        !self.search_and_select.is_empty() || !self.prepend_todo.is_empty() || !self.append_todo.is_empty() || self.append_file.is_some()
     }
 }
 

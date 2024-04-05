@@ -27,11 +27,16 @@ pub fn get_todo_path() -> io::Result<PathBuf> {
 
 #[inline(always)]
 pub fn temp_note_path() -> PathBuf{
+    temp_path("note")
+}
+
+#[inline(always)]
+pub fn temp_path(name: &str) -> PathBuf{
     let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Err(_)=>12345,
         Ok(some) => some.as_secs(),
     };
-    let filename = format!("c3-note.{time}");
+    let filename = format!("c3-{name}.{time}");
     let path = home_dir().unwrap().join(filename);
     path.to_path_buf()
 }
