@@ -66,7 +66,9 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | y | yank todo to clipboard |
 | p | paste todo from clipboard |
 | P | enable module |
-| / | search todo |
+| / | search current list for todo |
+| ? | search the whole tree for todo |
+| O | open nnn file picker for choosing a file to append to current list
 | n | search next |
 | N | search previous |
 | w | write changes to file |
