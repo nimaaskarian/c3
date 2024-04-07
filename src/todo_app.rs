@@ -52,8 +52,9 @@ impl App {
             changed: false,
             args,
             search: Search::new(),
-            restriction: Some(|todo: &Todo| !todo.done()),
+            restriction: None,
         };
+        app.update_show_done_restriction();
         for str in app.args.search_and_select.clone() {
             app.search(Some(str));
             for index in app.search.indices() {
@@ -68,6 +69,11 @@ impl App {
     pub fn append_list_from_path(&mut self, path: PathBuf) {
         let todo_list = TodoArray::read(&path, !self.args.no_tree, true);
         self.append_list(todo_list)
+    }
+
+    #[inline]
+    pub fn set_priority_restriction(&mut self, priority:PriorityType) {
+        // self.restriction = Some(|todo| todo.prio)
     }
 
     #[inline]
@@ -214,6 +220,15 @@ impl App {
     #[inline]
     pub fn toggle_show_done(&mut self) {
         self.args.display_args.show_done = !self.show_done();
+        self.update_show_done_restriction();
+    }
+
+    pub fn update_show_done_restriction(&mut self) {
+        if self.show_done() {
+            self.restriction = None
+        } else {
+            self.restriction = Some(|todo| !todo.done())
+        }
     }
 
     #[inline]
@@ -254,7 +269,6 @@ impl App {
     #[inline]
     pub fn toggle_current_done(&mut self) {
         self.mut_todo().unwrap().toggle_done();
-        // self.traverse_up();
     }
 
     #[inline]

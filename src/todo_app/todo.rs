@@ -152,6 +152,10 @@ impl Todo {
     }
 
     #[inline]
+    pub fn priority(&self) -> PriorityType{
+        self.priority
+    }
+    #[inline]
     pub fn new(message:String, priority:PriorityType, done: bool, dependency: Dependency) -> Self {
         Todo {
             schedule: Schedule::new(),
