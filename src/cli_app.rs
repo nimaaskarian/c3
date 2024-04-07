@@ -1,7 +1,7 @@
 use std::io;
 use crate::DisplayArgs;
 
-use super::todo_app::{App ,TodoList, Todo};
+use super::todo_app::{App ,TodoArray, Todo};
 
 #[inline]
 pub fn run(app: &mut App) -> io::Result<()>{
@@ -91,11 +91,8 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    pub fn print_list(&mut self, todo_list: &TodoList, display_args: &DisplayArgs) {
-        let mut todos = todo_list.undone.todos.clone();
-        if display_args.show_done {
-            todos.extend(todo_list.done.todos.clone())
-        }
+    pub fn print_list(&mut self, todo_list: &TodoArray, display_args: &DisplayArgs) {
+        let todos = todo_list.todos.clone();
 
         for (index, todo) in todos.iter().enumerate() {
             self.is_last = index == todos.len() - 1;

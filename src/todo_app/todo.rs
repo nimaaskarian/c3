@@ -10,7 +10,7 @@ mod dependency;
 use dependency::Dependency;
 use schedule::Schedule;
 use note::{sha1, open_temp_editor};
-use super::TodoList;
+use super::TodoArray;
 use crate::DisplayArgs;
 //}}}
 
@@ -169,7 +169,7 @@ impl Todo {
     }
 
     #[inline]
-    pub fn dependencies(&self) -> Option<&TodoList> {
+    pub fn dependencies(&self) -> Option<&TodoArray> {
         self.dependency.todo_list()
     }
 
@@ -346,10 +346,11 @@ impl Todo {
         } else {
             self.priority
         };
-        if self.schedule.is_reminder() {
-            priority*10-5
-        } else {
-            priority*10
+        match (self.schedule.is_reminder(), self.done()) {
+            (true, true) => priority*20-10,
+            (false, true) => priority*20,
+            (false, false) => priority*2,
+            (true, false) => priority*2-1,
         }
     }
 
