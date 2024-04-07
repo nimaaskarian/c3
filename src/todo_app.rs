@@ -17,6 +17,7 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
+pub type RestrictionFunction = Option<Box<dyn Fn(&Todo) -> bool>>;
 pub struct App {
     selected: Vec<usize>,
     clipboard: Clipboard,
@@ -31,7 +32,7 @@ pub struct App {
     last_query: String,
     x_index: usize,
     y_index: usize,
-    restriction: Option<fn(&Todo) -> bool>,
+    restriction: RestrictionFunction,
 }
 
 impl App {
@@ -69,11 +70,6 @@ impl App {
     pub fn append_list_from_path(&mut self, path: PathBuf) {
         let todo_list = TodoArray::read(&path, !self.args.no_tree, true);
         self.append_list(todo_list)
-    }
-
-    #[inline]
-    pub fn set_priority_restriction(&mut self, priority:PriorityType) {
-        // self.restriction = Some(|todo| todo.prio)
     }
 
     #[inline]
@@ -117,7 +113,7 @@ impl App {
 
     fn add_to_tree_positions(&mut self, list: &TodoArray, prior_indices: &[usize]) {
         let mut matching_indices : Vec<usize> = vec![];
-        for (i, todo) in list.todos(self.restriction).iter().enumerate() {
+        for (i, todo) in list.todos(&self.restriction).iter().enumerate() {
             if todo.matches(self.last_query.as_str()) {
                 matching_indices.push(i)
             }
@@ -154,7 +150,7 @@ impl App {
             self.prior_indexes = position.prior_indices.clone();
             let list = self.current_list();
             for index in position.matching_indices.clone() {
-                println!("{}",list.index(index,self.restriction).display(&self.args.display_args));
+                println!("{}",list.index(index,&self.restriction).display(&self.args.display_args));
             }
         }
     }
@@ -192,7 +188,7 @@ impl App {
     #[inline]
     pub fn append(&mut self, message:String) {
         self.mut_current_list().push(Todo::default(message, 0));
-        self.index = self.current_list().len(self.restriction)-1;
+        self.index = self.current_list().len(&self.restriction)-1;
     }
 
     pub fn index(&self) -> usize {
@@ -201,7 +197,7 @@ impl App {
 
     #[inline]
     pub fn search(&mut self, query:Option<String>) {
-        let todo_messages = self.current_list().messages(self.restriction);
+        let todo_messages = self.current_list().messages(&self.restriction);
         self.search.search(query, todo_messages);
     }
 
@@ -227,7 +223,7 @@ impl App {
         if self.show_done() {
             self.restriction = None
         } else {
-            self.restriction = Some(|todo| !todo.done())
+            self.restriction = Some(Box::new(|todo| !todo.done()))
         }
     }
 
@@ -291,8 +287,8 @@ impl App {
         let mut list = &self.todo_list;
         let mut parent = None;
         for index in self.prior_indexes.iter() {
-            parent = Some(list.index(*index, self.restriction));
-            if let Some(todo_list) = list.index(*index, self.restriction).dependency.todo_list() {
+            parent = Some(list.index(*index, &self.restriction));
+            if let Some(todo_list) = list.index(*index, &self.restriction).dependency.todo_list() {
                 list = todo_list
             } else {
                 break
@@ -367,7 +363,7 @@ impl App {
     #[inline]
     pub fn is_todos_empty(&self) -> bool{
         if self.show_done() {
-            self.current_list().is_empty(self.restriction)
+            self.current_list().is_empty(&self.restriction)
         } else {
             self.is_undone_empty()
         }
@@ -400,7 +396,7 @@ impl App {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.current_list().len(self.restriction)
+        self.current_list().len(&self.restriction)
     }
 
     #[inline]
@@ -424,7 +420,7 @@ impl App {
             return list;
         }
         for index in self.prior_indexes.iter() {
-            if let Some(todo_list) = &list.index(*index, self.restriction).dependency.todo_list() {
+            if let Some(todo_list) = &list.index(*index, &self.restriction).dependency.todo_list() {
                 list = todo_list
             } else {
                 break
@@ -483,12 +479,22 @@ impl App {
 
     #[inline]
     pub fn is_undone_empty(&self) -> bool{
-        self.current_list().is_empty(self.restriction)
+        self.current_list().is_empty(&self.restriction)
     }
 
     #[inline]
     pub fn is_done_empty(&self) -> bool{
-        self.current_list().is_empty(self.restriction)
+        self.current_list().is_empty(&self.restriction)
+    }
+
+    #[inline]
+    pub fn unset_restriction(&mut self) {
+        self.restriction = None
+    }
+
+    #[inline]
+    pub fn set_priority_limit(&mut self, priority:PriorityType) {
+        self.restriction = Some(Box::new(move |todo| todo.priority() == priority))
     }
 
     #[inline]
@@ -518,10 +524,10 @@ impl App {
         let size = self.len();
 
         if size <= index {
-            return Some(&current_list.index(size - 1, self.restriction));
+            return Some(&current_list.index(size - 1, &self.restriction));
         }
 
-        Some(&self.current_list().index(index, self.restriction))
+        Some(&self.current_list().index(index, &self.restriction))
     }
 
     #[inline]
@@ -546,7 +552,7 @@ impl App {
 
     #[inline]
     pub fn display_list(&self, todo_list: &TodoArray) -> Vec<String> {
-        todo_list.display(&self.args.display_args, self.restriction)
+        todo_list.display(&self.args.display_args, &self.restriction)
     }
 
     #[inline]
@@ -632,7 +638,7 @@ impl App {
     #[inline]
     pub fn print_selected(&self) {
         for index in self.selected.clone() {
-            println!("{}", self.todo_list.index(index, self.restriction).display(&self.args.display_args));
+            println!("{}", self.todo_list.index(index, &self.restriction).display(&self.args.display_args));
         }
     }
 }

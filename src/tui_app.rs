@@ -242,6 +242,11 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
+    pub fn priority_prompt(&mut self) {
+        self.set_text_mode(Self::on_priority_prompt, "Limit priority", "Enter priority to show");
+    }
+
+    #[inline]
     pub fn append_prompt(&mut self) {
         self.set_text_mode(Self::on_prepend_todo, "Add todo at first", "Enter the todo message");
     }
@@ -256,24 +261,36 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn on_save_prompt(app:&mut TuiApp, str:String) {
+    fn on_priority_prompt(&mut self, str: String) {
+        if str.is_empty() {
+            self.todo_app.unset_restriction();
+            return
+        }
+        let priority = str.parse::<u8>().ok();
+        if let Some(priority) = priority {
+            self.todo_app.set_priority_limit(priority)
+        }
+    }
+
+    #[inline]
+    fn on_save_prompt(&mut self, str:String) {
         let lower = str.to_lowercase();
         if lower.starts_with("y") {
-            let _ = app.todo_app.write();
+            let _ = self.todo_app.write();
         } else if lower.starts_with("c") {
             return;
         }
-        let _ = app.quit();
+        let _ = self.quit();
     }
 
     #[inline]
-    fn on_append_todo(app: &mut Self, str:String) {
-        app.todo_app.append(str);
+    fn on_append_todo(&mut self, str:String) {
+        self.todo_app.append(str);
     }
 
     #[inline]
-    fn on_prepend_todo(app:&mut TuiApp,str:String) {
-        app.todo_app.prepend(str);
+    fn on_prepend_todo(&mut self,str:String) {
+        self.todo_app.prepend(str);
     }
 
     #[inline]
@@ -381,6 +398,7 @@ impl<'a>TuiApp<'a>{
                     Char('S') => self.schedule_prompt(),
                     Char('m') => self.reminder_prompt(),
                     Char('!') => self.todo_app.toggle_show_done(),
+                    Char('@') => self.priority_prompt(),
                     Char('y') => self.todo_app.yank_todo(),
                     Char('p') => self.todo_app.paste_todo(),
                     Char('i') => self.todo_app.increase_day_done(),

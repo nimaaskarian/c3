@@ -4,7 +4,7 @@ use std::ops::{Index, IndexMut};
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::io;
 
-use super::{App, Todo};
+use super::{App, Todo, RestrictionFunction};
 use crate::DisplayArgs;
 
 #[derive(Debug,PartialEq, Clone, Default)]
@@ -20,7 +20,7 @@ impl TodoArray {
         }
     }
 
-    pub fn index(&self, index:usize, restriction: Option<fn(&Todo) -> bool>) -> &Output {
+    pub fn index(&self, index:usize, restriction: &RestrictionFunction) -> &Output {
         self.todos(restriction)[index]
     }
 
@@ -28,7 +28,7 @@ impl TodoArray {
         &mut self.todos[index]
     }
 
-    pub fn todos(&self, restriction: Option<fn(&Todo) -> bool>) -> Vec<&Todo> {
+    pub fn todos(&self, restriction: &RestrictionFunction) -> Vec<&Todo> {
         if let Some(restriction) = restriction {
             self.todos.iter().filter(|todo| restriction(todo)).collect()
         } else {
@@ -36,7 +36,7 @@ impl TodoArray {
         }
     }
 
-    pub fn mut_todos(&mut self, restriction: Option<fn(&Todo) -> bool>) -> Vec<&mut Todo> {
+    pub fn mut_todos(&mut self, restriction: &RestrictionFunction) -> Vec<&mut Todo> {
         if let Some(restriction) = restriction {
             self.todos.iter_mut().filter(|todo| restriction(todo)).collect()
         } else {
@@ -162,19 +162,19 @@ impl TodoArray {
         self.todos.iter_mut()
     }
 
-    pub fn messages(&self, restriction: Option<fn(&Todo) -> bool>) -> Vec<String> {
+    pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<String> {
         self.todos(restriction).iter().map(|todo| todo.message.clone()).collect()
     }
 
-    pub fn display(&self, args: &DisplayArgs, restriction: Option<fn(&Todo) -> bool>) -> Vec<String> {
+    pub fn display(&self, args: &DisplayArgs, restriction: &RestrictionFunction) -> Vec<String> {
         self.todos(restriction).iter().map(|todo| todo.display(&args)).collect()
     }
 
-    pub fn len(&self, restriction: Option<fn(&Todo) -> bool>) -> usize {
+    pub fn len(&self, restriction: &RestrictionFunction) -> usize {
         self.todos(restriction).len()
     }
 
-    pub fn is_empty(&self, restriction: Option<fn(&Todo) -> bool>) -> bool {
+    pub fn is_empty(&self, restriction: &RestrictionFunction) -> bool {
         self.todos(restriction).is_empty()
     }
 
