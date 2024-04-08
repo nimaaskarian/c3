@@ -10,7 +10,7 @@ pub use todo::Todo;
 use crate::Args;
 
 pub use self::todo::PriorityType;
-pub use self::todo_list::TodoArray;
+pub use self::todo_list::TodoList;
 
 #[derive(Clone)]
 struct SearchPosition {
@@ -22,7 +22,7 @@ pub type RestrictionFunction = Option<Rc<dyn Fn(&Todo) -> bool>>;
 pub struct App {
     selected: Vec<usize>,
     clipboard: Clipboard,
-    pub(super) todo_list: TodoArray,
+    pub(super) todo_list: TodoList,
     index: usize,
     prior_indexes: Vec<usize>,
     changed:bool,
@@ -39,7 +39,7 @@ pub struct App {
 impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
-        let todo_list = TodoArray::read(&args.todo_path, !args.no_tree, true);
+        let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
         let mut app = App {
             x_index: 0,
             y_index: 0,
@@ -69,12 +69,12 @@ impl App {
 
     #[inline]
     pub fn append_list_from_path(&mut self, path: PathBuf) {
-        let todo_list = TodoArray::read(&path, !self.args.no_tree, true);
+        let todo_list = TodoList::read(&path, !self.args.no_tree, true);
         self.append_list(todo_list)
     }
 
     #[inline]
-    pub fn append_list(&mut self, todo_list: TodoArray) {
+    pub fn append_list(&mut self, todo_list: TodoList) {
         self.mut_current_list().append_list(todo_list)
     }
 
@@ -108,11 +108,11 @@ impl App {
         }
     }
 
-    fn traverse_parents_from_root(&mut self, callback: fn(&mut App, &TodoArray, &[usize])) {
+    fn traverse_parents_from_root(&mut self, callback: fn(&mut App, &TodoList, &[usize])) {
         self.todo_list.clone().traverse_tree(callback, None, self)
     }
 
-    fn add_to_tree_positions(&mut self, list: &TodoArray, prior_indices: &[usize]) {
+    fn add_to_tree_positions(&mut self, list: &TodoList, prior_indices: &[usize]) {
         let mut matching_indices : Vec<usize> = vec![];
         for (i, todo) in list.todos(&self.restriction).iter().enumerate() {
             if todo.matches(self.last_query.as_str()) {
@@ -271,7 +271,7 @@ impl App {
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = TodoArray::read(&self.args.todo_path, true, true);
+        self.todo_list = TodoList::read(&self.args.todo_path, true, true);
     }
 
     #[inline]
@@ -402,7 +402,7 @@ impl App {
     }
 
     #[inline]
-    pub fn mut_current_list(&mut self) -> &mut TodoArray {
+    pub fn mut_current_list(&mut self) -> &mut TodoList {
         self.changed = true;
         let is_root = self.is_root();
         let mut list = &mut self.todo_list;
@@ -416,7 +416,7 @@ impl App {
     }
 
     #[inline]
-    pub fn current_list(&self) -> &TodoArray {
+    pub fn current_list(&self) -> &TodoList {
         let mut list = &self.todo_list;
         if self.is_root() {
             return list;
@@ -554,7 +554,7 @@ impl App {
     }
 
     #[inline]
-    pub fn display_list(&self, todo_list: &TodoArray) -> Vec<String> {
+    pub fn display_list(&self, todo_list: &TodoList) -> Vec<String> {
         todo_list.display(&self.args.display_args, &self.restriction)
     }
 
@@ -608,7 +608,7 @@ impl App {
         let todos_count = self.len();
         match Todo::try_from(self.clipboard.get_text()) {
             Ok(mut todo) => {
-                let todo_parent = TodoArray::dependency_parent(&self.args.todo_path, true);
+                let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
                 let _ = todo.dependency.read(&todo_parent);
                 let bottom = self.bottom()+1;
                 let list = &mut self.mut_current_list();

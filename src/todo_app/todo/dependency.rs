@@ -1,6 +1,6 @@
 use scanf::sscanf;
 use std::{io::{self, Write}, path::PathBuf, fs::File};
-use super::TodoArray;
+use super::TodoList;
 use super::Todo;
 
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -17,7 +17,7 @@ pub struct Dependency {
     mode: DependencyMode,
     note: String,
     written: bool,
-    pub(crate) todo_list: TodoArray,
+    pub(crate) todo_list: TodoList,
 }
 
 impl Dependency {
@@ -37,7 +37,7 @@ impl Dependency {
             mode,
             name,
             note: String::new(),
-            todo_list: TodoArray::new(),
+            todo_list: TodoList::new(),
         }
     }
 
@@ -95,7 +95,7 @@ impl Dependency {
                     self.name = name_todo;
                     self.mode = DependencyMode::TodoList;
                 }
-                self.todo_list = TodoArray::read(&path.join(&self.name), true, false);
+                self.todo_list = TodoList::read(&path.join(&self.name), true, false);
             }
             _ => {}
         };
@@ -105,7 +105,7 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn todo_list(&self) -> Option<&TodoArray> {
+    pub fn todo_list(&self) -> Option<&TodoList> {
         if self.mode == DependencyMode::TodoList {
             Some(&self.todo_list)
         } else {
@@ -114,7 +114,7 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn todo_list_mut(&mut self) -> Option<&mut TodoArray> {
+    pub fn todo_list_mut(&mut self) -> Option<&mut TodoList> {
         if self.mode == DependencyMode::TodoList {
             Some(&mut self.todo_list)
         } else {
@@ -142,7 +142,7 @@ impl Dependency {
     #[inline]
     pub fn path(&self ,path: &PathBuf) -> Option<PathBuf>{
         match path.parent() {
-            Some(path) => Some(TodoArray::dependency_parent(&path.to_path_buf(), false)),
+            Some(path) => Some(TodoList::dependency_parent(&path.to_path_buf(), false)),
             None => None,
         }
     }

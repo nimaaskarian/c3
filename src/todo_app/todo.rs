@@ -10,7 +10,7 @@ mod dependency;
 use dependency::Dependency;
 use schedule::Schedule;
 use note::{sha1, open_temp_editor};
-use super::TodoArray;
+use super::TodoList;
 use crate::DisplayArgs;
 //}}}
 
@@ -173,7 +173,7 @@ impl Todo {
     }
 
     #[inline]
-    pub fn dependencies(&self) -> Option<&TodoArray> {
+    pub fn dependencies(&self) -> Option<&TodoList> {
         self.dependency.todo_list()
     }
 

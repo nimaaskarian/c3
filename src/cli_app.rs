@@ -1,7 +1,5 @@
 use std::io;
-use crate::DisplayArgs;
-
-use super::todo_app::{App ,TodoArray, Todo};
+use super::todo_app::App;
 
 #[inline]
 pub fn run(app: &mut App) -> io::Result<()>{

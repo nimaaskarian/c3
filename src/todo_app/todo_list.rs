@@ -7,14 +7,14 @@ use super::{App, Todo, RestrictionFunction};
 use crate::DisplayArgs;
 
 #[derive(Debug,PartialEq, Clone, Default)]
-pub struct TodoArray {
+pub struct TodoList {
     todos: Vec<Todo>,
 }
 
 type Output = Todo;
-impl TodoArray {
+impl TodoList {
     pub fn new() -> Self{
-        TodoArray {
+        TodoList {
             todos: Vec::new(),
         }
     }
@@ -67,7 +67,7 @@ impl TodoArray {
         Ok(())
     }
 
-    pub fn traverse_tree(&self,callback: fn(&mut App, &TodoArray, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
+    pub fn traverse_tree(&self,callback: fn(&mut App, &TodoList, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
         let prior_indices = prior_indices.unwrap_or(vec![]);
         callback(app, self, prior_indices.as_slice());
         for (i, todo) in self.todos.iter().enumerate() {
@@ -124,7 +124,7 @@ impl TodoArray {
     }
 
     pub fn with_capacity(capacity: usize) -> Self{
-        TodoArray {
+        TodoList {
             todos: Vec::with_capacity(capacity),
         }
     }
@@ -240,7 +240,7 @@ impl TodoArray {
         i
     }
 
-    pub fn append_list(&mut self, mut todo_list: TodoArray) {
+    pub fn append_list(&mut self, mut todo_list: TodoList) {
         self.todos.append(&mut todo_list.todos);
         self.sort();
     }
