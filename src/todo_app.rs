@@ -266,6 +266,7 @@ impl App {
     #[inline]
     pub fn toggle_current_done(&mut self) {
         self.mut_todo().unwrap().toggle_done();
+        self.mut_current_list().sort();
     }
 
     #[inline]

@@ -85,7 +85,6 @@ impl TryFrom<&str> for Todo {
             match state {
                 State::Priority => {
                     if c == '-' {
-                        state = State::Priority;
                         done = true;
                     } else if c.is_digit(10) {
                         priority = c.to_digit(10).unwrap() as u8;
