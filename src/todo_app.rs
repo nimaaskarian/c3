@@ -33,7 +33,7 @@ pub struct App {
     last_query: String,
     x_index: usize,
     y_index: usize,
-    restriction: RestrictionFunction,
+    pub(super) restriction: RestrictionFunction,
 }
 
 impl App {
