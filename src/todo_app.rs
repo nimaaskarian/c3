@@ -5,6 +5,7 @@ mod todo_list;
 mod todo;
 mod search;
 use search::Search;
+use std::rc::Rc;
 pub use todo::Todo;
 use crate::Args;
 
@@ -17,7 +18,7 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
-pub type RestrictionFunction = Option<Box<dyn Fn(&Todo) -> bool>>;
+pub type RestrictionFunction = Option<Rc<dyn Fn(&Todo) -> bool>>;
 pub struct App {
     selected: Vec<usize>,
     clipboard: Clipboard,
@@ -86,10 +87,10 @@ impl App {
             let sel_index = *sel_index - index_shift;
             let iter_index = iter_index - iter_index;
             if let Some(priority) = self.args.set_selected_priority {
-                self.todo_list.index_mut(sel_index).set_priority(priority as PriorityType);
+                self.todo_list.index_mut(sel_index, self.restriction.clone()).set_priority(priority as PriorityType);
             }
             if let Some(message) = self.args.set_selected_message.clone() {
-                self.todo_list.index_mut(sel_index).set_message(message);
+                self.todo_list.index_mut(sel_index, self.restriction.clone()).set_message(message);
             }
             if self.args.delete_selected {
                 self.todo_list.remove(sel_index);
@@ -98,7 +99,7 @@ impl App {
                 self.changed = true;
             }
             if self.args.done_selected {
-                self.todo_list.index_mut(sel_index).toggle_done();
+                self.todo_list.index_mut(sel_index, self.restriction.clone()).toggle_done();
                 if !self.show_done() {
                     self.selected.remove(iter_index);
                 }
@@ -223,7 +224,7 @@ impl App {
         if self.show_done() {
             self.restriction = None
         } else {
-            self.restriction = Some(Box::new(|todo| !todo.done()))
+            self.restriction = Some(Rc::new(|todo| !todo.done()))
         }
     }
 
@@ -376,12 +377,13 @@ impl App {
         }
         let index = self.index.min(self.len() - 1);
         let size = self.len();
+        let res_cloned = self.restriction.clone();
 
         if size <= index {
-            return Some(self.mut_current_list().index_mut(size - 1));
+            return Some(self.mut_current_list().index_mut(size - 1, res_cloned));
         }
 
-        Some(self.mut_current_list().index_mut(index))
+        Some(self.mut_current_list().index_mut(index, res_cloned))
     }
 
     #[inline]
@@ -408,7 +410,7 @@ impl App {
             return list;
         }
         for index in self.prior_indexes.iter() {
-            list = &mut list.index_mut(*index).dependency.todo_list
+            list = &mut list.index_mut(*index, self.restriction.clone()).dependency.todo_list
         };
         list
     }
@@ -494,7 +496,8 @@ impl App {
 
     #[inline]
     pub fn set_priority_limit(&mut self, priority:PriorityType) {
-        self.restriction = Some(Box::new(move |todo| todo.priority() == priority))
+        self.args.display_args.show_done = true;
+        self.restriction = Some(Rc::new(move |todo| todo.priority() == priority))
     }
 
     #[inline]

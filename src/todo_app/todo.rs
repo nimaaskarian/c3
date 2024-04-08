@@ -344,18 +344,21 @@ impl Todo {
     }
 
     #[inline(always)]
-    pub fn comparison_priority(&self) -> PriorityType{
-        let priority = if self.priority == 0 {
-            10
+    pub fn comparison_priority(&self) -> PriorityType {
+        let mut priority = if self.priority == 0 {
+            20
         } else {
-            self.priority
+            self.priority*2
         };
-        match (self.schedule.is_reminder(), self.done()) {
-            (true, true) => priority*20-10,
-            (false, true) => priority*20,
-            (false, false) => priority*2,
-            (true, false) => priority*2-1,
+
+        if self.schedule.is_reminder() {
+            priority-=1;
         }
+        if self.done() {
+            priority*=12;
+        }
+
+        priority
     }
 
     #[inline]

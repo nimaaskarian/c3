@@ -1,6 +1,5 @@
 use std::fs::{create_dir_all, read, File};
 use std::path::PathBuf;
-use std::ops::{Index, IndexMut};
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::io;
 
@@ -24,8 +23,12 @@ impl TodoArray {
         self.todos(restriction)[index]
     }
 
-    pub fn index_mut(&mut self, index:usize) -> &mut Output {
-        &mut self.todos[index]
+    pub fn index_mut(&mut self, index:usize, restriction: RestrictionFunction) -> &mut Todo {
+        if let Some(restriction) = restriction {
+            self.todos.iter_mut().filter(|todo| restriction(todo)).nth(index).unwrap()
+        } else {
+            self.todos.iter_mut().nth(index).unwrap()
+        }
     }
 
     pub fn todos(&self, restriction: &RestrictionFunction) -> Vec<&Todo> {
@@ -36,7 +39,7 @@ impl TodoArray {
         }
     }
 
-    pub fn mut_todos(&mut self, restriction: &RestrictionFunction) -> Vec<&mut Todo> {
+    pub fn mut_todos(&mut self, restriction: RestrictionFunction) -> Vec<&mut Todo> {
         if let Some(restriction) = restriction {
             self.todos.iter_mut().filter(|todo| restriction(todo)).collect()
         } else {
