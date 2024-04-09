@@ -183,7 +183,7 @@ impl App {
     #[inline]
     pub fn prepend(&mut self, message:String) {
         self.mut_current_list().prepend(Todo::default(message, 1));
-        self.index = 0;
+        self.go_top();
     }
 
     #[inline]
@@ -307,8 +307,7 @@ impl App {
     pub fn increment(&mut self) {
         let size = self.len();
         if size == 0 {
-            self.index = 0;
-            return;
+            return self.go_top();
         };
         if self.index != size - 1 {
             self.index += 1
@@ -337,7 +336,7 @@ impl App {
             match self.todo() {
                 Some(todo) if todo.dependency.is_list() => {
                     self.prior_indexes.push(self.index);
-                    self.index = 0;
+                    self.go_top();
                     self.search(None);
                 }
                 _ => {},
