@@ -53,7 +53,7 @@ impl <'a>CliApp <'a>{
         }
         if self.todo_app.is_tree() {
             let mut print_todo = PrintTodoTree::new(self.todo_app.args.minimal_tree);
-            print_todo.print_list(&self.todo_app.todo_list, &self.todo_app.args.display_args, &self.todo_app.restriction);
+            print_todo.print_list(&self.todo_app.todo_list, &self.todo_app.args.display_args, self.todo_app.restriction.clone());
         } else {
             self.print_list()
         }
@@ -91,8 +91,8 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    pub fn print_list(&mut self, todo_list: &TodoList, display_args: &DisplayArgs, restriction: &RestrictionFunction) {
-        let todos = todo_list.todos(restriction);
+    pub fn print_list(&mut self, todo_list: &TodoList, display_args: &DisplayArgs, restriction: RestrictionFunction) {
+        let todos = todo_list.todos(restriction.clone());
 
         for (index, todo) in todos.iter().enumerate() {
             self.is_last = index == todos.len() - 1;
@@ -103,7 +103,7 @@ impl PrintTodoTree {
 
             if let Some(todo_list) = todo.dependency.todo_list() {
                 let mut tree_child = self.tree_child();
-                tree_child.print_list(todo_list, display_args, restriction);
+                tree_child.print_list(todo_list, display_args, restriction.clone());
             }
 
             if let Some(note) = todo.dependency.note() {

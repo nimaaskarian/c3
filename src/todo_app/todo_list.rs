@@ -19,7 +19,7 @@ impl TodoList {
         }
     }
 
-    pub fn index(&self, index:usize, restriction: &RestrictionFunction) -> &Output {
+    pub fn index(&self, index:usize, restriction: RestrictionFunction) -> &Output {
         self.todos(restriction)[index]
     }
 
@@ -31,7 +31,7 @@ impl TodoList {
         }
     }
 
-    pub fn todos(&self, restriction: &RestrictionFunction) -> Vec<&Todo> {
+    pub fn todos(&self, restriction: RestrictionFunction) -> Vec<&Todo> {
         if let Some(restriction) = restriction {
             self.todos.iter().filter(|todo| restriction(todo)).collect()
         } else {
@@ -157,19 +157,19 @@ impl TodoList {
         self.todos.iter_mut()
     }
 
-    pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<String> {
+    pub fn messages(&self, restriction: RestrictionFunction) -> Vec<String> {
         self.todos(restriction).iter().map(|todo| todo.message.clone()).collect()
     }
 
-    pub fn display(&self, args: &DisplayArgs, restriction: &RestrictionFunction) -> Vec<String> {
+    pub fn display(&self, args: &DisplayArgs, restriction: RestrictionFunction) -> Vec<String> {
         self.todos(restriction).iter().map(|todo| todo.display(&args)).collect()
     }
 
-    pub fn len(&self, restriction: &RestrictionFunction) -> usize {
+    pub fn len(&self, restriction: RestrictionFunction) -> usize {
         self.todos(restriction).len()
     }
 
-    pub fn is_empty(&self, restriction: &RestrictionFunction) -> bool {
+    pub fn is_empty(&self, restriction: RestrictionFunction) -> bool {
         self.todos(restriction).is_empty()
     }
 
