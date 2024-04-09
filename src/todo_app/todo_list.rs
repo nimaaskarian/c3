@@ -39,14 +39,6 @@ impl TodoList {
         }
     }
 
-    pub fn mut_todos(&mut self, restriction: RestrictionFunction) -> Vec<&mut Todo> {
-        if let Some(restriction) = restriction {
-            self.todos.iter_mut().filter(|todo| restriction(todo)).collect()
-        } else {
-            self.todos.iter_mut().collect()
-        }
-    }
-
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &PathBuf) -> io::Result<()> {
         for todo in &mut self.todos {
@@ -202,6 +194,12 @@ impl TodoList {
             (0, index)
         }
     }
+
+    #[inline(always)]
+    pub fn reorder_last(&mut self) -> usize {
+        self.reorder(self.todos.len()-1)
+    }
+
 
     pub fn reorder(&mut self, index:usize) -> usize {
         let priority = self.todos[index].comparison_priority();

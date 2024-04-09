@@ -189,7 +189,7 @@ impl App {
     #[inline]
     pub fn append(&mut self, message:String) {
         self.mut_current_list().push(Todo::default(message, 0));
-        self.index = self.current_list().len(&self.restriction)-1;
+        self.index = self.mut_current_list().reorder_last();
     }
 
     pub fn index(&self) -> usize {

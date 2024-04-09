@@ -354,7 +354,7 @@ impl Todo {
             priority-=1;
         }
         if self.done() {
-            priority*=12;
+            priority+=20;
         }
 
         priority
