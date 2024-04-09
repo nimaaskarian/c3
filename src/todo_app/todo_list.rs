@@ -20,10 +20,14 @@ impl TodoList {
     }
 
     pub fn index(&self, index:usize, restriction: RestrictionFunction) -> &Output {
-        self.todos(restriction)[index]
+        if let Some(restriction) = restriction {
+            self.todos.iter().filter(|todo| restriction(todo)).nth(index).unwrap()
+        } else {
+            self.todos.iter().nth(index).unwrap()
+        }
     }
 
-    pub fn index_mut(&mut self, index:usize, restriction: RestrictionFunction) -> &mut Todo {
+    pub fn index_mut(&mut self, index:usize, restriction: RestrictionFunction) -> &mut Output {
         if let Some(restriction) = restriction {
             self.todos.iter_mut().filter(|todo| restriction(todo)).nth(index).unwrap()
         } else {
