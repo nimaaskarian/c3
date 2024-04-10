@@ -312,10 +312,22 @@ impl Todo {
         self.done = done;
     }
 
+    #[inline(always)]
+    fn standardize_priority(priority:PriorityType) -> PriorityType {
+        match priority {
+            0 => 10,
+            any => any,
+        }
+    }
+
+    #[inline(always)]
+    fn standardized_priority(&self) -> PriorityType {
+        Self::standardize_priority(self.priority)
+    }
 
     #[inline]
     pub fn decrease_priority(&mut self) {
-        if self.comparison_priority() < 9 {
+        if self.standardized_priority() < 9 {
             self.priority+=1
         } else {
             self.priority=0
@@ -324,8 +336,8 @@ impl Todo {
 
     #[inline]
     pub fn increase_priority(&mut self) {
-        if self.comparison_priority() > 1 {
-            self.priority=self.comparison_priority()-1
+        if self.standardized_priority() > 1 {
+            self.priority=self.standardized_priority()-1
         } else {
             self.priority=1
         }
@@ -344,17 +356,12 @@ impl Todo {
 
     #[inline(always)]
     pub fn comparison_priority(&self) -> PriorityType {
-        let mut priority = if self.priority == 0 {
-            20
-        } else {
-            self.priority*2
-        };
-
+        let mut priority = self.standardized_priority()*2;
         if self.schedule.is_reminder() {
             priority-=1;
         }
         if self.done() {
-            priority+=20;
+            priority+=Self::standardize_priority(0)*2;
         }
 
         priority
