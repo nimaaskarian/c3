@@ -506,6 +506,12 @@ impl App {
     }
 
     #[inline]
+    pub fn set_priority_limit_no_done(&mut self, priority:PriorityType) {
+        self.args.display_args.show_done = false;
+        self.restriction = Some(Rc::new(move |todo| todo.priority() == priority && !todo.done()))
+    }
+
+    #[inline]
     pub fn set_current_priority(&mut self, priority:PriorityType) {
         if let Some(todo) = self.mut_todo() {
             todo.set_priority(priority);

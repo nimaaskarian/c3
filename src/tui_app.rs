@@ -261,14 +261,23 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn on_priority_prompt(&mut self, str: String) {
+    fn on_priority_prompt(&mut self, mut str: String) {
         if str.is_empty() {
-            self.todo_app.unset_restriction();
-            return
+            return self.todo_app.unset_restriction();
         }
+        let show_done = if str.chars().last().unwrap() == 'd' {
+            str.pop();
+            true
+        } else {
+            false
+        };
         let priority = str.parse::<u8>().ok();
         if let Some(priority) = priority {
-            self.todo_app.set_priority_limit(priority)
+            if show_done {
+                self.todo_app.set_priority_limit(priority)
+            } else {
+                self.todo_app.set_priority_limit_no_done(priority)
+            }
         }
     }
 
