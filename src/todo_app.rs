@@ -93,7 +93,7 @@ impl App {
                 self.todo_list.index_mut(sel_index, self.restriction.clone()).set_message(message);
             }
             if self.args.delete_selected {
-                self.todo_list.remove(sel_index);
+                self.todo_list.remove(sel_index, self.restriction.clone());
                 self.selected.remove(iter_index);
                 index_shift += 1;
                 self.changed = true;
@@ -392,9 +392,10 @@ impl App {
 
     #[inline]
     pub fn cut_todo(&mut self) {
+        let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
-            let todo = self.mut_current_list().remove(index);
+            let todo = self.mut_current_list().remove(index, restriction);
             let todo_string:String = (&todo).into();
             self.clipboard.set_text(todo_string);
         }
@@ -545,9 +546,10 @@ impl App {
 
     #[inline]
     pub fn delete_todo(&mut self) {
+        let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
-            let todo = self.mut_current_list().remove(index);
+            let todo = self.mut_current_list().remove(index, restriction);
             self.removed_todos.push(todo);
         }
     }

@@ -177,8 +177,11 @@ impl TodoList {
         self.todos(restriction).is_empty()
     }
 
-    pub fn remove(&mut self, index:usize) -> Todo{
-        self.todos.remove(index).clone()
+    pub fn remove(&mut self, index:usize, restriction: RestrictionFunction) -> Todo{
+        let mut binding = self.todos(restriction);
+        let filtered:Vec<_> = binding.iter_mut().collect();
+        let index_in_vec = self.todos.iter().position(|x| &x == filtered[index]).unwrap();
+        self.todos.remove(index_in_vec)
     }
 
     pub fn push(&mut self,item:Todo) {
