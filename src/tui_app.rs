@@ -263,7 +263,7 @@ impl<'a>TuiApp<'a>{
     #[inline]
     fn on_priority_prompt(&mut self, mut str: String) {
         if str.is_empty() {
-            return self.todo_app.unset_restriction();
+            return self.todo_app.update_show_done_restriction();
         }
         let show_done = if str.chars().last().unwrap() == 'd' {
             str.pop();
