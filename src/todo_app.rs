@@ -86,24 +86,24 @@ impl App {
             }
             let sel_index = *sel_index - index_shift;
             let iter_index = iter_index - iter_index;
+            let todo = self.todo_list.index_mut(sel_index, self.restriction.clone());
+            self.changed = true;
             if let Some(priority) = self.args.set_selected_priority {
-                self.todo_list.index_mut(sel_index, self.restriction.clone()).set_priority(priority as PriorityType);
+                todo.set_priority(priority as PriorityType);
             }
             if let Some(message) = self.args.set_selected_message.clone() {
-                self.todo_list.index_mut(sel_index, self.restriction.clone()).set_message(message);
+                todo.set_message(message);
+            }
+            if self.args.done_selected {
+                todo.toggle_done();
+                if !self.show_done() {
+                    self.selected.remove(iter_index);
+                }
             }
             if self.args.delete_selected {
                 self.todo_list.remove(sel_index, self.restriction.clone());
                 self.selected.remove(iter_index);
                 index_shift += 1;
-                self.changed = true;
-            }
-            if self.args.done_selected {
-                self.todo_list.index_mut(sel_index, self.restriction.clone()).toggle_done();
-                if !self.show_done() {
-                    self.selected.remove(iter_index);
-                }
-                self.changed = true;
             }
         }
     }
