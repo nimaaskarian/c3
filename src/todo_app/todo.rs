@@ -59,7 +59,6 @@ enum State {
     Priority,
     Dependency,
     Message,
-    End,
 }
 
 impl TryFrom<&str> for Todo {
@@ -106,12 +105,10 @@ impl TryFrom<&str> for Todo {
                 }
                 State::Message => {
                     if i == schedule_start_index.unwrap()-1 {
-                        state = State::End;
+                        break;
                     } else {
                         message.push(c);
                     }
-                }
-                State::End => {
                 }
             }
         }
