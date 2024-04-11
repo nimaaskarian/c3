@@ -34,9 +34,9 @@ impl <'a>CliApp <'a>{
 
     #[inline]
     fn print_list(&self) {
-        // for display in self.todo_app.display_current() {
-        //     println!("{}", display);
-        // }
+        for display in self.todo_app.display_current() {
+            println!("{}", display);
+        }
     }
 
     #[inline]

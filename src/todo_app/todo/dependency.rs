@@ -1,4 +1,3 @@
-use scanf::sscanf;
 use std::{io::{self, Write}, path::PathBuf, fs::File};
 use super::TodoList;
 use super::Todo;
@@ -193,19 +192,17 @@ impl From<&str> for Dependency {
     fn from (input: &str) -> Dependency {
         let mut name = String::new();
         let mode: DependencyMode;
-
-        match input {
-            _ if sscanf!(input, "{}.todo", name).is_ok() => {
+        if input.is_empty() {
+            mode = DependencyMode::None;
+        } else {
+            name = String::from(input);
+            if input.ends_with(".todo") {
                 mode = DependencyMode::TodoList;
-                name = format!("{name}.todo");
-            }
-            _ if sscanf!(input, "{}", name).is_ok() && !name.is_empty() => {
+            } else {
                 mode = DependencyMode::Note;
             }
-            _ => {
-                mode = DependencyMode::None;
-            }
-        };
+        }
+
 
         Dependency::new(name, mode, false)
     }
