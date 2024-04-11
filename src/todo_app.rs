@@ -14,7 +14,7 @@ pub use self::todo_list::TodoList;
 
 #[derive(Clone)]
 struct SearchPosition {
-    prior_indices: Vec<usize>,
+    tree_path: Vec<usize>,
     matching_indices: Vec<usize>,
 }
 
@@ -24,7 +24,7 @@ pub struct App {
     clipboard: Clipboard,
     pub(super) todo_list: TodoList,
     index: usize,
-    prior_indexes: Vec<usize>,
+    tree_path: Vec<usize>,
     changed:bool,
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
@@ -50,7 +50,7 @@ impl App {
             todo_list,
             clipboard: Clipboard::new(),
             index: 0,
-            prior_indexes: vec![],
+            tree_path: vec![],
             changed: false,
             args,
             search: Search::new(),
@@ -111,7 +111,7 @@ impl App {
         }
         if !matching_indices.is_empty() {
             self.tree_search_positions.push(SearchPosition {
-                prior_indices: prior_indices.to_vec(),
+                tree_path: prior_indices.to_vec(),
                 matching_indices,
             })
         }
@@ -128,7 +128,7 @@ impl App {
             return;
         }
         let before_position = SearchPosition {
-            prior_indices: self.prior_indexes.clone(),
+            tree_path: self.tree_path.clone(),
             matching_indices: vec![self.index],
         };
         self.tree_search_positions.push(before_position);
@@ -138,7 +138,7 @@ impl App {
 
     pub fn print_searched(&mut self) {
         for position in self.tree_search_positions.iter() {
-            self.prior_indexes = position.prior_indices.clone();
+            self.tree_path = position.tree_path.clone();
             let list = self.current_list();
             for index in position.matching_indices.clone() {
                 println!("{}",list.index(index,self.restriction.clone()).display(&self.args.display_args));
@@ -242,7 +242,7 @@ impl App {
     #[inline]
     fn set_tree_search_position(&mut self) {
         let item = self.tree_search_positions[self.x_index].clone();
-        self.prior_indexes = item.prior_indices;
+        self.tree_path = item.tree_path;
         self.index = item.matching_indices[self.y_index];
     }
 
@@ -283,7 +283,7 @@ impl App {
     pub fn parent(&self) -> Option<&Todo>{
         let mut list = &self.todo_list;
         let mut parent = None;
-        for index in self.prior_indexes.iter() {
+        for index in self.tree_path.iter() {
             parent = Some(list.index(*index, self.restriction.clone()));
             if let Some(todo_list) = list.index(*index, self.restriction.clone()).dependency.todo_list() {
                 list = todo_list
@@ -326,7 +326,7 @@ impl App {
         if self.is_tree() {
             match self.todo() {
                 Some(todo) if todo.dependency.is_list() => {
-                    self.prior_indexes.push(self.index);
+                    self.tree_path.push(self.index);
                     self.go_top();
                     self.search(None);
                 }
@@ -338,7 +338,7 @@ impl App {
     #[inline]
     pub fn traverse_up(&mut self) {
         if !self.is_root() {
-            self.index = self.prior_indexes.remove(self.prior_indexes.len()-1);
+            self.index = self.tree_path.remove(self.tree_path.len()-1);
             self.search(None);
         }
     }
@@ -405,7 +405,7 @@ impl App {
         if  is_root{
             return list;
         }
-        for index in self.prior_indexes.iter() {
+        for index in self.tree_path.iter() {
             list = &mut list.index_mut(*index, self.restriction.clone()).dependency.todo_list
         };
         list
@@ -417,7 +417,7 @@ impl App {
         if self.is_root() {
             return list;
         }
-        for index in self.prior_indexes.iter() {
+        for index in self.tree_path.iter() {
             if let Some(todo_list) = &list.index(*index, self.restriction.clone()).dependency.todo_list() {
                 list = todo_list
             } else {
@@ -453,7 +453,7 @@ impl App {
 
     #[inline]
     pub fn is_root(&self) -> bool {
-        self.prior_indexes.is_empty()
+        self.tree_path.is_empty()
     }
     
     #[inline]
