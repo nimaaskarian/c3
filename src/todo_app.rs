@@ -57,13 +57,6 @@ impl App {
             restriction: None,
         };
         app.update_show_done_restriction();
-        for str in app.args.search_and_select.clone() {
-            app.search(Some(str));
-            for index in app.search.indices() {
-                app.selected.push(index);
-            }
-        }
-
         app
     }
 
@@ -79,33 +72,30 @@ impl App {
     }
 
     pub fn do_commands_on_selected(&mut self) {
-        let mut index_shift = 0;
-        for (iter_index, sel_index) in self.selected.clone().iter().enumerate() {
-            if  index_shift > *sel_index  || index_shift > iter_index {
-                break
+        for query in self.args.search_and_select.iter() {
+            if self.args.delete_selected {
+                self.changed = true;
+                self.todo_list.set_todos(self.todo_list
+                    .iter()
+                    .filter(|todo| !todo.matches(query))
+                    .cloned()
+                    .collect());
+                continue;
             }
-            let sel_index = *sel_index - index_shift;
-            let iter_index = iter_index - iter_index;
-            let todo = self.todo_list.index_mut(sel_index, self.restriction.clone());
-            self.changed = true;
-            if let Some(priority) = self.args.set_selected_priority {
-                todo.set_priority(priority as PriorityType);
-            }
-            if let Some(message) = self.args.set_selected_message.clone() {
-                todo.set_message(message);
-            }
-            if self.args.done_selected {
-                todo.toggle_done();
-                if !self.show_done() {
-                    self.selected.remove(iter_index);
+            for todo in self.todo_list.iter_mut().filter(|todo| todo.matches(query)) {
+                self.changed = true;
+                if let Some(priority) = self.args.set_selected_priority {
+                    todo.set_priority(priority as PriorityType);
+                }
+                if let Some(message) = self.args.set_selected_message.clone() {
+                    todo.set_message(message);
+                }
+                if self.args.done_selected {
+                    todo.set_done(true);
                 }
             }
-            if self.args.delete_selected {
-                self.todo_list.remove(sel_index, self.restriction.clone());
-                self.selected.remove(iter_index);
-                index_shift += 1;
-            }
         }
+        self.args.search_and_select = vec![];
     }
 
     fn traverse_parents_from_root(&mut self, callback: fn(&mut App, &TodoList, &[usize])) {

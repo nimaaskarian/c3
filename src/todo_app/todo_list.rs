@@ -152,6 +152,10 @@ impl TodoList {
         Ok(dependency_path)
     }
 
+    #[inline(always)]
+    pub (super) fn set_todos(&mut self, todos:Vec<Todo>) {
+        self.todos = todos
+    }
 
     pub fn iter(&self) -> std::slice::Iter<Todo> {
         self.todos.iter()
