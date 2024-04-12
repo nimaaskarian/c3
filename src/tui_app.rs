@@ -367,7 +367,7 @@ impl<'a>TuiApp<'a>{
             output = self.update_editor()?;
         } else {
             output = self.update_no_editor()?;
-            self.todo_app.fix_index();
+            self.todo_app.fixed_index();
         }
         Ok(output)
     }

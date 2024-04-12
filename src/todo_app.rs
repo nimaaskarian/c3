@@ -271,11 +271,10 @@ impl App {
     }
 
     #[inline]
-    pub fn fix_index(&mut self) {
-        let size = self.len();
-        self.index = match size {
-            0 => 0,
-            _ => self.index.min(size-1),
+    pub fn fixed_index(&mut self) {
+        self.index = match Self::fix_index(self.restriction.clone() ,self.current_list(), self.index) {
+            Some(index) => index,
+            None => 0,
         };
     }
 
@@ -284,13 +283,17 @@ impl App {
         let mut list = &self.todo_list;
         let mut parent = None;
         for index in self.tree_path.iter() {
-            parent = Some(list.index(*index, self.restriction.clone()));
-            if let Some(todo_list) = list.index(*index, self.restriction.clone()).dependency.todo_list() {
+            let index = Self::fix_index(self.restriction.clone(), list, *index);
+            if index.is_none() {
+                break
+            }
+            parent = Some(list.index(index.unwrap(), self.restriction.clone()));
+            if let Some(todo_list) = list.index(index.unwrap(), self.restriction.clone()).dependency.todo_list() {
                 list = todo_list
             } else {
                 break
             }
-        };
+        }
         parent
     }
 
@@ -397,6 +400,14 @@ impl App {
         self.current_list().len(self.restriction.clone())
     }
 
+    pub fn fix_index(restriction: RestrictionFunction, list: &TodoList, index: usize) -> Option<usize> {
+        let size = list.len(restriction);
+        match size {
+            0 => None,
+            _ => Some(index.min(size-1)),
+        }
+    }
+
     #[inline]
     pub fn mut_current_list(&mut self) -> &mut TodoList {
         self.changed = true;
@@ -406,7 +417,12 @@ impl App {
             return list;
         }
         for index in self.tree_path.iter() {
-            list = &mut list.index_mut(*index, self.restriction.clone()).dependency.todo_list
+            let index = Self::fix_index(self.restriction.clone() ,list, *index);
+            if let Some(index) = index {
+                list = &mut list.index_mut(index, self.restriction.clone()).dependency.todo_list
+            } else {
+                break;
+            }
         };
         list
     }
@@ -418,7 +434,11 @@ impl App {
             return list;
         }
         for index in self.tree_path.iter() {
-            if let Some(todo_list) = &list.index(*index, self.restriction.clone()).dependency.todo_list() {
+            let index = Self::fix_index(self.restriction.clone() ,list, *index);
+            if index.is_none() {
+                break
+            }
+            if let Some(todo_list) = &list.index(index.unwrap(), self.restriction.clone()).dependency.todo_list() {
                 list = todo_list
             } else {
                 break
