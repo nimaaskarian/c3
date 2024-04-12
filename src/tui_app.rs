@@ -38,13 +38,14 @@ pub enum TodoWidget<'a> {
 
 pub fn create_todo_widget<'a>(display_list:&Vec<String>, title:String, highlight_symbol: &'a str) ->  TodoWidget<'a> {
     if display_list.is_empty() {
-        return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
+        TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
+    } else {
+        TodoWidget::List(List::new((*display_list).clone())
+            .block(default_block(title))
+            .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+            .highlight_symbol(highlight_symbol)
+            .repeat_highlight_symbol(true))
     }
-    TodoWidget::List(List::new((*display_list).clone())
-        .block(default_block(title))
-        .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-        .highlight_symbol(highlight_symbol)
-        .repeat_highlight_symbol(true))
 }
 
 /// Shutdown TUI app (undo everything did in startup, and show cursor)
@@ -507,19 +508,27 @@ impl<'a>TuiApp<'a>{
                 frame.render_widget(note_widget, dependency_layout);
             } 
             if let Some(todo_list) = todo.dependency.todo_list() {
-                match create_todo_widget(&self.todo_app.display_list(todo_list), String::from("Todo dependencies"), self.highlight_string()) {
-                    TodoWidget::List(widget) => frame.render_widget(widget, dependency_layout),
-                    TodoWidget::Paragraph(widget) => frame.render_widget(widget, dependency_layout),
-                }
+                self.render_todos_widget(frame, None, dependency_layout, &self.todo_app.display_list(todo_list), String::from("Todo dependencies"))
             }
         }
     }
 
-    #[inline]
-    fn render_todos_widget(&self, frame: &mut Frame, list_state: &mut ListState, todo_layout: &Rc<[Rect]>) {
-        match create_todo_widget(&self.todo_app.display_current(), self.title(), self.highlight_string()) {
-            TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout[1]),
-            TodoWidget::List(widget) => frame.render_stateful_widget(widget, todo_layout[1], list_state),
+    #[inline(always)]
+    fn render_current_todos_widget(&self, frame: &mut Frame, list_state: &mut ListState, todo_layout: Rect) {
+        self.render_todos_widget(frame, Some(list_state), todo_layout, &self.todo_app.display_current(), self.title())
+    }
+
+    #[inline(always)]
+    fn render_todos_widget(&self, frame: &mut Frame, list_state: Option<&mut ListState>, todo_layout: Rect, display_list:&Vec<String>, title: String) {
+        match create_todo_widget(display_list, title, self.highlight_string()) {
+            TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout),
+            TodoWidget::List(widget) => {
+                if let Some(list_state) = list_state {
+                    frame.render_stateful_widget(widget, todo_layout, list_state)
+                } else {
+                    frame.render_widget(widget, todo_layout)
+                }
+            }
         }
     }
 
@@ -548,6 +557,6 @@ impl<'a>TuiApp<'a>{
         self.render_dependency_widget(frame, todo, todo_app_layout[1]);
 
         frame.render_widget(self.textarea.widget(), todo_and_textarea_layout[0]);
-        self.render_todos_widget(frame, list_state, &todo_and_textarea_layout);
+        self.render_current_todos_widget(frame, list_state, todo_and_textarea_layout[1]);
     }
 }

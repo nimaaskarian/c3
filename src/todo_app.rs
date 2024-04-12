@@ -386,7 +386,7 @@ impl App {
         let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
-            let todo = self.mut_current_list().remove(index, restriction);
+            let todo = self.mut_current_list().cut(index, restriction);
             let todo_string:String = (&todo).into();
             self.clipboard.set_text(todo_string);
         }
@@ -546,7 +546,7 @@ impl App {
         let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
-            let todo = self.mut_current_list().remove(index, restriction);
+            let todo = self.mut_current_list().cut(index, restriction);
             self.removed_todos.push(todo);
         }
     }
