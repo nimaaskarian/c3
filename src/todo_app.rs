@@ -279,9 +279,10 @@ impl App {
     }
 
     #[inline]
-    pub fn parent(&self) -> Option<&Todo>{
+    pub fn parent(&mut self) -> Option<&Todo>{
         let mut list = &self.todo_list;
         let mut parent = None;
+        let mut count = 0;
         for index in self.tree_path.iter() {
             let index = Self::fix_index(self.restriction.clone(), list, *index);
             if index.is_none() {
@@ -293,7 +294,9 @@ impl App {
             } else {
                 break
             }
+            count+=1;
         }
+        self.tree_path.truncate(count);
         parent
     }
 
@@ -416,6 +419,7 @@ impl App {
         if  is_root{
             return list;
         }
+        let mut count = 0;
         for index in self.tree_path.iter() {
             let index = Self::fix_index(self.restriction.clone() ,list, *index);
             if let Some(index) = index {
@@ -423,7 +427,9 @@ impl App {
             } else {
                 break;
             }
+            count+=1;
         };
+        self.tree_path.truncate(count);
         list
     }
 

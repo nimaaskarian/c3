@@ -123,7 +123,7 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    pub fn title(&self) -> String { 
+    pub fn title(&mut self) -> String { 
         let changed_str = if self.todo_app.is_changed() {
             "*"
         } else {
@@ -504,19 +504,20 @@ impl<'a>TuiApp<'a>{
                 frame.render_widget(note_widget, dependency_layout);
             } 
             if let Some(todo_list) = todo.dependency.todo_list() {
-                self.render_todos_widget(frame, None, dependency_layout, &self.todo_app.display_list(todo_list), String::from("Todo dependencies"))
+                Self::render_todos_widget(self.highlight_string(), frame, None, dependency_layout, &self.todo_app.display_list(todo_list), String::from("Todo dependencies"))
             }
         }
     }
 
     #[inline(always)]
-    fn render_current_todos_widget(&self, frame: &mut Frame, list_state: &mut ListState, todo_layout: Rect) {
-        self.render_todos_widget(frame, Some(list_state), todo_layout, &self.todo_app.display_current(), self.title())
+    fn render_current_todos_widget(&mut self, frame: &mut Frame, list_state: &mut ListState, todo_layout: Rect) {
+        let title = self.title();
+        Self::render_todos_widget(self.highlight_string(),frame, Some(list_state), todo_layout, &self.todo_app.display_current(), title)
     }
 
     #[inline(always)]
-    fn render_todos_widget(&self, frame: &mut Frame, list_state: Option<&mut ListState>, todo_layout: Rect, display_list:&Vec<String>, title: String) {
-        match create_todo_widget(display_list, title, self.highlight_string()) {
+    fn render_todos_widget(highlight_symbol: &str,frame: &mut Frame, list_state: Option<&mut ListState>, todo_layout: Rect, display_list:&Vec<String>, title: String) {
+        match create_todo_widget(display_list, title, highlight_symbol) {
             TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout),
             TodoWidget::List(widget) => {
                 if let Some(list_state) = list_state {
@@ -529,7 +530,7 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    pub fn ui(&self, frame:&mut Frame, list_state: &mut ListState) {
+    pub fn ui(&mut self, frame:&mut Frame, list_state: &mut ListState) {
         let todo = self.todo_app.todo();
 
         list_state.select(Some(self.todo_app.index()));
