@@ -48,7 +48,6 @@ pub fn create_todo_widget<'a>(display_list:&Vec<String>, title:String, highlight
     }
 }
 
-/// Shutdown TUI app (undo everything did in startup, and show cursor)
 pub fn shutdown() -> io::Result<()> {
     disable_raw_mode()?;
     stdout().execute(crossterm::cursor::Show)?;
@@ -56,14 +55,12 @@ pub fn shutdown() -> io::Result<()> {
     Ok(())
 }
 
-/// Prepare terminal for TUI applicaton by enabling rowmode and entering alternate screen.
 pub fn startup() -> io::Result<()> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
     Ok(())
 }
 
-/// Restart terminal
 #[inline]
 pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
     terminal.clear()?;
@@ -71,7 +68,6 @@ pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Res
     Ok(())
 }
 
-/// Restart TUI app
 #[inline]
 pub fn run(app:&mut App) -> io::Result<()> {
     startup()?;
