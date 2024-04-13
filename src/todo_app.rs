@@ -18,7 +18,8 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
-pub type RestrictionFunction = Option<Rc<dyn Fn(&Todo) -> bool>>;
+pub type RestrictionFunction = Rc<dyn Fn(&Todo) -> bool>;
+pub type Restriction = Option<RestrictionFunction>;
 pub struct App {
     selected: Vec<usize>,
     clipboard: Clipboard,
@@ -33,7 +34,7 @@ pub struct App {
     last_query: String,
     x_index: usize,
     y_index: usize,
-    pub(super) restriction: RestrictionFunction,
+    restriction: Restriction,
 }
 
 impl App {
@@ -58,6 +59,10 @@ impl App {
         };
         app.update_show_done_restriction();
         app
+    }
+
+    pub fn restriction(&self) -> Restriction{
+        self.restriction.clone()
     }
 
     #[inline]
@@ -212,9 +217,9 @@ impl App {
 
     pub fn update_show_done_restriction(&mut self) {
         if self.show_done() {
-            self.restriction = None
+            self.unset_restriction()
         } else {
-            self.restriction = Some(Rc::new(|todo| !todo.done()))
+            self.set_restriction(Rc::new(|todo| !todo.done()))
         }
     }
 
@@ -271,32 +276,26 @@ impl App {
     }
 
     #[inline]
-    pub fn fixed_index(&mut self) {
-        self.index = match Self::fix_index(self.restriction.clone() ,self.current_list(), self.index) {
-            Some(index) => index,
-            None => 0,
-        };
+    pub fn fix_index(&mut self) {
+        let size = self.current_list().len(self.restriction.clone());
+        self.index = match size {
+            0 => 0,
+            _ => self.index.min(size-1),
+        }
     }
 
     #[inline]
     pub fn parent(&mut self) -> Option<&Todo>{
         let mut list = &self.todo_list;
         let mut parent = None;
-        let mut count = 0;
-        for index in self.tree_path.iter() {
-            let index = Self::fix_index(self.restriction.clone(), list, *index);
-            if index.is_none() {
-                break
-            }
-            parent = Some(list.index(index.unwrap(), self.restriction.clone()));
-            if let Some(todo_list) = list.index(index.unwrap(), self.restriction.clone()).dependency.todo_list() {
+        for index in self.tree_path.clone() {
+            parent = Some(&list.todos[index]);
+            if let Some(todo_list) = list.todos[index].dependency.todo_list() {
                 list = todo_list
             } else {
                 break
             }
-            count+=1;
         }
-        self.tree_path.truncate(count);
         parent
     }
 
@@ -332,7 +331,7 @@ impl App {
         if self.is_tree() {
             match self.todo() {
                 Some(todo) if todo.dependency.is_list() => {
-                    self.tree_path.push(self.index);
+                    self.tree_path.push(self.todo_list.true_position_in_list(self.index, self.restriction.clone()));
                     self.go_top();
                     self.search(None);
                 }
@@ -343,8 +342,8 @@ impl App {
 
     #[inline]
     pub fn traverse_up(&mut self) {
-        if !self.is_root() {
-            self.index = self.tree_path.remove(self.tree_path.len()-1);
+        if let Some(index) = self.tree_path.pop() {
+            self.index = index;
             self.search(None);
         }
     }
@@ -403,14 +402,6 @@ impl App {
         self.current_list().len(self.restriction.clone())
     }
 
-    pub fn fix_index(restriction: RestrictionFunction, list: &TodoList, index: usize) -> Option<usize> {
-        let size = list.len(restriction);
-        match size {
-            0 => None,
-            _ => Some(index.min(size-1)),
-        }
-    }
-
     #[inline]
     pub fn mut_current_list(&mut self) -> &mut TodoList {
         self.changed = true;
@@ -419,17 +410,17 @@ impl App {
         if  is_root{
             return list;
         }
-        let mut count = 0;
-        for index in self.tree_path.iter() {
-            let index = Self::fix_index(self.restriction.clone() ,list, *index);
-            if let Some(index) = index {
-                list = &mut list.index_mut(index, self.restriction.clone()).dependency.todo_list
-            } else {
-                break;
-            }
-            count+=1;
+        for index in self.tree_path.clone() {
+            list = &mut list.todos[index].dependency.todo_list
         };
-        self.tree_path.truncate(count);
+        // for index in self.tree_path.iter() {
+        //     let index = Self::fix_index(self.restriction.clone() ,list, *index);
+        //     if let Some(index) = index {
+        //         list = &mut list.index_mut(index, self.restriction.clone()).dependency.todo_list
+        //     } else {
+        //         break;
+        //     }
+        // };
         list
     }
 
@@ -439,12 +430,8 @@ impl App {
         if self.is_root() {
             return list;
         }
-        for index in self.tree_path.iter() {
-            let index = Self::fix_index(self.restriction.clone() ,list, *index);
-            if index.is_none() {
-                break
-            }
-            if let Some(todo_list) = &list.index(index.unwrap(), self.restriction.clone()).dependency.todo_list() {
+        for index in self.tree_path.clone() {
+            if let Some(todo_list) = &list.todos[index].dependency.todo_list() {
                 list = todo_list
             } else {
                 break
@@ -511,21 +498,26 @@ impl App {
         self.current_list().is_empty(self.restriction.clone())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn unset_restriction(&mut self) {
         self.restriction = None
+    }
+
+    #[inline(always)]
+    pub fn set_restriction(&mut self, restriction: RestrictionFunction) {
+        self.restriction = Some(restriction)
     }
 
     #[inline]
     pub fn set_priority_limit(&mut self, priority:PriorityType) {
         self.args.display_args.show_done = true;
-        self.restriction = Some(Rc::new(move |todo| todo.priority() == priority))
+        self.set_restriction(Rc::new(move |todo| todo.priority() == priority))
     }
 
     #[inline]
     pub fn set_priority_limit_no_done(&mut self, priority:PriorityType) {
         self.args.display_args.show_done = false;
-        self.restriction = Some(Rc::new(move |todo| todo.priority() == priority && !todo.done()))
+        self.set_restriction(Rc::new(move |todo| todo.priority() == priority && !todo.done()))
     }
 
     #[inline]

@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::io;
 
-use super::{App, Todo, RestrictionFunction};
+use super::{App, Todo, Restriction};
 use crate::DisplayArgs;
 
 #[derive(Debug,PartialEq, Clone, Default)]
 pub struct TodoList {
-    todos: Vec<Todo>,
+    pub todos: Vec<Todo>,
 }
 
 type Output = Todo;
@@ -19,7 +19,7 @@ impl TodoList {
         }
     }
 
-    pub fn index(&self, index:usize, restriction: RestrictionFunction) -> &Output {
+    pub fn index(&self, index:usize, restriction: Restriction) -> &Output {
         if let Some(restriction) = restriction {
             self.todos.iter().filter(|todo| restriction(todo)).nth(index).unwrap()
         } else {
@@ -27,7 +27,7 @@ impl TodoList {
         }
     }
 
-    pub fn index_mut(&mut self, index:usize, restriction: RestrictionFunction) -> &mut Output {
+    pub fn index_mut(&mut self, index:usize, restriction: Restriction) -> &mut Output {
         if let Some(restriction) = restriction {
             self.todos.iter_mut().filter(|todo| restriction(todo)).nth(index).unwrap()
         } else {
@@ -35,7 +35,7 @@ impl TodoList {
         }
     }
 
-    pub fn todos(&self, restriction: RestrictionFunction) -> Vec<&Todo> {
+    pub fn todos(&self, restriction: Restriction) -> Vec<&Todo> {
         if let Some(restriction) = restriction {
             self.todos.iter().filter(|todo| restriction(todo)).collect()
         } else {
@@ -165,32 +165,36 @@ impl TodoList {
         self.todos.iter_mut()
     }
 
-    pub fn messages(&self, restriction: RestrictionFunction) -> Vec<String> {
+    pub fn messages(&self, restriction: Restriction) -> Vec<String> {
         self.todos(restriction).iter().map(|todo| todo.message.clone()).collect()
     }
 
-    pub fn display(&self, args: &DisplayArgs, restriction: RestrictionFunction) -> Vec<String> {
+    pub fn display(&self, args: &DisplayArgs, restriction: Restriction) -> Vec<String> {
         self.todos(restriction).iter().map(|todo| todo.display(&args)).collect()
     }
 
-    pub fn len(&self, restriction: RestrictionFunction) -> usize {
+    pub fn len(&self, restriction: Restriction) -> usize {
         self.todos(restriction).len()
     }
 
-    pub fn is_empty(&self, restriction: RestrictionFunction) -> bool {
+    pub fn is_empty(&self, restriction: Restriction) -> bool {
         self.todos(restriction).is_empty()
     }
 
-    pub fn remove(&mut self, index:usize, restriction: RestrictionFunction) {
+    pub fn remove(&mut self, index:usize, restriction: Restriction) {
         let mut binding = self.todos(restriction);
         let filtered:Vec<_> = binding.iter_mut().collect();
         self.todos = self.todos.iter().filter(|x| &x != &filtered[index]).cloned().collect();
     }
 
-    pub fn cut(&mut self, index:usize, restriction: RestrictionFunction) -> Todo{
+    pub fn true_position_in_list(&mut self, index:usize, restriction: Restriction) -> usize {
         let mut binding = self.todos(restriction);
         let filtered:Vec<_> = binding.iter_mut().collect();
-        let index_in_vec = self.todos.iter().position(|x| &x == filtered[index]).unwrap();
+        self.todos.iter().position(|x| &x == filtered[index]).unwrap()
+    }
+
+    pub fn cut(&mut self, index:usize, restriction: Restriction) -> Todo{
+        let index_in_vec = self.true_position_in_list(index, restriction);
         self.todos.remove(index_in_vec)
     }
 

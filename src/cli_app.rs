@@ -1,5 +1,5 @@
 use std::io;
-use super::todo_app::{App, TodoList, Todo, RestrictionFunction};
+use super::todo_app::{App, TodoList, Todo, Restriction};
 use crate::DisplayArgs;
 
 #[inline]
@@ -51,7 +51,7 @@ impl <'a>CliApp <'a>{
         }
         if self.todo_app.is_tree() {
             let mut print_todo = PrintTodoTree::new(self.todo_app.args.minimal_tree);
-            print_todo.print_list(&self.todo_app.todo_list, &self.todo_app.args.display_args, self.todo_app.restriction.clone());
+            print_todo.print_list(&self.todo_app.todo_list, &self.todo_app.args.display_args, self.todo_app.restriction());
         } else {
             self.print_list()
         }
@@ -89,7 +89,7 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    pub fn print_list(&mut self, todo_list: &TodoList, display_args: &DisplayArgs, restriction: RestrictionFunction) {
+    pub fn print_list(&mut self, todo_list: &TodoList, display_args: &DisplayArgs, restriction: Restriction) {
         let todos = todo_list.todos(restriction.clone());
 
         for (index, todo) in todos.iter().enumerate() {
