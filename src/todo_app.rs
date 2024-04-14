@@ -597,7 +597,7 @@ impl App {
     #[inline]
     pub fn add_dependency(&mut self) {
         if let Some(todo) = self.mut_todo() {
-            let _ = todo.add_todo_dependency();
+            todo.add_todo_dependency();
         }
     }
 
@@ -628,8 +628,10 @@ impl App {
 
     #[inline]
     pub fn yank_todo(&mut self) {
-        let todo_string:String = self.todo().unwrap().into();
-        self.clipboard.set_text(todo_string);
+        if let Some(todo) = self.todo() {
+            let todo_string:String = todo.into();
+            self.clipboard.set_text(todo_string);
+        }
     }
 
     #[inline]
@@ -653,9 +655,9 @@ impl App {
     #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
         if self.is_tree() {
-            if let Some(todo) = self.todo() {
+            if let Some(todo) = self.mut_todo() {
                 if todo.dependency.is_none() {
-                    let _ = self.mut_todo().unwrap().add_todo_dependency();
+                    todo.add_todo_dependency();
                 }
             }
             self.traverse_down()

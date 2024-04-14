@@ -41,7 +41,6 @@ impl Into<String> for &Todo {
 pub enum TodoError {
     ReadFailed,
     NoteEmpty,
-    AlreadyExists,
     DependencyCreationFailed,
 }
 
@@ -59,6 +58,7 @@ enum State {
     Priority,
     Dependency,
     Message,
+    End,
 }
 
 impl TryFrom<&str> for Todo {
@@ -86,7 +86,7 @@ impl TryFrom<&str> for Todo {
                     if c == '-' {
                         done = true;
                     } else if c.is_digit(10) {
-                        priority = c.to_digit(10).unwrap() as u8;
+                        priority = c.to_digit(10).unwrap() as PriorityType;
                     } else if c == ' ' {
                         state = State::Message;
                     } else if c == '>' {
@@ -105,30 +105,33 @@ impl TryFrom<&str> for Todo {
                 }
                 State::Message => {
                     if i == schedule_start_index.unwrap()-1 {
-                        break;
+                        state = State::End
                     } else {
                         message.push(c);
                     }
                 }
+                State::End => {
+                    let schedule = Schedule::from(schedule_string);
+                    let dependency = Dependency::from(dependency_string.as_str());
+
+                    if schedule.should_undone() {
+                        done = false;
+                    }
+                    if schedule.should_done() {
+                        done = true;
+                    }
+                    return Ok(Todo {
+                        dependency,
+                        removed_dependency: None,
+                        schedule,
+                        message,
+                        priority,
+                        done,
+                    })
+                }
             }
         }
-
-        let schedule = Schedule::from(schedule_string);
-
-        if schedule.should_undone() {
-            done = false;
-        }
-        if schedule.should_done() {
-            done = true;
-        }
-        Ok(Todo {
-            dependency: Dependency::from(dependency_string.as_str()),
-            removed_dependency: None,
-            schedule,
-            message,
-            priority: priority as u8,
-            done,
-        })
+        Err(TodoError::ReadFailed)
     }
 }
 
@@ -186,12 +189,9 @@ impl Todo {
     }
 
     #[inline]
-    pub fn add_todo_dependency(&mut self) -> Result<(), TodoError>{
+    pub fn add_todo_dependency(&mut self) {
         if self.dependency.is_none() {
             self.dependency = Dependency::new_todo_list(self.hash());
-            Ok(())
-        } else {
-            Err(TodoError::AlreadyExists)
         }
     }
 
@@ -429,7 +429,7 @@ mod tests {
     fn test_dependency_name() {
         let mut todo = Todo::default("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
-        todo.add_todo_dependency().expect("Error setting dependency");
+        todo.add_todo_dependency();
 
         let result = &todo.dependency.get_name();
         assert_eq!(result, expected);
@@ -438,7 +438,7 @@ mod tests {
     #[test]
     fn test_dependency_type() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        todo.add_todo_dependency().expect("Error setting dependency");
+        todo.add_todo_dependency();
 
         assert!(todo.dependency.is_list());
     }
@@ -447,7 +447,7 @@ mod tests {
     fn test_add_todo() {
         let mut todo = Todo::default("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
-        todo.add_todo_dependency().expect("Error setting dependency");
+        todo.add_todo_dependency();
 
         let result = &todo.dependency.get_name();
         assert_eq!(result, expected);
@@ -482,7 +482,7 @@ mod tests {
     fn test_add_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
 
-        let _ = todo.add_todo_dependency();
+        todo.add_todo_dependency();
 
         assert!(todo.dependency.is_list());
     }
@@ -490,7 +490,7 @@ mod tests {
     #[test]
     fn test_remove_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        let _ = todo.add_todo_dependency();
+        todo.add_todo_dependency();
 
         todo.remove_dependency();
 
