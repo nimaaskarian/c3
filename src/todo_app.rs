@@ -76,6 +76,14 @@ impl App {
         self.mut_current_list().append_list(todo_list)
     }
 
+    pub fn set_query_restriction(&mut self, query: String) {
+        if self.show_done() {
+            self.set_restriction(Rc::new(move |todo| todo.matches(query.as_str())))
+        } else {
+            self.set_restriction(Rc::new(move |todo| todo.matches(query.as_str()) && !todo.done()))
+        }
+    }
+
     pub fn do_commands_on_selected(&mut self) {
         for query in self.args.search_and_select.iter() {
             if self.args.delete_selected {
