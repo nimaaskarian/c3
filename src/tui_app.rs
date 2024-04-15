@@ -211,7 +211,7 @@ impl<'a>TuiApp<'a>{
         if day.is_none() {
             return;
         }
-        if let Some(todo) = self.todo_app.mut_todo(){
+        if let Some(todo) = self.todo_app.todo_mut(){
             todo.enable_day(day.unwrap() as i64);
         }
     }
@@ -244,7 +244,7 @@ impl<'a>TuiApp<'a>{
     #[inline]
     fn on_reminder(&mut self,str:String) {
         if let Ok(date) = date::parse_user_input(&str) {
-            if let Some(todo) = self.todo_app.mut_todo() {
+            if let Some(todo) = self.todo_app.todo_mut() {
                 todo.schedule.enable_reminder(date);
             }
         }
@@ -336,7 +336,7 @@ impl<'a>TuiApp<'a>{
     #[inline]
     fn on_edit_todo(&mut self,str:String) {
         if !str.is_empty() {
-            self.todo_app.mut_todo().unwrap().set_message(str);
+            self.todo_app.todo_mut().unwrap().set_message(str);
         }
     }
 

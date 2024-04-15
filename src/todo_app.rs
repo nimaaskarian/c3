@@ -73,7 +73,7 @@ impl App {
 
     #[inline]
     pub fn append_list(&mut self, todo_list: TodoList) {
-        self.mut_current_list().append_list(todo_list)
+        self.current_list_mut().append_list(todo_list)
     }
 
     pub fn set_query_restriction(&mut self, query: String) {
@@ -171,28 +171,28 @@ impl App {
 
     #[inline]
     pub fn increase_day_done(&mut self) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.schedule.add_days_to_date(-1)
         }
     }
 
     #[inline]
     pub fn decrease_day_done(&mut self) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.schedule.add_days_to_date(1)
         }
     }
 
     #[inline]
     pub fn prepend(&mut self, message:String) {
-        self.mut_current_list().prepend(Todo::default(message, 1));
+        self.current_list_mut().prepend(Todo::default(message, 1));
         self.go_top();
     }
 
     #[inline]
     pub fn append(&mut self, message:String) {
-        self.mut_current_list().push(Todo::default(message, 0));
-        self.index = self.mut_current_list().reorder_last();
+        self.current_list_mut().push(Todo::default(message, 0));
+        self.index = self.current_list_mut().reorder_last();
     }
 
     pub fn index(&self) -> usize {
@@ -269,11 +269,11 @@ impl App {
     #[inline]
     pub fn toggle_current_done(&mut self) {
         let index = self.index;
-        self.mut_todo().unwrap().toggle_done();
+        self.todo_mut().unwrap().toggle_done();
         if self.show_done() {
-            self.index = self.mut_current_list().reorder(index);
+            self.index = self.current_list_mut().reorder(index);
         } else {
-            self.mut_current_list().sort();
+            self.current_list_mut().sort();
         }
     }
 
@@ -379,7 +379,7 @@ impl App {
     }
 
     #[inline]
-    pub fn mut_todo(&mut self) -> Option<&mut Todo> {
+    pub fn todo_mut(&mut self) -> Option<&mut Todo> {
         if self.is_todos_empty() {
             return None
         }
@@ -388,10 +388,10 @@ impl App {
         let res_cloned = self.restriction.clone();
 
         if size <= index {
-            return Some(self.mut_current_list().index_mut(size - 1, res_cloned));
+            return Some(self.current_list_mut().index_mut(size - 1, res_cloned));
         }
 
-        Some(self.mut_current_list().index_mut(index, res_cloned))
+        Some(self.current_list_mut().index_mut(index, res_cloned))
     }
 
     #[inline]
@@ -399,7 +399,7 @@ impl App {
         let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
-            let todo = self.mut_current_list().cut(index, restriction);
+            let todo = self.current_list_mut().cut(index, restriction);
             let todo_string:String = (&todo).into();
             self.clipboard.set_text(todo_string);
         }
@@ -411,7 +411,7 @@ impl App {
     }
 
     #[inline]
-    pub fn mut_current_list(&mut self) -> &mut TodoList {
+    pub fn current_list_mut(&mut self) -> &mut TodoList {
         self.changed = true;
         let is_root = self.is_root();
         let mut list = &mut self.todo_list;
@@ -476,14 +476,14 @@ impl App {
 
     #[inline]
     pub fn toggle_current_daily(&mut self) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.toggle_daily()
         }
     }
 
     #[inline]
     pub fn toggle_current_weekly(&mut self) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.toggle_weekly()
         }
     }
@@ -523,7 +523,7 @@ impl App {
 
     #[inline]
     pub fn set_current_priority(&mut self, priority:PriorityType) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.set_priority(priority);
             self.reorder_current();
         }
@@ -557,7 +557,7 @@ impl App {
     #[inline]
     pub fn reorder_current(&mut self) {
         let index = self.index;
-        self.index = self.mut_current_list().reorder(index);
+        self.index = self.current_list_mut().reorder(index);
     }
 
     #[inline]
@@ -565,7 +565,7 @@ impl App {
         let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
-            let todo = self.mut_current_list().cut(index, restriction);
+            let todo = self.current_list_mut().cut(index, restriction);
             self.removed_todos.push(todo);
         }
     }
@@ -582,14 +582,14 @@ impl App {
 
     #[inline]
     pub fn remove_current_dependent(&mut self) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.remove_dependency();
         }
     }
 
     #[inline]
     pub fn add_dependency(&mut self) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.add_todo_dependency();
         }
     }
@@ -597,7 +597,7 @@ impl App {
     #[inline]
     pub fn edit_or_add_note(&mut self) {
         if self.is_tree() {
-            if let Some(todo) = self.mut_todo() {
+            if let Some(todo) = self.todo_mut() {
                 let _ = todo.edit_note();
             }
         }
@@ -605,7 +605,7 @@ impl App {
 
     #[inline]
     pub fn decrease_current_priority(&mut self) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.decrease_priority();
             self.reorder_current();
         }
@@ -613,7 +613,7 @@ impl App {
     
     #[inline]
     pub fn increase_current_priority(&mut self) {
-        if let Some(todo) = self.mut_todo() {
+        if let Some(todo) = self.todo_mut() {
             todo.increase_priority();
             self.reorder_current();
         }
@@ -635,7 +635,7 @@ impl App {
                 let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
                 let _ = todo.dependency.read(&todo_parent);
                 let bottom = self.bottom()+1;
-                let list = &mut self.mut_current_list();
+                let list = &mut self.current_list_mut();
                 list.push(todo);
                 if todos_count != 0 {
                     self.index = list.reorder(bottom);
@@ -652,7 +652,7 @@ impl App {
             // change anything, we won't borrow mutable and set the self.changed=true
             if let Some(todo) = self.todo() {
                 if todo.dependency.is_none() {
-                    self.mut_todo().unwrap().add_todo_dependency();
+                    self.todo_mut().unwrap().add_todo_dependency();
                 }
             }
             self.traverse_down()
