@@ -1,6 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std {{{
-use std::{fs::{read_to_string, remove_file}, io::{self, stdout}, path::PathBuf, rc::Rc};
+use std::{io::{self, stdout, BufRead, BufReader}, path::PathBuf, process::Stdio, rc::Rc};
 use std::process::Command;
 // }}}
 // lib {{{
@@ -20,7 +20,7 @@ use modules::{
     potato::Potato,
 };
 use super::todo_app::{App, Todo};
-use crate::{date, fileio::temp_path, todo_app::PriorityType};
+use crate::{date, todo_app::PriorityType};
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
@@ -223,17 +223,22 @@ impl<'a>TuiApp<'a>{
 
     #[inline]
     pub fn nnn_append_todo(&mut self) {
-        let path = temp_path("nnn-file-picker");
-        if Command::new("nnn").args(["-p", path.to_str().unwrap_or("")]).status().is_err(){
-            return
+         let mut output = Command::new("nnn")
+        .args(["-p", "-"])
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .expect("Failed to start nnn.");
+
+        let exit_status = output.wait().expect("Failed to wait on nnn.");
+
+        if exit_status.success() {
+            let reader = BufReader::new(output.stdout.unwrap());
+            let first_line = reader.lines().nth(0);
+            let path = first_line.unwrap().unwrap();
+            self.todo_app.append_list_from_path(PathBuf::from(path));
         }
-        let mut output_str = match read_to_string(&path) {
-            Ok(value) => value,
-            Err(_) => return,
-        };
-        output_str.pop();
-        self.todo_app.append_list_from_path(PathBuf::from(output_str));
-        let _ = remove_file(path);
     }
 
     #[inline]
