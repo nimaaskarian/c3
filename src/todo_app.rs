@@ -421,14 +421,6 @@ impl App {
         for index in self.tree_path.clone() {
             list = &mut list.todos[index].dependency.todo_list
         };
-        // for index in self.tree_path.iter() {
-        //     let index = Self::fix_index(self.restriction.clone() ,list, *index);
-        //     if let Some(index) = index {
-        //         list = &mut list.index_mut(index, self.restriction.clone()).dependency.todo_list
-        //     } else {
-        //         break;
-        //     }
-        // };
         list
     }
 

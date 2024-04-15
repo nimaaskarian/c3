@@ -241,10 +241,8 @@ impl TodoList {
 
     #[inline(always)]
     fn move_index(&mut self, from: usize, to: usize, shift:usize) -> usize{
-
         let mut i = from;
-        if from < to
-        {
+        if from < to {
             for j in from..to {
                 self.todos.swap(j, j+1);
                 i = j+1;
@@ -254,7 +252,6 @@ impl TodoList {
                 self.todos.swap(j, j+1);
                 i = j;
             }
-
         }
         i
     }
@@ -266,8 +263,6 @@ impl TodoList {
 
     #[inline(always)]
     pub fn sort (&mut self) {
-        // , ascending:Option<bool>
-        // let ascending = ascending.unwrap_or(false);
         self.todos.sort_by(|a, b| a.comparison_priority().cmp(&b.comparison_priority()));
     }
 }

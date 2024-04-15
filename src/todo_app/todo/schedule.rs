@@ -213,13 +213,6 @@ impl Schedule {
         self.date = Some(date);
     }
 
-
-    // pub fn match_message(input: &mut String) -> Self {
-    //     let ScheduleRest { schedule, rest } = ScheduleRest::from(input);
-    //     *input = rest;
-    //     schedule
-    // }
-
     #[inline(always)]
     pub fn is_reminder(&self) -> bool {
         self._type == Type::Reminder
