@@ -3,6 +3,8 @@
 # c3
 ![GitHub top language](https://img.shields.io/github/languages/top/nimaaskarian/c3?color=orange)
 ![AUR version](https://img.shields.io/aur/version/c3?logo=archlinux)
+![2024-04-15-132950-snap](https://github.com/nimaaskarian/c3/assets/88832088/f5b38ef0-a37c-4949-9209-8abae5df4775)
+
 
 A crossplatform to-do list app that uses and extends [calcurse](https://www.calcurse.org/)'s format, to be a tree like to-do list with both sub-dependencies and notes.
 
