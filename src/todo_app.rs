@@ -648,9 +648,9 @@ impl App {
     #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
         if self.is_tree() {
-            if let Some(todo) = self.mut_todo() {
+            if let Some(todo) = self.todo() {
                 if todo.dependency.is_none() {
-                    todo.add_todo_dependency();
+                    self.mut_todo().unwrap().add_todo_dependency();
                 }
             }
             self.traverse_down()
