@@ -266,3 +266,106 @@ impl TodoList {
         self.todos.sort_by(|a, b| a.comparison_priority().cmp(&b.comparison_priority()));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{self, remove_dir_all, remove_file};
+
+    use super::*;
+
+    fn get_todo_list() -> TodoList {
+        let path = PathBuf::from("tests/TODO_LIST");
+        TodoList::read(&path, true, true)
+    }
+
+    #[test]
+    fn test_todolist_read_undone() {
+        let todo_list = get_todo_list();
+        let expected_undone = vec![Todo::written("this todo has prio 1".to_string(), 1, false)
+            ,Todo::written("this one has prio 2".to_string(), 2, false)];
+
+        assert_eq!(expected_undone, todo_list.todos.iter().filter(|todo| !todo.done()).cloned().collect::<Vec<Todo>>());
+    }
+
+    #[test]
+    fn test_todolist_read_done() {
+        let todo_list = get_todo_list();
+        let expected_done = vec![Todo::written("this one is 2 and done".to_string(), 2, true),Todo::written("this one is 0 and done".to_string(), 0, true)];
+        assert_eq!(expected_done, todo_list.todos.iter().filter(|todo| todo.done()).cloned().collect::<Vec<Todo>>());
+    }
+
+    #[test]
+    fn test_len() {
+        let todo_list = get_todo_list();
+        assert_eq!(todo_list.len(None), 4);
+    }
+
+    #[test]
+    fn test_write() {
+        let mut todo_list = get_todo_list();
+        let path = PathBuf::from("todo-list-test-write/tmplist");
+        let _ = todo_list.write(&path, true);
+
+
+        let contents = fs::read_to_string(&path).expect("Reading file failed :(");
+        let expected = "[1] this todo has prio 1
+[2] this one has prio 2
+[-2] this one is 2 and done
+[-0] this one is 0 and done
+";
+
+        remove_dir_all(&path.parent().unwrap()).expect("Remove test failed");
+        let _ = remove_file(path);
+        assert_eq!(contents, expected)
+    }
+
+    #[test]
+    fn test_push() {
+        let mut todo_list = get_todo_list();
+        let path = PathBuf::from("todo-list-test-push/tmplist");
+        todo_list.push(Todo::default("Show me your warface".to_string(), 0));
+        todo_list.reorder_last();
+        let _ = todo_list.write(&path, true);
+
+        let contents = fs::read_to_string(&path).expect("Reading file failed :(");
+        let expected = "[1] this todo has prio 1
+[2] this one has prio 2
+[0] Show me your warface
+[-2] this one is 2 and done
+[-0] this one is 0 and done
+";
+
+        remove_dir_all(&path.parent().unwrap()).expect("Remove test failed");
+        let _ = remove_file(path);
+        assert_eq!(contents, expected);
+    }
+
+    #[test]
+    fn test_initially_sorted() {
+        let todo_list = get_todo_list();
+        let mut sorted_list = todo_list.clone();
+        sorted_list.sort();
+
+        assert_eq!(todo_list, sorted_list)
+    }
+
+    #[test]
+    fn test_write_dependencies() -> io::Result<()>{
+        let mut todo_list = get_todo_list();
+        let _ = todo_list.todos[0].add_todo_dependency();
+        let path = PathBuf::from("test-write-dependency/tmplist");
+        todo_list.todos[0].dependency.push(Todo::try_from("[0] Some dependency").unwrap());
+        let dependency_path = todo_list.write(&path, true)?;
+        todo_list.write_dependencies(&dependency_path)?;
+
+        let todo_dependency_path = PathBuf::from(format!("test-write-dependency/notes/{}.todo", todo_list.todos[0].hash()));
+        let contents = fs::read_to_string(&todo_dependency_path).expect("Reading file failed :(");
+        let expected = "[0] Some dependency\n";
+        assert_eq!(contents, expected);
+
+        todo_list.todos[0].remove_dependency();
+        todo_list.write(&path, true)?;
+        remove_dir_all(&path.parent().unwrap())?;
+        Ok(())
+    }
+}
