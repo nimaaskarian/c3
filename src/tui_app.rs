@@ -100,6 +100,7 @@ pub struct TuiApp<'a>{
     show_right:bool,
     text_mode: bool,
     on_submit: Option<fn(&mut Self, String)->()>,
+    on_input: Option<fn(&mut Self, String)->()>,
     module_enabled: bool,
     module: &'a mut dyn Module<'a>,
     textarea: TextArea<'a>,
@@ -116,6 +117,7 @@ impl<'a>TuiApp<'a>{
             textarea,
             module,
             on_submit: None,
+            on_input: None,
             show_right: true,
             text_mode: false,
             module_enabled,
@@ -148,6 +150,17 @@ impl<'a>TuiApp<'a>{
     #[inline]
     pub fn set_text_mode(&mut self, on_submit:fn(&mut Self, String)->(),title: &'a str ,placeholder: &str) {
         self.on_submit = Some(on_submit);
+        self.turn_on_text_mode(title, placeholder);
+    }
+
+    #[inline]
+    pub fn set_responsive_text_mode(&mut self, on_input:fn(&mut Self, String)->(),title: &'a str ,placeholder: &str) {
+        self.on_input = Some(on_input);
+        self.turn_on_text_mode(title, placeholder);
+    }
+
+    #[inline(always)]
+    fn turn_on_text_mode(&mut self, title: &'a str ,placeholder: &str) {
         self.textarea.set_placeholder_text(placeholder);
         self.textarea.set_block(default_block(title));
         self.text_mode = true;
@@ -160,7 +173,10 @@ impl<'a>TuiApp<'a>{
 
     #[inline]
     pub fn restrict_search_prompt(&mut self) {
-        self.set_text_mode(Self::on_restrict_search, "Restrict search todo", "Enter search query")
+        const TITLE:&str = "Restrict search todo";
+        const PLACEHOLDER:&str = "Enter search query";
+        self.set_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
+        self.set_responsive_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
     }
 
     #[inline]
@@ -250,7 +266,10 @@ impl<'a>TuiApp<'a>{
 
     #[inline]
     pub fn priority_prompt(&mut self) {
-        self.set_text_mode(Self::on_priority_prompt, "Limit priority", "Enter priority to show");
+        const TITLE:&str = "Limit priority";
+        const PLACEHOLDER:&str = "Enter priority to show";
+        self.set_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
+        self.set_responsive_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
     }
 
     #[inline]
@@ -365,6 +384,10 @@ impl<'a>TuiApp<'a>{
             },
             input => {
                 self.textarea.input(input) ;
+                if let Some(on_input) = self.on_input {
+                    let message = self.textarea.lines()[0].clone();
+                    on_input(self, message);
+                }
                 Ok(None)
             }
         }
