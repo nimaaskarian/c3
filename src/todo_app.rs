@@ -508,12 +508,13 @@ impl App {
 
     #[inline(always)]
     pub fn unset_restriction(&mut self) {
-        self.restriction = None
+        self.restriction = None;
     }
 
     #[inline(always)]
     pub fn set_restriction(&mut self, restriction: RestrictionFunction) {
-        self.restriction = Some(restriction)
+        self.restriction = Some(restriction);
+        self.fix_index();
     }
 
     #[inline]
