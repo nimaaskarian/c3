@@ -88,13 +88,15 @@ impl Dependency {
                 self.note = std::fs::read_to_string(file_path)?;
             }
             DependencyMode::Note | DependencyMode::TodoList 
+                // Sometimes calcurse likes to remove the extra .todo from the file name
+                // That's why we have the first part of the if statement. c3 itself usually writes
+                // the list files to a <sha1>.todo format in notes directory
                 if file_path.is_file() || path.join(&name_todo).is_file() => {
-
-                if self.mode == DependencyMode::Note {
-                    self.name = name_todo;
-                    self.mode = DependencyMode::TodoList;
-                }
-                self.todo_list = TodoList::read(&path.join(&self.name), true, false);
+                    if self.mode == DependencyMode::Note {
+                        self.name = name_todo;
+                        self.mode = DependencyMode::TodoList;
+                    }
+                    self.todo_list = TodoList::read(&path.join(&self.name), true, false);
             }
             _ => {}
         };

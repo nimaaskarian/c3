@@ -648,6 +648,8 @@ impl App {
     #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
         if self.is_tree() {
+            // The reason we are using a self.todo() here, is that if we don't want to
+            // change anything, we won't borrow mutable and set the self.changed=true
             if let Some(todo) = self.todo() {
                 if todo.dependency.is_none() {
                     self.mut_todo().unwrap().add_todo_dependency();
