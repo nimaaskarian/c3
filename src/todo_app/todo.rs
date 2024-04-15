@@ -52,13 +52,12 @@ impl TryFrom<String> for Todo {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 enum State {
     #[default]
     Priority,
     Dependency,
     Message,
-    End,
 }
 
 impl TryFrom<&str> for Todo {
@@ -105,33 +104,35 @@ impl TryFrom<&str> for Todo {
                 }
                 State::Message => {
                     if i == schedule_start_index.unwrap()-1 {
-                        state = State::End
+                        break;
                     } else {
                         message.push(c);
                     }
                 }
-                State::End => {
-                    let schedule = Schedule::from(schedule_string);
-                    let dependency = Dependency::from(dependency_string.as_str());
-
-                    if schedule.should_undone() {
-                        done = false;
-                    }
-                    if schedule.should_done() {
-                        done = true;
-                    }
-                    return Ok(Todo {
-                        dependency,
-                        removed_dependency: None,
-                        schedule,
-                        message,
-                        priority,
-                        done,
-                    })
-                }
             }
         }
-        Err(TodoError::ReadFailed)
+        if state == State::Message && !message.is_empty() {
+
+            let schedule = Schedule::from(schedule_string);
+            let dependency = Dependency::from(dependency_string.as_str());
+
+            if schedule.should_undone() {
+                done = false;
+            }
+            if schedule.should_done() {
+                done = true;
+            }
+            Ok(Todo {
+                dependency,
+                removed_dependency: None,
+                schedule,
+                message,
+                priority,
+                done,
+            })
+        } else {
+            Err(TodoError::ReadFailed)
+        }
     }
 }
 
