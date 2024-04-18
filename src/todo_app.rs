@@ -510,7 +510,7 @@ impl App {
     }
 
     #[inline]
-    pub fn set_priority_limit(&mut self, priority:PriorityType) {
+    pub fn set_priority_restriction(&mut self, priority:PriorityType) {
         self.args.display_args.show_done = true;
         self.set_restriction(Rc::new(move |todo| todo.priority() == priority))
     }
@@ -703,6 +703,77 @@ mod tests {
         }
         app.write()?;
         Ok(app)
+    }
+
+    #[test]
+    fn test_is_changed() -> io::Result<()>{
+        let dir = dir("test-is-changed")?;
+        let mut app = write_test_todos(&dir)?;
+        assert_eq!(app.is_changed(), false);
+        app.todo_mut();
+        assert_eq!(app.is_changed(), true);
+        app.write()?;
+        assert_eq!(app.is_changed(), false);
+        app.current_list_mut();
+        assert_eq!(app.is_changed(), true);
+        app.read();
+        assert_eq!(app.is_changed(), false);
+        remove_dir_all(dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_restrictions_done() -> io::Result<()>{
+        let dir = dir("test-set-restrictions-done")?;
+        let mut app = write_test_todos(&dir)?;
+        app.toggle_current_done();
+        assert_eq!(app.len(), 0);
+        app.toggle_show_done();
+        assert_eq!(app.len(), 1);
+        app.toggle_show_done();
+        assert_eq!(app.len(), 0);
+        remove_dir_all(dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_restrictions_query() -> io::Result<()>{
+        let dir = dir("test-set-restrictions-query")?;
+        let mut app = write_test_todos(&dir)?;
+        assert_eq!(app.len(), 1);
+        app.set_query_restriction(String::from("hello"));
+        assert_eq!(app.len(), 1);
+        app.unset_restriction();
+        assert_eq!(app.len(), 1);
+        remove_dir_all(dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_restrictions_priority() -> io::Result<()>{
+        let dir = dir("test-set-restrictions-priority")?;
+        let mut app = write_test_todos(&dir)?;
+        app.set_current_priority(2);
+        assert_eq!(app.len(), 1);
+        app.set_priority_restriction(2);
+        assert_eq!(app.len(), 1);
+        app.set_priority_restriction(0);
+        assert_eq!(app.len(), 0);
+        remove_dir_all(dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_search() -> io::Result<()>{
+        let dir = dir("test-tree-search")?;
+        let mut app = write_test_todos(&dir)?;
+        remove_dir_all(dir)?;
+        let query = String::from("nod");
+        app.tree_search(Some(query));
+        let position = &app.tree_search_positions[1];
+        assert_eq!(position.tree_path,vec![0,0]);
+        assert_eq!(position.matching_indices,vec![0]);
+        Ok(())
     }
 
     #[test]

@@ -96,11 +96,20 @@ pub enum Operation {
     Restart,
 }
 
+#[derive(Debug, PartialEq)]
+enum EditorOperation {
+    Cancel,
+    Submit,
+    Input,
+    Ignore,
+}
+
+type HandlerParameter = String;
 pub struct TuiApp<'a>{
     show_right:bool,
     text_mode: bool,
-    on_submit: Option<fn(&mut Self, String)->()>,
-    on_input: Option<fn(&mut Self, String)->()>,
+    on_submit: Option<fn(&mut Self, HandlerParameter)->()>,
+    on_input: Option<fn(&mut Self, HandlerParameter)->()>,
     module_enabled: bool,
     module: &'a mut dyn Module<'a>,
     textarea: TextArea<'a>,
@@ -148,13 +157,14 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    pub fn set_text_mode(&mut self, on_submit:fn(&mut Self, String)->(),title: &'a str ,placeholder: &str) {
+    pub fn set_text_mode(&mut self, on_submit:fn(&mut Self, HandlerParameter)->(),title: &'a str ,placeholder: &str) {
+        self.on_input = None;
         self.on_submit = Some(on_submit);
         self.turn_on_text_mode(title, placeholder);
     }
 
     #[inline]
-    pub fn set_responsive_text_mode(&mut self, on_input:fn(&mut Self, String)->(),title: &'a str ,placeholder: &str) {
+    pub fn set_responsive_text_mode(&mut self, on_input:fn(&mut Self, HandlerParameter)->(),title: &'a str ,placeholder: &str) {
         self.on_input = Some(on_input);
         self.turn_on_text_mode(title, placeholder);
     }
@@ -166,6 +176,13 @@ impl<'a>TuiApp<'a>{
         self.text_mode = true;
     }
 
+    #[inline(always)]
+    fn turn_off_text_mode(&mut self) {
+        self.textarea.delete_line_by_head();
+        self.textarea.delete_line_by_end();
+        self.text_mode = false;
+    }
+
     #[inline]
     pub fn search_prompt(&mut self) {
         self.set_text_mode(Self::on_search, "Search todo", "Enter search query")
@@ -175,8 +192,8 @@ impl<'a>TuiApp<'a>{
     pub fn restrict_search_prompt(&mut self) {
         const TITLE:&str = "Restrict search todo";
         const PLACEHOLDER:&str = "Enter search query";
-        self.set_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
         self.set_responsive_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
+        self.on_submit = Some(Self::on_restrict_search);
     }
 
     #[inline]
@@ -206,7 +223,7 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn on_schedule(&mut self,str:String) {
+    fn on_schedule(&mut self,str:HandlerParameter) {
         let day = str.parse::<u64>().ok();
         if day.is_none() {
             return;
@@ -242,7 +259,7 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn on_reminder(&mut self,str:String) {
+    fn on_reminder(&mut self,str:HandlerParameter) {
         if let Ok(date) = date::parse_user_input(&str) {
             if let Some(todo) = self.todo_app.todo_mut() {
                 todo.schedule.enable_reminder(date);
@@ -305,7 +322,7 @@ impl<'a>TuiApp<'a>{
         let priority = str.parse::<u8>().ok();
         if let Some(priority) = priority {
             if show_done {
-                self.todo_app.set_priority_limit(priority)
+                self.todo_app.set_priority_restriction(priority)
             } else {
                 self.todo_app.set_priority_limit_no_done(priority)
             }
@@ -313,7 +330,7 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn on_save_prompt(&mut self, str:String) {
+    fn on_save_prompt(&mut self, str:HandlerParameter) {
         let lower = str.to_lowercase();
         if lower.starts_with("y") {
             let _ = self.todo_app.write();
@@ -324,36 +341,48 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn on_append_todo(&mut self, str:String) {
+    fn on_append_todo(&mut self, str:HandlerParameter) {
         self.todo_app.append(str);
     }
 
     #[inline]
-    fn on_prepend_todo(&mut self,str:String) {
+    fn on_prepend_todo(&mut self,str:HandlerParameter) {
         self.todo_app.prepend(str);
     }
 
     #[inline]
-    fn on_edit_todo(&mut self,str:String) {
+    fn on_edit_todo(&mut self,str:HandlerParameter) {
         if !str.is_empty() {
             self.todo_app.todo_mut().unwrap().set_message(str);
         }
     }
 
+    #[inline(always)]
+    fn current_textarea_message(&self) -> String {
+        self.textarea.lines()[0].clone()
+    }
 
     #[inline]
     fn enable_text_editor(&mut self) -> io::Result<()>{
-        match self.editor()? {
-            None => {},
-            Some(should_add) => {
-                if should_add {
-                    let todo_message = self.textarea.lines()[0].clone();
-                    self.on_submit.unwrap()(self, todo_message);
+        let operation = self.editor()?;
+        match operation {
+            EditorOperation::Input => {
+                if let Some(on_input) = self.on_input {
+                    let message = self.current_textarea_message();
+                    on_input(self, message);
                 }
-                self.textarea.delete_line_by_head();
-                self.textarea.delete_line_by_end();
-                self.text_mode = false;
             }
+            EditorOperation::Submit => {
+                if let Some(on_submit) = self.on_submit {
+                    let message = self.current_textarea_message();
+                    on_submit(self, message);
+                }
+                self.turn_off_text_mode();
+            }
+            EditorOperation::Cancel => {
+                self.turn_off_text_mode();
+            }
+            EditorOperation::Ignore => {}
         }
         Ok(())
     }
@@ -371,29 +400,25 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn editor(&mut self) -> io::Result<Option<bool>> {
+    fn editor(&mut self) -> io::Result<EditorOperation> {
         match crossterm::event::read()?.into() {
             Input {
                 key: tui_textarea::Key::Esc, .. 
-            } => Ok(Some(false)),
+            } => Ok(EditorOperation::Cancel),
             Input {
                 key: tui_textarea::Key::Enter, ..
-            }=> Ok(Some(true)),
+            }=> Ok(EditorOperation::Submit),
             Input {
                 key: tui_textarea::Key::Char('u'),
                 ctrl: true,
                 ..
             } => {
                 self.textarea.delete_line_by_head();
-                Ok(None)
+                Ok(EditorOperation::Ignore)
             },
             input => {
-                self.textarea.input(input) ;
-                if let Some(on_input) = self.on_input {
-                    let message = self.textarea.lines()[0].clone();
-                    on_input(self, message);
-                }
-                Ok(None)
+                self.textarea.input(input);
+                Ok(EditorOperation::Input)
             }
         }
     }
