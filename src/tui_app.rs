@@ -511,7 +511,7 @@ impl<'a>TuiApp<'a>{
                     Char('A') => self.append_prompt(),
                     Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
                     Char('q') => self.quit_save_prompt(),
-                    Char('B') => {
+                    Char('b') => {
                         self.todo_app.batch_editor_messages();
                         return Ok(Operation::Restart);
                     },
