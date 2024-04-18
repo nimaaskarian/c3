@@ -156,15 +156,13 @@ impl App {
         let new_messages = open_temp_editor(Some(&content),temp_path("messages")).unwrap();
         let mut new_messages = new_messages.lines();
         if let Some(restriction) = self.restriction.clone() {
-            for todo in self.todo_list.todos.iter_mut().filter(|todo| restriction(todo)) {
+            for todo in self.current_list_mut().todos.iter_mut().filter(|todo| restriction(todo)) {
                 if Self::batch_edit_helper(todo, new_messages.next()) {
-                    self.changed = true
                 }
             }
         } else {
-            for todo in self.todo_list.todos.iter_mut() {
+            for todo in self.current_list_mut().todos.iter_mut() {
                 if Self::batch_edit_helper(todo, new_messages.next()) {
-                    self.changed = true
                 }
             }
         }
