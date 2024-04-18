@@ -8,6 +8,7 @@ use search::Search;
 use std::rc::Rc;
 pub use todo::Todo;
 use crate::Args;
+use crate::fileio::{open_temp_editor, temp_path};
 
 pub use self::todo::PriorityType;
 pub use self::todo_list::TodoList;
@@ -147,6 +148,42 @@ impl App {
         self.tree_search_positions.push(before_position);
         self.traverse_parents_from_root(Self::add_to_tree_positions);
         self.search_next();
+    }
+
+    pub fn batch_editor_messages(&mut self) {
+        let restriction = self.restriction().clone();
+        let content = self.current_list().messages(restriction).join("\n");
+        let new_messages = open_temp_editor(Some(&content),temp_path("messages")).unwrap();
+        let mut new_messages = new_messages.lines();
+        if let Some(restriction) = self.restriction.clone() {
+            for todo in self.todo_list.todos.iter_mut().filter(|todo| restriction(todo)) {
+                if Self::batch_edit_helper(todo, new_messages.next()) {
+                    self.changed = true
+                }
+            }
+        } else {
+            for todo in self.todo_list.todos.iter_mut() {
+                if Self::batch_edit_helper(todo, new_messages.next()) {
+                    self.changed = true
+                }
+            }
+        }
+        while let Some(message) = new_messages.next() {
+            self.append(String::from(message))
+        }
+    }
+
+    #[inline(always)]
+    fn batch_edit_helper(todo: &mut Todo, message: Option<&str>) -> bool {
+        if let Some(message) = message {
+            let message = String::from(message);
+            if todo.message == message {
+                return false
+            }
+            todo.set_message(message);
+            return true
+        } 
+        false
     }
 
     pub fn print_searched(&mut self) {

@@ -9,7 +9,7 @@ pub mod schedule;
 mod dependency;
 use dependency::Dependency;
 use schedule::Schedule;
-use note::{sha1, open_temp_editor};
+use note::{sha1, open_note_temp_editor};
 use super::TodoList;
 use crate::DisplayArgs;
 //}}}
@@ -250,7 +250,7 @@ impl Todo {
     #[inline]
     pub fn edit_note(&mut self)-> io::Result<()>{
         if !self.dependency.is_list() {
-            let note = open_temp_editor(self.dependency.note())?;
+            let note = open_note_temp_editor(self.dependency.note())?;
             if !note.is_empty() {
                 self.set_note(note)?;
             }

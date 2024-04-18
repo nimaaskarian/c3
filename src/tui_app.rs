@@ -511,6 +511,10 @@ impl<'a>TuiApp<'a>{
                     Char('A') => self.append_prompt(),
                     Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
                     Char('q') => self.quit_save_prompt(),
+                    Char('B') => {
+                        self.todo_app.batch_editor_messages();
+                        return Ok(Operation::Restart);
+                    },
                     Char(c) if c.is_digit(10) => {
                         let priority = c.to_digit(10).unwrap();
                         self.todo_app.set_current_priority(priority as PriorityType);
