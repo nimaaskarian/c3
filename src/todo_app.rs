@@ -1,3 +1,4 @@
+use std::str::Lines;
 use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
@@ -155,20 +156,30 @@ impl App {
         let content = self.current_list().messages(restriction).join("\n");
         let new_messages = open_temp_editor(Some(&content),temp_path("messages")).unwrap();
         let mut new_messages = new_messages.lines();
+        self.batch_edit_current_list(new_messages)
+    }
+
+    #[inline(always)]
+    fn batch_edit_current_list(&mut self, mut messages: Lines<'_>) {
+        let mut changed = false;
         if let Some(restriction) = self.restriction.clone() {
             for todo in self.current_list_mut().todos.iter_mut().filter(|todo| restriction(todo)) {
-                if Self::batch_edit_helper(todo, new_messages.next()) {
+                if Self::batch_edit_helper(todo, messages.next()) {
+                    changed = true;
                 }
             }
         } else {
             for todo in self.current_list_mut().todos.iter_mut() {
-                if Self::batch_edit_helper(todo, new_messages.next()) {
+                if Self::batch_edit_helper(todo, messages.next()) {
+                    changed = true;
                 }
             }
         }
-        while let Some(message) = new_messages.next() {
+        while let Some(message) = messages.next() {
+            changed = true;
             self.append(String::from(message))
         }
+        self.changed = changed;
     }
 
     #[inline(always)]
