@@ -2,12 +2,11 @@ diff --git a/Cargo.toml b/Cargo.toml
 index 6269407..db31eef 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -4,6 +4,7 @@ version = "0.3.7"
+@@ -4,5 +4,6 @@ version = "0.3.7"
  edition = "2021"
  
  [dependencies]
 +arboard = "3.3.0"
- scanf = "1.2.1"
  sha1 = "0.10.1"
  home = "0.5.9"
 diff --git a/src/todo_app/clipboard.rs b/src/todo_app/clipboard.rs
