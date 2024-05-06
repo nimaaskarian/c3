@@ -121,7 +121,7 @@ impl PrintTodoTree {
         self.is_last = true;
 
         let mut lines = note.lines();
-        self.print_indention_with_depth(self.depth+1);
+        self.print_indention_with_depth(self.depth+1, true);
         if let Some(line) = lines.next() {
             println!("{}", line);
         }
@@ -144,8 +144,8 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    fn print_indention_with_depth(&self, depth: usize) {
-        if self.should_print_indention {
+    fn print_indention_with_depth(&self, depth: usize, should_print_indention:bool) {
+        if should_print_indention {
             return
         }
         for i in 1..depth {
@@ -164,6 +164,6 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_indention(&self) {
-        self.print_indention_with_depth(self.depth);
+        self.print_indention_with_depth(self.depth, self.should_print_indention);
     }
 }
