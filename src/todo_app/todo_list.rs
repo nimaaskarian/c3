@@ -187,10 +187,14 @@ impl TodoList {
         self.todos = self.todos.iter().filter(|x| &x != &filtered[index]).cloned().collect();
     }
 
-    pub fn true_position_in_list(&mut self, index:usize, restriction: Restriction) -> usize {
+    pub fn true_position_in_list(&self, index:usize, restriction: Restriction) -> usize {
         let mut binding = self.todos(restriction);
         let filtered:Vec<_> = binding.iter_mut().collect();
-        self.todos.iter().position(|x| &x == filtered[index]).unwrap()
+        match self.todos.iter().position(|x| &x == filtered[index]) {
+            Some(position) => position,
+            None => 0,
+        }
+        
     }
 
     pub fn cut(&mut self, index:usize, restriction: Restriction) -> Todo{

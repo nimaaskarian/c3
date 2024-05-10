@@ -385,7 +385,10 @@ impl App {
         if self.is_tree() {
             match self.todo() {
                 Some(todo) if todo.dependency.is_list() => {
-                    self.tree_path.push(self.todo_list.true_position_in_list(self.index, self.restriction.clone()));
+                    let index = self.index;
+                    let restriction = self.restriction.clone();
+                    let true_index = self.current_list().true_position_in_list(index, restriction);
+                    self.tree_path.push(true_index);
                     self.go_top();
                     self.search(None);
                 }
