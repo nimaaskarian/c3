@@ -74,6 +74,22 @@ impl App {
     }
 
     #[inline]
+    pub fn open_path(&mut self, path: PathBuf) {
+        self.todo_list = TodoList::read(&path, !self.args.no_tree, true);
+        self.args.todo_path = path;
+    }
+
+    #[inline]
+    pub fn output_list_to_path(&mut self, path: PathBuf) -> io::Result<()>{
+        let changed = self.changed;
+        let list = self.current_list_mut();
+        let dependency_path = list.write(&path, true)?;
+        list.write_dependencies(&dependency_path)?;
+        self.changed = changed;
+        Ok(())
+    }
+
+    #[inline]
     pub fn append_list(&mut self, todo_list: TodoList) {
         self.current_list_mut().append_list(todo_list)
     }
@@ -155,7 +171,7 @@ impl App {
         let restriction = self.restriction().clone();
         let content = self.current_list().messages(restriction).join("\n");
         let new_messages = open_temp_editor(Some(&content),temp_path("messages")).unwrap();
-        let mut new_messages = new_messages.lines();
+        let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
     }
 

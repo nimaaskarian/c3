@@ -5,9 +5,7 @@ use std::process::Command;
 // }}}
 // lib {{{
 use crossterm::{
-    ExecutableCommand,
-    terminal::{disable_raw_mode, LeaveAlternateScreen, enable_raw_mode, EnterAlternateScreen},
-    event::{self, Event::Key, KeyCode::Char, KeyCode},
+    event::{self, Event::Key, KeyCode::{self, Char}, KeyModifiers, ModifierKeyCode}, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand
 };
 use tui_textarea::{Input, TextArea, CursorMove};
 use ratatui::{prelude::*, widgets::*};
@@ -238,8 +236,7 @@ impl<'a>TuiApp<'a>{
         self.set_text_mode(Self::on_reminder, "Date reminder", "");
     }
 
-    #[inline]
-    pub fn nnn_append_todo(&mut self) {
+    fn nnn_path() -> Option<PathBuf> {
          let mut output = Command::new("nnn")
         .args(["-p", "-"])
         .stdin(Stdio::inherit())
@@ -249,12 +246,32 @@ impl<'a>TuiApp<'a>{
         .expect("Failed to start nnn.");
 
         let exit_status = output.wait().expect("Failed to wait on nnn.");
-
         if exit_status.success() {
             let reader = BufReader::new(output.stdout.unwrap());
             let first_line = reader.lines().nth(0);
             let path = first_line.unwrap().unwrap();
+            return Some(PathBuf::from(path))
+        }
+        None
+    }
+
+    #[inline]
+    pub fn nnn_append_todo(&mut self) {
+        if let Some(path) = Self::nnn_path() {
             self.todo_app.append_list_from_path(PathBuf::from(path));
+        }
+    }
+
+    pub fn nnn_open(&mut self) {
+        if let Some(path) = Self::nnn_path() {
+            self.todo_app.open_path(PathBuf::from(path));
+        }
+    }
+
+    #[inline]
+    pub fn nnn_output_todo(&mut self) {
+        if let Some(path) = Self::nnn_path() {
+            self.todo_app.output_list_to_path(PathBuf::from(path));
         }
     }
 
@@ -461,6 +478,10 @@ impl<'a>TuiApp<'a>{
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
+                    Char('o') if key.modifiers == KeyModifiers::CONTROL => {
+                        self.nnn_open();
+                        return Ok(Operation::Restart)
+                    }
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
@@ -471,9 +492,13 @@ impl<'a>TuiApp<'a>{
                     Char('y') => self.todo_app.yank_todo(),
                     Char('p') => self.todo_app.paste_todo(),
                     Char('i') => self.todo_app.increase_day_done(),
-                    Char('o') => self.todo_app.decrease_day_done(),
-                    Char('O') => {
+                    Char('I') => self.todo_app.decrease_day_done(),
+                    Char('o') => {
                         self.nnn_append_todo();
+                        return Ok(Operation::Restart)
+                    }
+                    Char('O') => {
+                        self.nnn_output_todo();
                         return Ok(Operation::Restart)
                     }
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
