@@ -3,6 +3,8 @@
 # c3
 ![GitHub top language](https://img.shields.io/github/languages/top/nimaaskarian/c3?color=orange)
 ![AUR version](https://img.shields.io/aur/version/c3?logo=archlinux)
+![2024-04-15-132950-snap](https://github.com/nimaaskarian/c3/assets/88832088/f5b38ef0-a37c-4949-9209-8abae5df4775)
+
 
 A crossplatform to-do list app that uses and extends [calcurse](https://www.calcurse.org/)'s format, to be a tree like to-do list with both sub-dependencies and notes.
 
@@ -58,7 +60,7 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | D | delete todo |
 | > | add todo note |
 | i | increase day done |
-| o | decrease day done |
+| I | increase day done |
 | t | add todo dependency |
 | l | go in depedency/add todo dependency |
 | h | go back to parent |
@@ -69,7 +71,9 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | P | enable module |
 | / | search current list for todo |
 | ? | search the whole tree for todo |
-| O | open nnn file picker for choosing a file to append to current list
+| o | open nnn file picker to choose a file to append to current list |
+| O | open nnn file picker to choose a file to output current list to |
+| Ctrl+o | open nnn file picker to choose a file to open |
 | n | search next |
 | N | search previous |
 | w | write changes to file |

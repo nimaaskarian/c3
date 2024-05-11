@@ -1,5 +1,3 @@
-use scanf::sscanf;
-
 use crate::date;
 
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -19,24 +17,62 @@ pub struct Schedule {
     pub last_type: Type,
 }
 
+#[derive(Default)]
+enum State {
+    #[default]
+    Type,
+    Days,
+    PreDate,
+    Date,
+}
+
 impl<T> From<T> for Schedule 
 where
 T: ToString,
 {
     fn from(input:T) -> Schedule {
-        let mut day = 0;
         let mut date_string = String::new();
-        let _type = match input {
-            _ if sscanf!(input.to_string().as_str(), "D{}({})", day, date_string).is_ok() => {
-                Type::Scheduled
+        let mut state = State::default();
+        let mut _type = Type::None;
+        let mut day_str = String::new();
+
+        for c in input.to_string().chars() {
+            match state {
+                State::Type => {
+                    if c == 'D' {
+                        _type = Type::Scheduled;
+                        state = State::Days;
+                    } else if c == 'R' {
+                        _type = Type::Reminder;
+                        state = State::PreDate;
+                    } else {
+                        break;
+                    }
+                }
+                State::Days => {
+                    if c.is_digit(10) {
+                        day_str.push(c);
+                    } else if c == '(' {
+                        state = State::Date;
+                    }
+                }
+                State::PreDate => {
+                    if c == '(' {
+                        state = State::Date;
+                    }
+                }
+                State::Date => {
+                    if c == ')' {
+                        break;
+                    } else {
+                        date_string.push(c)
+                    }
+                }
             }
-            _ if sscanf!(input.to_string().as_str(), "R({})", date_string).is_ok() => {
-                Type::Reminder
-            }
-            _ => {
-                Type::None
-            },
-        };
+        }
+
+        let day:i64 = day_str.parse().unwrap_or(0);
+
         let date = match date::parse(&date_string) {
             Ok(value) => Some(value),
             Err(_) => None
@@ -176,13 +212,6 @@ impl Schedule {
         self._type = Type::Reminder;
         self.date = Some(date);
     }
-
-
-    // pub fn match_message(input: &mut String) -> Self {
-    //     let ScheduleRest { schedule, rest } = ScheduleRest::from(input);
-    //     *input = rest;
-    //     schedule
-    // }
 
     #[inline(always)]
     pub fn is_reminder(&self) -> bool {

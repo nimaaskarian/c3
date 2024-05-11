@@ -1,85 +1,160 @@
 use std::fs::{create_dir_all, read, File};
 use std::path::PathBuf;
-use std::ops::{Index, IndexMut};
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::io;
 
-use super::{App, Todo};
+use super::{App, Todo, Restriction};
 use crate::DisplayArgs;
 
-macro_rules! all_todos {
-    ($self:ident) => {
-        [&$self.undone.todos, &$self.done.todos].iter().flat_map(|v| v.iter())
-    };
-}
-
-macro_rules! undone_todos {
-    ($self:ident) => {
-        [&$self.undone.todos].iter().flat_map(|v| v.iter())
-    };
-}
-
-pub(crate) use all_todos;
-pub(crate) use undone_todos;
-
-macro_rules! all_todos_mut {
-    ($self:ident) => {
-        [&mut $self.undone.todos, &mut $self.done.todos].iter_mut().flat_map(|v| v.iter_mut())
-    };
-}
-
 #[derive(Debug,PartialEq, Clone, Default)]
-pub struct TodoArray {
-    pub todos: Vec<Todo>
+pub struct TodoList {
+    pub todos: Vec<Todo>,
 }
 
-impl Index<usize> for TodoArray {
-    type Output = Todo;
-    fn index(&self, index:usize) -> &Self::Output {
-        &self.todos[index]
-    }
-}
-
-impl IndexMut<usize> for TodoArray {
-    fn index_mut(&mut self, index:usize) -> &mut Todo {
-        &mut self.todos[index]
-    }
-}
-
-impl Index<usize> for TodoList {
-    type Output = Todo;
-    fn index(&self, index:usize) -> &Self::Output {
-        let size = self.undone.len();
-        if index < size {
-            &self.undone[index]
-        } else {
-            &self.done[index-size]
-        }
-    }
-}
-
-impl IndexMut<usize> for TodoList {
-    fn index_mut(&mut self, index:usize) -> &mut Todo {
-        let size = self.undone.len();
-        if index < size {
-            &mut self.undone[index]
-        } else {
-            &mut self.done[index-size]
-        }
-    }
-}
-
-impl TodoArray {
+type Output = Todo;
+impl TodoList {
     pub fn new() -> Self{
-        TodoArray {
-            todos: Vec::new()
+        TodoList {
+            todos: Vec::new(),
+        }
+    }
+
+    pub fn index(&self, index:usize, restriction: Restriction) -> &Output {
+        if let Some(restriction) = restriction {
+            self.todos.iter().filter(|todo| restriction(todo)).nth(index).unwrap()
+        } else {
+            self.todos.iter().nth(index).unwrap()
+        }
+    }
+
+    pub fn index_mut(&mut self, index:usize, restriction: Restriction) -> &mut Output {
+        if let Some(restriction) = restriction {
+            self.todos.iter_mut().filter(|todo| restriction(todo)).nth(index).unwrap()
+        } else {
+            self.todos.iter_mut().nth(index).unwrap()
+        }
+    }
+
+    pub fn todos(&self, restriction: Restriction) -> Vec<&Todo> {
+        if let Some(restriction) = restriction {
+            self.todos.iter().filter(|todo| restriction(todo)).collect()
+        } else {
+            self.todos.iter().collect()
+        }
+    }
+
+    #[inline]
+    pub(super) fn delete_removed_dependent_files(&mut self, filename: &PathBuf) -> io::Result<()> {
+        for todo in &mut self.todos {
+            todo.delete_removed_dependent_files(filename)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn prepend(&mut self, todo:Todo) {
+        self.insert(0,todo);
+    }
+
+    #[inline]
+    pub fn print(&self) -> io::Result<()> {
+        let mut stdout_writer = BufWriter::new(stdout());
+        self.write_to_buf(&mut stdout_writer)?;
+        Ok(())
+    }
+
+    pub fn traverse_tree(&self,callback: fn(&mut App, &TodoList, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
+        let prior_indices = prior_indices.unwrap_or(vec![]);
+        callback(app, self, prior_indices.as_slice());
+        for (i, todo) in self.todos.iter().enumerate() {
+            if let Some(todo_list) = todo.dependency.todo_list() {
+                let mut prior_indices = prior_indices.clone();
+                prior_indices.push(i);
+                todo_list.traverse_tree(callback, Some(prior_indices), app);
+            }
+        }
+    }
+
+    pub(super) fn remove_dependency_files(&mut self, filename: &PathBuf) -> io::Result<()> {
+        for todo in &mut self.todos {
+            todo.delete_dependency_file(filename)?;
+        }
+        Ok(())
+    }
+
+    pub fn read(filename: &PathBuf, read_dependencies: bool, is_root: bool) -> Self{
+        let mut todo_array = Self::new();
+        if !filename.is_file() {
+            return todo_array
+        }
+        let file_data = read(filename).unwrap();
+
+        for line in file_data.lines() {
+            let todo = match Todo::try_from(line.unwrap()) {
+                Ok(value) => value,
+                Err(..) => continue,
+            };
+            todo_array.push(todo);
+        }
+        todo_array.sort();
+        if read_dependencies {
+            let dependency_path = Self::dependency_parent(filename, is_root);
+            let _ = todo_array.read_dependencies(&dependency_path);
+        }
+        todo_array
+    }
+
+    fn read_dependencies(&mut self, path: &PathBuf) -> io::Result<()>{
+        for todo in &mut self.todos {
+            todo.dependency.read(&path)?;
+        }
+        Ok(())
+    }
+
+    pub fn dependency_parent(filename: &PathBuf, is_root: bool) -> PathBuf {
+        if is_root {
+            filename.parent().unwrap().to_path_buf().join("notes")
+        } else {
+            filename.parent().unwrap().to_path_buf()
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self{
-        TodoArray {
+        TodoList {
             todos: Vec::with_capacity(capacity),
         }
+    }
+
+    #[inline]
+    fn write_to_buf<W: Write> (&self, writer: &mut BufWriter<W>) -> io::Result<()> {
+        for todo in &self.todos {
+            writeln!(writer, "{}", todo.as_string())?;
+        }
+        writer.flush()?;
+        Ok(())
+    }
+
+    #[inline]
+    pub(super) fn write_dependencies(&mut self, filename: &PathBuf) -> io::Result<()> {
+        for todo in &mut self.todos {
+            todo.dependency.todo_list.write_dependencies(filename)?;
+            todo.dependency.write(filename)?;
+        }
+        Ok(())
+    }
+    #[inline]
+    pub fn write(&mut self, filename: &PathBuf, is_root: bool) -> io::Result<PathBuf> {
+        let dependency_path = Self::dependency_parent(filename, is_root);
+        create_dir_all(&dependency_path)?;
+        let file = File::create(filename)?;
+        let mut writer = BufWriter::new(file);
+        self.write_to_buf(&mut writer)?;
+        Ok(dependency_path)
+    }
+
+    #[inline(always)]
+    pub (super) fn set_todos(&mut self, todos:Vec<Todo>) {
+        self.todos = todos
     }
 
     pub fn iter(&self) -> std::slice::Iter<Todo> {
@@ -90,24 +165,41 @@ impl TodoArray {
         self.todos.iter_mut()
     }
 
-    pub fn messages(&self) -> Vec<String> {
-        self.todos.iter().map(|todo| todo.message.clone()).collect()
+    pub fn messages(&self, restriction: Restriction) -> Vec<String> {
+        self.todos(restriction).iter().map(|todo| todo.message.clone()).collect()
     }
 
-    pub fn display(&self, args: &DisplayArgs) -> Vec<String> {
-        self.todos.iter().map(|todo| todo.display(&args)).collect()
+    pub fn display(&self, args: &DisplayArgs, restriction: Restriction) -> Vec<String> {
+        self.todos(restriction).iter().map(|todo| todo.display(&args)).collect()
     }
 
-    pub fn len(&self) -> usize {
-        self.todos.len()
+    pub fn len(&self, restriction: Restriction) -> usize {
+        self.todos(restriction).len()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.todos.is_empty()
+    pub fn is_empty(&self, restriction: Restriction) -> bool {
+        self.todos(restriction).is_empty()
     }
 
-    pub fn remove(&mut self, index:usize) -> Todo{
-        self.todos.remove(index)
+    pub fn remove(&mut self, index:usize, restriction: Restriction) {
+        let mut binding = self.todos(restriction);
+        let filtered:Vec<_> = binding.iter_mut().collect();
+        self.todos = self.todos.iter().filter(|x| &x != &filtered[index]).cloned().collect();
+    }
+
+    pub fn true_position_in_list(&self, index:usize, restriction: Restriction) -> usize {
+        let mut binding = self.todos(restriction);
+        let filtered:Vec<_> = binding.iter_mut().collect();
+        match self.todos.iter().position(|x| &x == filtered[index]) {
+            Some(position) => position,
+            None => 0,
+        }
+        
+    }
+
+    pub fn cut(&mut self, index:usize, restriction: Restriction) -> Todo{
+        let index_in_vec = self.true_position_in_list(index, restriction);
+        self.todos.remove(index_in_vec)
     }
 
     pub fn push(&mut self,item:Todo) {
@@ -128,6 +220,12 @@ impl TodoArray {
         }
     }
 
+    #[inline(always)]
+    pub fn reorder_last(&mut self) -> usize {
+        self.reorder(self.todos.len()-1)
+    }
+
+
     pub fn reorder(&mut self, index:usize) -> usize {
         let priority = self.todos[index].comparison_priority();
 
@@ -147,10 +245,8 @@ impl TodoArray {
 
     #[inline(always)]
     fn move_index(&mut self, from: usize, to: usize, shift:usize) -> usize{
-
         let mut i = from;
-        if from < to
-        {
+        if from < to {
             for j in from..to {
                 self.todos.swap(j, j+1);
                 i = j+1;
@@ -160,244 +256,21 @@ impl TodoArray {
                 self.todos.swap(j, j+1);
                 i = j;
             }
-
         }
         i
     }
 
-    pub fn print (&self) {
-        let mut i = 1;
-        for todo in &self.todos {
-            println!("{} - {}", i,todo.as_string());
-            i+=1;
-        }
+    pub fn append_list(&mut self, mut todo_list: TodoList) {
+        self.todos.append(&mut todo_list.todos);
+        self.sort();
     }
 
     #[inline(always)]
     pub fn sort (&mut self) {
-        // , ascending:Option<bool>
-        // let ascending = ascending.unwrap_or(false);
         self.todos.sort_by(|a, b| a.comparison_priority().cmp(&b.comparison_priority()));
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct TodoList {
-    pub undone: TodoArray,
-    pub done: TodoArray,
-}
-
-impl TodoList {
-    pub fn new () -> Self {
-        let undone = TodoArray::new();
-        let done = TodoArray::new();
-
-        TodoList {
-            done,
-            undone
-        }
-    }
-
-    pub fn append_list(&mut self, mut todo_list: TodoList) {
-        self.undone.todos.append(&mut todo_list.undone.todos);
-        self.done.todos.append(&mut todo_list.done.todos);
-        self.done.sort();
-        self.undone.sort();
-    }
-
-    pub fn remove(&mut self, index: usize) -> Todo {
-        let size = self.undone.len();
-
-        if index < size {
-            self.undone.remove(index)
-        } else {
-            let index = index - size;
-            self.done.remove(index)
-        }
-        
-    }
-
-    pub fn traverse_tree(&self,callback: fn(&mut App, &TodoList, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
-        let prior_indices = prior_indices.unwrap_or(vec![]);
-        callback(app, self, prior_indices.as_slice());
-        for (i, todo) in all_todos!(self).enumerate() {
-            if let Some(todo_list) = todo.dependency.todo_list() {
-                let mut prior_indices = prior_indices.clone();
-                prior_indices.push(i);
-                todo_list.traverse_tree(callback, Some(prior_indices), app);
-            }
-        }
-    }
-
-    pub fn traverse_tree_undone(&self,callback: fn(&mut App, &TodoList, &[usize]), prior_indices: Option<Vec<usize>>, app:&mut App) {
-        let prior_indices = prior_indices.unwrap_or(vec![]);
-        callback(app, self, prior_indices.as_slice());
-        for (i, todo) in undone_todos!(self).enumerate() {
-            if let Some(todo_list) = todo.dependency.todo_list() {
-                let mut prior_indices = prior_indices.clone();
-                prior_indices.push(i);
-                todo_list.traverse_tree(callback, Some(prior_indices), app);
-            }
-        }
-    }
-
-    pub fn reorder(&mut self, index: usize) -> usize {
-        let size = self.undone.len();
-
-        if index < size {
-            self.undone.reorder(index)
-        } else {
-            self.done.reorder(index - size) + size
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.undone.is_empty() && self.done.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.undone.len() + self.done.len()
-    }
-
-    pub fn display(&self, display_args:&DisplayArgs) -> Vec<String> {
-        let mut display_list = self.undone.display(display_args);
-
-        if display_args.show_done {
-            display_list.extend(self.done.display(display_args));
-        }
-        display_list
-    }
-
-    pub fn dependency_parent(filename: &PathBuf, is_root: bool) -> PathBuf {
-        if is_root {
-            filename.parent().unwrap().to_path_buf().join("notes")
-        } else {
-            filename.parent().unwrap().to_path_buf()
-        }
-    }
-
-    pub fn read(filename: &PathBuf, read_dependencies: bool, is_root: bool) -> Self{
-        let mut todo_list = Self::new();
-        if !filename.is_file() {
-            return todo_list
-        }
-        let file_data = read(filename).unwrap();
-
-        for line in file_data.lines() {
-            let todo = match Todo::try_from(line.unwrap()) {
-                Ok(value) => value,
-                Err(..) => continue,
-            };
-            todo_list.push(todo);
-        }
-        todo_list.undone.sort();
-        todo_list.done.sort();
-        if read_dependencies {
-            let dependency_path = Self::dependency_parent(filename, is_root);
-            let _ = todo_list.read_dependencies(&dependency_path);
-        }
-        todo_list
-    }
-
-    fn read_dependencies(&mut self, path: &PathBuf) -> io::Result<()>{
-        for todo in all_todos_mut!(self) {
-            todo.dependency.read(&path)?;
-        }
-        Ok(())
-    }
-
-    #[inline]
-    pub fn push(&mut self, todo:Todo) {
-        if todo.done() {
-            self.done.push(todo);
-        } else {
-            self.undone.push(todo);
-        }
-    }
-
-    #[inline]
-    pub fn prepend(&mut self, todo:Todo) {
-        self.undone.insert(0,todo);
-    }
-
-    #[inline]
-    pub fn fix_undone(&mut self) {
-        for index in 0..self.undone.todos.len() {
-            if self.undone.todos[index].done() {
-                self.done.push(self.undone.todos.remove(index));
-            }
-            if index+1 >= self.undone.todos.len() {
-                break;
-            }
-        }
-    }
-    
-    pub fn fix_done(&mut self) {
-        for index in 0..self.done.todos.len() {
-            if !self.done.todos[index].done() {
-                self.undone.push(self.done.todos.remove(index));
-            }
-            if index+1 >= self.done.todos.len() {
-                break;
-            }
-        }
-
-    }
-
-    #[inline]
-    fn write_to_buf<W: Write> (&self, writer: &mut BufWriter<W>) -> io::Result<()> {
-        let todos = [&self.undone.todos, &self.done.todos];
-
-        for todo in todos.iter().flat_map(|v| v.iter()) {
-            writeln!(writer, "{}", todo.as_string())?;
-        }
-        writer.flush()?;
-        Ok(())
-    }
-
-    #[inline]
-    pub(super) fn write_dependencies(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in all_todos_mut!(self) {
-            todo.dependency.todo_list.write_dependencies(filename)?;
-            todo.dependency.write(filename)?;
-        }
-        Ok(())
-    }
-
-    #[inline]
-    pub(super) fn remove_dependency_files(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in all_todos_mut!(self) {
-            todo.delete_dependency_file(filename)?;
-        }
-        Ok(())
-    }
-
-    #[inline]
-    pub(super) fn delete_removed_dependent_files(&mut self, filename: &PathBuf) -> io::Result<()> {
-        for todo in all_todos_mut!(self) {
-            todo.delete_removed_dependent_files(filename)?;
-        }
-        Ok(())
-    }
-    
-
-    #[inline]
-    pub fn write(&mut self, filename: &PathBuf, is_root: bool) -> io::Result<PathBuf> {
-        let dependency_path = Self::dependency_parent(filename, is_root);
-        create_dir_all(&dependency_path)?;
-        let file = File::create(filename)?;
-        let mut writer = BufWriter::new(file);
-        self.write_to_buf(&mut writer)?;
-        Ok(dependency_path)
-    }
-
-    #[inline]
-    pub fn print(&self) -> io::Result<()> {
-        let mut stdout_writer = BufWriter::new(stdout());
-        self.write_to_buf(&mut stdout_writer)?;
-        Ok(())
-    }
-}
 #[cfg(test)]
 mod tests {
     use std::fs::{self, remove_dir_all, remove_file};
@@ -415,20 +288,20 @@ mod tests {
         let expected_undone = vec![Todo::written("this todo has prio 1".to_string(), 1, false)
             ,Todo::written("this one has prio 2".to_string(), 2, false)];
 
-        assert_eq!(expected_undone, todo_list.undone.todos);
+        assert_eq!(expected_undone, todo_list.todos.iter().filter(|todo| !todo.done()).cloned().collect::<Vec<Todo>>());
     }
 
     #[test]
     fn test_todolist_read_done() {
         let todo_list = get_todo_list();
         let expected_done = vec![Todo::written("this one is 2 and done".to_string(), 2, true),Todo::written("this one is 0 and done".to_string(), 0, true)];
-        assert_eq!(expected_done, todo_list.done.todos);
+        assert_eq!(expected_done, todo_list.todos.iter().filter(|todo| todo.done()).cloned().collect::<Vec<Todo>>());
     }
 
     #[test]
     fn test_len() {
         let todo_list = get_todo_list();
-        assert_eq!(todo_list.len(), 4);
+        assert_eq!(todo_list.len(None), 4);
     }
 
     #[test]
@@ -455,6 +328,7 @@ mod tests {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-push/tmplist");
         todo_list.push(Todo::default("Show me your warface".to_string(), 0));
+        todo_list.reorder_last();
         let _ = todo_list.write(&path, true);
 
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
@@ -474,8 +348,7 @@ mod tests {
     fn test_initially_sorted() {
         let todo_list = get_todo_list();
         let mut sorted_list = todo_list.clone();
-        sorted_list.undone.sort();
-        sorted_list.done.sort();
+        sorted_list.sort();
 
         assert_eq!(todo_list, sorted_list)
     }
@@ -483,18 +356,18 @@ mod tests {
     #[test]
     fn test_write_dependencies() -> io::Result<()>{
         let mut todo_list = get_todo_list();
-        let _ = todo_list[0].add_todo_dependency();
+        let _ = todo_list.todos[0].add_todo_dependency();
         let path = PathBuf::from("test-write-dependency/tmplist");
-        todo_list[0].dependency.push(Todo::try_from("[0] Some dependency").unwrap());
+        todo_list.todos[0].dependency.push(Todo::try_from("[0] Some dependency").unwrap());
         let dependency_path = todo_list.write(&path, true)?;
         todo_list.write_dependencies(&dependency_path)?;
 
-        let todo_dependency_path = PathBuf::from(format!("test-write-dependency/notes/{}.todo", todo_list[0].hash()));
+        let todo_dependency_path = PathBuf::from(format!("test-write-dependency/notes/{}.todo", todo_list.todos[0].hash()));
         let contents = fs::read_to_string(&todo_dependency_path).expect("Reading file failed :(");
         let expected = "[0] Some dependency\n";
         assert_eq!(contents, expected);
 
-        todo_list[0].remove_dependency();
+        todo_list.todos[0].remove_dependency();
         todo_list.write(&path, true)?;
         remove_dir_all(&path.parent().unwrap())?;
         Ok(())

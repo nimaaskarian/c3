@@ -1,7 +1,6 @@
 use std::io;
+use super::todo_app::{App, TodoList, Todo, Restriction};
 use crate::DisplayArgs;
-
-use super::todo_app::{App ,TodoList, Todo};
 
 #[inline]
 pub fn run(app: &mut App) -> io::Result<()>{
@@ -27,9 +26,7 @@ impl <'a>CliApp <'a>{
             app.append_list_from_path(path)
         }
         app.do_commands_on_selected();
-        if !app.args.append_todo.is_empty() || !app.args.prepend_todo.is_empty() || app.is_changed(){
-            let _ = app.write();
-        }
+        let _ = app.write();
         CliApp {
             todo_app: app,
         }
@@ -54,7 +51,7 @@ impl <'a>CliApp <'a>{
         }
         if self.todo_app.is_tree() {
             let mut print_todo = PrintTodoTree::new(self.todo_app.args.minimal_tree);
-            print_todo.print_list(&self.todo_app.todo_list, &self.todo_app.args.display_args);
+            print_todo.print_list(&self.todo_app.todo_list, &self.todo_app.args.display_args, self.todo_app.restriction());
         } else {
             self.print_list()
         }
@@ -62,9 +59,10 @@ impl <'a>CliApp <'a>{
     }
 }
 
+// TODO: Use traverse_tree instead of this struct for printing todo tree. 
 #[derive(Clone)]
 struct PrintTodoTree {
-    was_last: Vec<bool>,
+    last_stack: Vec<bool>,
     should_print_indention: bool,
     is_last: bool,
     depth: usize,
@@ -74,7 +72,7 @@ impl PrintTodoTree {
     #[inline]
     pub fn new(should_print_indention:bool) -> Self {
         PrintTodoTree {
-            was_last: vec![],
+            last_stack: vec![],
             is_last: false,
             depth: 0,
             should_print_indention,
@@ -82,31 +80,30 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    pub fn tree_child(&self) -> Self {
-        let mut new_print = self.clone();
-        new_print.depth+=1;
-        new_print.was_last.push(self.is_last);
+    pub fn tree_child(&self, what_to_push: bool) -> Self {
+        let mut child = self.clone();
+        child.depth+=1;
+        child.last_stack.push(!self.is_last && what_to_push);
 
-        new_print
+        child
     }
 
     #[inline]
-    pub fn print_list(&mut self, todo_list: &TodoList, display_args: &DisplayArgs) {
-        let mut todos = todo_list.undone.todos.clone();
-        if display_args.show_done {
-            todos.extend(todo_list.done.todos.clone())
-        }
+    pub fn print_list(&mut self, todo_list: &TodoList, display_args: &DisplayArgs, restriction: Restriction) {
+        let todos = todo_list.todos(restriction.clone());
 
         for (index, todo) in todos.iter().enumerate() {
             self.is_last = index == todos.len() - 1;
-            if self.depth > 0 {
+            if !self.last_stack.is_empty() {
                 self.print_indention();
             }
             self.print_todo(todo, display_args);
 
             if let Some(todo_list) = todo.dependency.todo_list() {
-                let mut tree_child = self.tree_child();
-                tree_child.print_list(todo_list, display_args);
+                let popped = self.last_stack.last();
+                let what_to_push = popped.is_some() && !self.last_stack.is_empty();
+                let mut tree_child = self.tree_child(what_to_push);
+                tree_child.print_list(todo_list, display_args, restriction.clone());
             }
 
             if let Some(note) = todo.dependency.note() {
@@ -122,42 +119,37 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_note(&mut self, note: &String) {
-        self.was_last.push(self.is_last);
-        self.is_last = true;
+        let mut last_stack = self.last_stack.clone();
+        last_stack.push(!self.is_last);
 
-        let mut lines = note.lines();
-        self.print_indention_with_depth(self.depth+1);
-        if let Some(line) = lines.next() {
-            println!("{}", line);
-        }
-        for line in lines {
-            self.print_prenote();
+        for line in note.lines() {
+            self.print_prenote(last_stack.clone());
             println!("{}", line);
         }
     }
 
     #[inline]
-    fn print_prenote(&self) {
-        for i in 0..self.depth {
-            if self.was_last[i+1] {
-                print!("    ")
-            } else {
+    fn print_prenote(&self, last_stack: Vec<bool>) {
+        for x in last_stack {
+            if x {
                 print!("│   ")
+            } else {
+                print!("    ")
             }
         }
         print!("    ")
     }
 
     #[inline]
-    fn print_indention_with_depth(&self, depth: usize) {
+    fn print_indention(&self) {
         if self.should_print_indention {
             return
         }
-        for i in 1..depth {
-            if self.was_last[i] {
-                print!("    ")
-            } else {
+        for x in self.last_stack.clone() {
+            if x {
                 print!("│   ")
+            } else {
+                print!("    ")
             }
         }
         if self.is_last {
@@ -165,10 +157,5 @@ impl PrintTodoTree {
         } else {
             print!("├── ");
         }
-    }
-
-    #[inline]
-    fn print_indention(&self) {
-        self.print_indention_with_depth(self.depth);
     }
 }

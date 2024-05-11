@@ -1,13 +1,11 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std {{{
-use std::{fs::{read_to_string, remove_file}, io::{self, stdout}, path::PathBuf, rc::Rc};
+use std::{io::{self, stdout, BufRead, BufReader}, path::PathBuf, process::Stdio, rc::Rc};
 use std::process::Command;
 // }}}
 // lib {{{
 use crossterm::{
-    ExecutableCommand,
-    terminal::{disable_raw_mode, LeaveAlternateScreen, enable_raw_mode, EnterAlternateScreen},
-    event::{self, Event::Key, KeyCode::Char, KeyCode},
+    event::{self, Event::Key, KeyCode::{self, Char}, KeyModifiers}, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand
 };
 use tui_textarea::{Input, TextArea, CursorMove};
 use ratatui::{prelude::*, widgets::*};
@@ -20,7 +18,7 @@ use modules::{
     potato::Potato,
 };
 use super::todo_app::{App, Todo};
-use crate::{date, fileio::temp_path, todo_app::PriorityType};
+use crate::{date, todo_app::PriorityType};
 // }}}
 
 pub fn default_block<'a, T>(title: T) -> Block<'a> 
@@ -38,16 +36,16 @@ pub enum TodoWidget<'a> {
 
 pub fn create_todo_widget<'a>(display_list:&Vec<String>, title:String, highlight_symbol: &'a str) ->  TodoWidget<'a> {
     if display_list.is_empty() {
-        return TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
+        TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
+    } else {
+        TodoWidget::List(List::new((*display_list).clone())
+            .block(default_block(title))
+            .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+            .highlight_symbol(highlight_symbol)
+            .repeat_highlight_symbol(true))
     }
-    TodoWidget::List(List::new((*display_list).clone())
-        .block(default_block(title))
-        .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-        .highlight_symbol(highlight_symbol)
-        .repeat_highlight_symbol(true))
 }
 
-/// Shutdown TUI app (undo everything did in startup, and show cursor)
 pub fn shutdown() -> io::Result<()> {
     disable_raw_mode()?;
     stdout().execute(crossterm::cursor::Show)?;
@@ -55,14 +53,12 @@ pub fn shutdown() -> io::Result<()> {
     Ok(())
 }
 
-/// Prepare terminal for TUI applicaton by enabling rowmode and entering alternate screen.
 pub fn startup() -> io::Result<()> {
     enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
     Ok(())
 }
 
-/// Restart terminal
 #[inline]
 pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
     terminal.clear()?;
@@ -70,7 +66,6 @@ pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Res
     Ok(())
 }
 
-/// Restart TUI app
 #[inline]
 pub fn run(app:&mut App) -> io::Result<()> {
     startup()?;
@@ -99,10 +94,20 @@ pub enum Operation {
     Restart,
 }
 
+#[derive(Debug, PartialEq)]
+enum EditorOperation {
+    Cancel,
+    Submit,
+    Input,
+    Ignore,
+}
+
+type HandlerParameter = String;
 pub struct TuiApp<'a>{
     show_right:bool,
     text_mode: bool,
-    on_submit: Option<fn(&mut Self, String)->()>,
+    on_submit: Option<fn(&mut Self, HandlerParameter)->()>,
+    on_input: Option<fn(&mut Self, HandlerParameter)->()>,
     module_enabled: bool,
     module: &'a mut dyn Module<'a>,
     textarea: TextArea<'a>,
@@ -119,6 +124,7 @@ impl<'a>TuiApp<'a>{
             textarea,
             module,
             on_submit: None,
+            on_input: None,
             show_right: true,
             text_mode: false,
             module_enabled,
@@ -126,7 +132,7 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    pub fn title(&self) -> String { 
+    pub fn title(&mut self) -> String { 
         let changed_str = if self.todo_app.is_changed() {
             "*"
         } else {
@@ -149,16 +155,43 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    pub fn set_text_mode(&mut self, on_submit:fn(&mut Self, String)->(),title: &'a str ,placeholder: &str) {
+    pub fn set_text_mode(&mut self, on_submit:fn(&mut Self, HandlerParameter)->(),title: &'a str ,placeholder: &str) {
+        self.on_input = None;
         self.on_submit = Some(on_submit);
+        self.turn_on_text_mode(title, placeholder);
+    }
+
+    #[inline]
+    pub fn set_responsive_text_mode(&mut self, on_input:fn(&mut Self, HandlerParameter)->(),title: &'a str ,placeholder: &str) {
+        self.on_input = Some(on_input);
+        self.turn_on_text_mode(title, placeholder);
+    }
+
+    #[inline(always)]
+    fn turn_on_text_mode(&mut self, title: &'a str ,placeholder: &str) {
         self.textarea.set_placeholder_text(placeholder);
         self.textarea.set_block(default_block(title));
         self.text_mode = true;
     }
 
+    #[inline(always)]
+    fn turn_off_text_mode(&mut self) {
+        self.textarea.delete_line_by_head();
+        self.textarea.delete_line_by_end();
+        self.text_mode = false;
+    }
+
     #[inline]
     pub fn search_prompt(&mut self) {
         self.set_text_mode(Self::on_search, "Search todo", "Enter search query")
+    }
+
+    #[inline]
+    pub fn restrict_search_prompt(&mut self) {
+        const TITLE:&str = "Restrict search todo";
+        const PLACEHOLDER:&str = "Enter search query";
+        self.set_responsive_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
+        self.on_submit = Some(Self::on_restrict_search);
     }
 
     #[inline]
@@ -173,6 +206,11 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
+    fn on_restrict_search(&mut self, str:String) {
+        self.todo_app.set_query_restriction(str)
+    }
+
+    #[inline]
     fn on_tree_search(&mut self, str:String) {
         self.todo_app.tree_search(Some(str));
     }
@@ -183,12 +221,12 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn on_schedule(&mut self,str:String) {
+    fn on_schedule(&mut self,str:HandlerParameter) {
         let day = str.parse::<u64>().ok();
         if day.is_none() {
             return;
         }
-        if let Some(todo) = self.todo_app.mut_todo(){
+        if let Some(todo) = self.todo_app.todo_mut(){
             todo.enable_day(day.unwrap() as i64);
         }
     }
@@ -198,25 +236,50 @@ impl<'a>TuiApp<'a>{
         self.set_text_mode(Self::on_reminder, "Date reminder", "");
     }
 
-    #[inline]
-    pub fn nnn_append_todo(&mut self) {
-        let path = temp_path("nnn-file-picker");
-        if Command::new("nnn").args(["-p", path.to_str().unwrap_or("")]).status().is_err(){
-            return
+    fn nnn_path() -> Option<PathBuf> {
+         let mut output = Command::new("nnn")
+        .args(["-p", "-"])
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .expect("Failed to start nnn.");
+
+        let exit_status = output.wait().expect("Failed to wait on nnn.");
+        if exit_status.success() {
+            let reader = BufReader::new(output.stdout.unwrap());
+            if let Some(line) = reader.lines().nth(0) {
+                let path = line.unwrap();
+                return Some(PathBuf::from(path))
+            }
         }
-        let mut output_str = match read_to_string(&path) {
-            Ok(value) => value,
-            Err(_) => return,
-        };
-        output_str.pop();
-        self.todo_app.append_list_from_path(PathBuf::from(output_str));
-        let _ = remove_file(path);
+        None
     }
 
     #[inline]
-    fn on_reminder(&mut self,str:String) {
+    pub fn nnn_append_todo(&mut self) {
+        if let Some(path) = Self::nnn_path() {
+            self.todo_app.append_list_from_path(PathBuf::from(path));
+        }
+    }
+
+    pub fn nnn_open(&mut self) {
+        if let Some(path) = Self::nnn_path() {
+            self.todo_app.open_path(PathBuf::from(path));
+        }
+    }
+
+    #[inline]
+    pub fn nnn_output_todo(&mut self) {
+        if let Some(path) = Self::nnn_path() {
+            let _ = self.todo_app.output_list_to_path(PathBuf::from(path));
+        }
+    }
+
+    #[inline]
+    fn on_reminder(&mut self,str:HandlerParameter) {
         if let Ok(date) = date::parse_user_input(&str) {
-            if let Some(todo) = self.todo_app.mut_todo() {
+            if let Some(todo) = self.todo_app.todo_mut() {
                 todo.schedule.enable_reminder(date);
             }
         }
@@ -242,6 +305,14 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
+    pub fn priority_prompt(&mut self) {
+        const TITLE:&str = "Limit priority";
+        const PLACEHOLDER:&str = "Enter priority to show";
+        self.set_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
+        self.set_responsive_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
+    }
+
+    #[inline]
     pub fn append_prompt(&mut self) {
         self.set_text_mode(Self::on_prepend_todo, "Add todo at first", "Enter the todo message");
     }
@@ -256,47 +327,80 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn on_save_prompt(app:&mut TuiApp, str:String) {
+    fn on_priority_prompt(&mut self, mut str: String) {
+        if str.is_empty() {
+            return self.todo_app.update_show_done_restriction();
+        }
+        let show_done = if str.chars().last().unwrap() == 'd' {
+            str.pop();
+            true
+        } else {
+            false
+        };
+        let priority = str.parse::<u8>().ok();
+        if let Some(priority) = priority {
+            if show_done {
+                self.todo_app.set_priority_restriction(priority)
+            } else {
+                self.todo_app.set_priority_limit_no_done(priority)
+            }
+        }
+    }
+
+    #[inline]
+    fn on_save_prompt(&mut self, str:HandlerParameter) {
         let lower = str.to_lowercase();
         if lower.starts_with("y") {
-            let _ = app.todo_app.write();
+            let _ = self.todo_app.write();
         } else if lower.starts_with("c") {
             return;
         }
-        let _ = app.quit();
+        let _ = self.quit();
     }
 
     #[inline]
-    fn on_append_todo(app: &mut Self, str:String) {
-        app.todo_app.append(str);
+    fn on_append_todo(&mut self, str:HandlerParameter) {
+        self.todo_app.append(str);
     }
 
     #[inline]
-    fn on_prepend_todo(app:&mut TuiApp,str:String) {
-        app.todo_app.prepend(str);
+    fn on_prepend_todo(&mut self,str:HandlerParameter) {
+        self.todo_app.prepend(str);
     }
 
     #[inline]
-    fn on_edit_todo(&mut self,str:String) {
+    fn on_edit_todo(&mut self,str:HandlerParameter) {
         if !str.is_empty() {
-            self.todo_app.mut_todo().unwrap().set_message(str);
+            self.todo_app.todo_mut().unwrap().set_message(str);
         }
     }
 
+    #[inline(always)]
+    fn current_textarea_message(&self) -> String {
+        self.textarea.lines()[0].clone()
+    }
 
     #[inline]
     fn enable_text_editor(&mut self) -> io::Result<()>{
-        match self.editor()? {
-            None => {},
-            Some(should_add) => {
-                if should_add {
-                    let todo_message = self.textarea.lines()[0].clone();
-                    self.on_submit.unwrap()(self, todo_message);
+        let operation = self.editor()?;
+        match operation {
+            EditorOperation::Input => {
+                if let Some(on_input) = self.on_input {
+                    let message = self.current_textarea_message();
+                    on_input(self, message);
                 }
-                self.textarea.delete_line_by_head();
-                self.textarea.delete_line_by_end();
-                self.text_mode = false;
             }
+            EditorOperation::Submit => {
+                if let Some(on_submit) = self.on_submit {
+                    let message = self.current_textarea_message();
+                    on_submit(self, message);
+                }
+                self.turn_off_text_mode();
+            }
+            EditorOperation::Cancel => {
+                self.turn_off_text_mode();
+            }
+            EditorOperation::Ignore => {}
         }
         Ok(())
     }
@@ -314,25 +418,25 @@ impl<'a>TuiApp<'a>{
     }
 
     #[inline]
-    fn editor(&mut self) -> io::Result<Option<bool>> {
+    fn editor(&mut self) -> io::Result<EditorOperation> {
         match crossterm::event::read()?.into() {
             Input {
                 key: tui_textarea::Key::Esc, .. 
-            } => Ok(Some(false)),
+            } => Ok(EditorOperation::Cancel),
             Input {
                 key: tui_textarea::Key::Enter, ..
-            }=> Ok(Some(true)),
+            }=> Ok(EditorOperation::Submit),
             Input {
                 key: tui_textarea::Key::Char('u'),
                 ctrl: true,
                 ..
             } => {
                 self.textarea.delete_line_by_head();
-                Ok(None)
+                Ok(EditorOperation::Ignore)
             },
             input => {
-                self.textarea.input(input) ;
-                Ok(None)
+                self.textarea.input(input);
+                Ok(EditorOperation::Input)
             }
         }
     }
@@ -375,18 +479,27 @@ impl<'a>TuiApp<'a>{
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
+                    Char('o') if key.modifiers == KeyModifiers::CONTROL => {
+                        self.nnn_open();
+                        return Ok(Operation::Restart)
+                    }
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
                     Char('S') => self.schedule_prompt(),
                     Char('m') => self.reminder_prompt(),
                     Char('!') => self.todo_app.toggle_show_done(),
+                    Char('@') => self.priority_prompt(),
                     Char('y') => self.todo_app.yank_todo(),
                     Char('p') => self.todo_app.paste_todo(),
                     Char('i') => self.todo_app.increase_day_done(),
-                    Char('o') => self.todo_app.decrease_day_done(),
-                    Char('O') => {
+                    Char('I') => self.todo_app.decrease_day_done(),
+                    Char('o') => {
                         self.nnn_append_todo();
+                        return Ok(Operation::Restart)
+                    }
+                    Char('O') => {
+                        self.nnn_output_todo();
                         return Ok(Operation::Restart)
                     }
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
@@ -420,9 +533,14 @@ impl<'a>TuiApp<'a>{
                     Char('a') => self.prepend_prompt(),
                     Char('/') => self.search_prompt(),
                     Char('?') => self.tree_search_prompt(),
+                    Char('\\') => self.restrict_search_prompt(),
                     Char('A') => self.append_prompt(),
                     Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
                     Char('q') => self.quit_save_prompt(),
+                    Char('b') => {
+                        self.todo_app.batch_editor_messages();
+                        return Ok(Operation::Restart);
+                    },
                     Char(c) if c.is_digit(10) => {
                         let priority = c.to_digit(10).unwrap();
                         self.todo_app.set_current_priority(priority as PriorityType);
@@ -480,24 +598,33 @@ impl<'a>TuiApp<'a>{
                 frame.render_widget(note_widget, dependency_layout);
             } 
             if let Some(todo_list) = todo.dependency.todo_list() {
-                match create_todo_widget(&self.todo_app.display_list(todo_list), String::from("Todo dependencies"), self.highlight_string()) {
-                    TodoWidget::List(widget) => frame.render_widget(widget, dependency_layout),
-                    TodoWidget::Paragraph(widget) => frame.render_widget(widget, dependency_layout),
+                Self::render_todos_widget(self.highlight_string(), frame, None, dependency_layout, &self.todo_app.display_list(todo_list), String::from("Todo dependencies"))
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn render_current_todos_widget(&mut self, frame: &mut Frame, list_state: &mut ListState, todo_layout: Rect) {
+        let title = self.title();
+        Self::render_todos_widget(self.highlight_string(),frame, Some(list_state), todo_layout, &self.todo_app.display_current(), title)
+    }
+
+    #[inline(always)]
+    fn render_todos_widget(highlight_symbol: &str,frame: &mut Frame, list_state: Option<&mut ListState>, todo_layout: Rect, display_list:&Vec<String>, title: String) {
+        match create_todo_widget(display_list, title, highlight_symbol) {
+            TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout),
+            TodoWidget::List(widget) => {
+                if let Some(list_state) = list_state {
+                    frame.render_stateful_widget(widget, todo_layout, list_state)
+                } else {
+                    frame.render_widget(widget, todo_layout)
                 }
             }
         }
     }
 
     #[inline]
-    fn render_todos_widget(&self, frame: &mut Frame, list_state: &mut ListState, todo_layout: &Rc<[Rect]>) {
-        match create_todo_widget(&self.todo_app.display_current(), self.title(), self.highlight_string()) {
-            TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout[1]),
-            TodoWidget::List(widget) => frame.render_stateful_widget(widget, todo_layout[1], list_state),
-        }
-    }
-
-    #[inline]
-    pub fn ui(&self, frame:&mut Frame, list_state: &mut ListState) {
+    pub fn ui(&mut self, frame:&mut Frame, list_state: &mut ListState) {
         let todo = self.todo_app.todo();
 
         list_state.select(Some(self.todo_app.index()));
@@ -521,6 +648,6 @@ impl<'a>TuiApp<'a>{
         self.render_dependency_widget(frame, todo, todo_app_layout[1]);
 
         frame.render_widget(self.textarea.widget(), todo_and_textarea_layout[0]);
-        self.render_todos_widget(frame, list_state, &todo_and_textarea_layout);
+        self.render_current_todos_widget(frame, list_state, todo_and_textarea_layout[1]);
     }
 }

@@ -9,7 +9,7 @@ pub mod schedule;
 mod dependency;
 use dependency::Dependency;
 use schedule::Schedule;
-use note::{sha1, open_temp_editor};
+use note::{sha1, open_note_temp_editor};
 use super::TodoList;
 use crate::DisplayArgs;
 //}}}
@@ -41,7 +41,6 @@ impl Into<String> for &Todo {
 pub enum TodoError {
     ReadFailed,
     NoteEmpty,
-    AlreadyExists,
     DependencyCreationFailed,
 }
 
@@ -53,13 +52,12 @@ impl TryFrom<String> for Todo {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 enum State {
     #[default]
     Priority,
     Dependency,
     Message,
-    End,
 }
 
 impl TryFrom<&str> for Todo {
@@ -85,10 +83,9 @@ impl TryFrom<&str> for Todo {
             match state {
                 State::Priority => {
                     if c == '-' {
-                        state = State::Priority;
                         done = true;
                     } else if c.is_digit(10) {
-                        priority = c.to_digit(10).unwrap() as u8;
+                        priority = c.to_digit(10).unwrap() as PriorityType;
                     } else if c == ' ' {
                         state = State::Message;
                     } else if c == '>' {
@@ -107,32 +104,35 @@ impl TryFrom<&str> for Todo {
                 }
                 State::Message => {
                     if i == schedule_start_index.unwrap()-1 {
-                        state = State::End;
+                        break;
                     } else {
                         message.push(c);
                     }
                 }
-                State::End => {
-                }
             }
         }
+        if state == State::Message && !message.is_empty() {
 
-        let schedule = Schedule::from(schedule_string);
+            let schedule = Schedule::from(schedule_string);
+            let dependency = Dependency::from(dependency_string.as_str());
 
-        if schedule.should_undone() {
-            done = false;
+            if schedule.should_undone() {
+                done = false;
+            }
+            if schedule.should_done() {
+                done = true;
+            }
+            Ok(Todo {
+                dependency,
+                removed_dependency: None,
+                schedule,
+                message,
+                priority,
+                done,
+            })
+        } else {
+            Err(TodoError::ReadFailed)
         }
-        if schedule.should_done() {
-            done = true;
-        }
-        Ok(Todo {
-            dependency: Dependency::from(dependency_string.as_str()),
-            removed_dependency: None,
-            schedule,
-            message,
-            priority: priority as u8,
-            done,
-        })
     }
 }
 
@@ -151,6 +151,10 @@ impl Todo {
         self.message.contains(query) || self.message.to_lowercase().contains(query)
     }
 
+    #[inline]
+    pub fn priority(&self) -> PriorityType{
+        self.priority
+    }
     #[inline]
     pub fn new(message:String, priority:PriorityType, done: bool, dependency: Dependency) -> Self {
         Todo {
@@ -186,12 +190,9 @@ impl Todo {
     }
 
     #[inline]
-    pub fn add_todo_dependency(&mut self) -> Result<(), TodoError>{
+    pub fn add_todo_dependency(&mut self) {
         if self.dependency.is_none() {
             self.dependency = Dependency::new_todo_list(self.hash());
-            Ok(())
-        } else {
-            Err(TodoError::AlreadyExists)
         }
     }
 
@@ -249,7 +250,7 @@ impl Todo {
     #[inline]
     pub fn edit_note(&mut self)-> io::Result<()>{
         if !self.dependency.is_list() {
-            let note = open_temp_editor(self.dependency.note())?;
+            let note = open_note_temp_editor(self.dependency.note())?;
             if !note.is_empty() {
                 self.set_note(note)?;
             }
@@ -309,10 +310,22 @@ impl Todo {
         self.done = done;
     }
 
+    #[inline(always)]
+    fn standardize_priority(priority:PriorityType) -> PriorityType {
+        match priority {
+            0 => 10,
+            any => any,
+        }
+    }
+
+    #[inline(always)]
+    fn standardized_priority(&self) -> PriorityType {
+        Self::standardize_priority(self.priority)
+    }
 
     #[inline]
     pub fn decrease_priority(&mut self) {
-        if self.comparison_priority() < 9 {
+        if self.standardized_priority() < 9 {
             self.priority+=1
         } else {
             self.priority=0
@@ -321,8 +334,8 @@ impl Todo {
 
     #[inline]
     pub fn increase_priority(&mut self) {
-        if self.comparison_priority() > 1 {
-            self.priority=self.comparison_priority()-1
+        if self.standardized_priority() > 1 {
+            self.priority=self.standardized_priority()-1
         } else {
             self.priority=1
         }
@@ -340,17 +353,16 @@ impl Todo {
     }
 
     #[inline(always)]
-    pub fn comparison_priority(&self) -> PriorityType{
-        let priority = if self.priority == 0 {
-            10
-        } else {
-            self.priority
-        };
+    pub fn comparison_priority(&self) -> PriorityType {
+        let mut priority = self.standardized_priority()*2;
         if self.schedule.is_reminder() {
-            priority*10-5
-        } else {
-            priority*10
+            priority-=1;
         }
+        if self.done() {
+            priority+=Self::standardize_priority(0)*2;
+        }
+
+        priority
     }
 
     #[inline]
@@ -418,7 +430,7 @@ mod tests {
     fn test_dependency_name() {
         let mut todo = Todo::default("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
-        todo.add_todo_dependency().expect("Error setting dependency");
+        todo.add_todo_dependency();
 
         let result = &todo.dependency.get_name();
         assert_eq!(result, expected);
@@ -427,7 +439,7 @@ mod tests {
     #[test]
     fn test_dependency_type() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        todo.add_todo_dependency().expect("Error setting dependency");
+        todo.add_todo_dependency();
 
         assert!(todo.dependency.is_list());
     }
@@ -436,7 +448,7 @@ mod tests {
     fn test_add_todo() {
         let mut todo = Todo::default("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
-        todo.add_todo_dependency().expect("Error setting dependency");
+        todo.add_todo_dependency();
 
         let result = &todo.dependency.get_name();
         assert_eq!(result, expected);
@@ -471,7 +483,7 @@ mod tests {
     fn test_add_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
 
-        let _ = todo.add_todo_dependency();
+        todo.add_todo_dependency();
 
         assert!(todo.dependency.is_list());
     }
@@ -479,7 +491,7 @@ mod tests {
     #[test]
     fn test_remove_dependency() {
         let mut todo = Todo::default("Test".to_string(), 1);
-        let _ = todo.add_todo_dependency();
+        todo.add_todo_dependency();
 
         todo.remove_dependency();
 

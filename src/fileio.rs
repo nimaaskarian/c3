@@ -1,8 +1,31 @@
-use std::fs::{File, remove_dir};
+use std::fs::{File, remove_dir, remove_file};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::io::{prelude::*, self};
+use std::io::{prelude::*, self, Write};
 use std::path::PathBuf;
 use home::home_dir;
+
+use std::process::Command;
+use std::env;
+
+#[inline(always)]
+pub fn open_temp_editor(content:Option<&String>, path: PathBuf) -> io::Result<String>{
+    let mut file = File::create(&path)?;
+    if let Some(content) = content {
+        write!(file, "{content}")?;
+    }
+    let editor = if cfg!(windows) {
+        String::from("notepad")
+    } else {
+         match env::var("EDITOR") {
+            Ok(editor) => editor,
+            Err(_) => String::from("vi")
+        }
+    };
+    Command::new(editor).arg(&path).status().expect("Couldn't open the editor.");
+    let content = file_content(&path)?;
+    remove_file(path).unwrap();
+    Ok(content)
+}
 
 #[inline(always)]
 pub fn append_home_dir(vec:[&str; 4]) -> PathBuf {
@@ -23,11 +46,6 @@ pub fn get_todo_path() -> io::Result<PathBuf> {
     let parentdir = file.parent().unwrap();
     std::fs::create_dir_all(parentdir)?;
     Ok(file)
-}
-
-#[inline(always)]
-pub fn temp_note_path() -> PathBuf{
-    temp_path("note")
 }
 
 #[inline(always)]

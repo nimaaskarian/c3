@@ -1,4 +1,3 @@
-use scanf::sscanf;
 use std::{io::{self, Write}, path::PathBuf, fs::File};
 use super::TodoList;
 use super::Todo;
@@ -89,13 +88,15 @@ impl Dependency {
                 self.note = std::fs::read_to_string(file_path)?;
             }
             DependencyMode::Note | DependencyMode::TodoList 
+                // Sometimes calcurse likes to remove the extra .todo from the file name
+                // That's why we have the first part of the if statement. c3 itself usually writes
+                // the list files to a <sha1>.todo format in notes directory
                 if file_path.is_file() || path.join(&name_todo).is_file() => {
-
-                if self.mode == DependencyMode::Note {
-                    self.name = name_todo;
-                    self.mode = DependencyMode::TodoList;
-                }
-                self.todo_list = TodoList::read(&path.join(&self.name), true, false);
+                    if self.mode == DependencyMode::Note {
+                        self.name = name_todo;
+                        self.mode = DependencyMode::TodoList;
+                    }
+                    self.todo_list = TodoList::read(&path.join(&self.name), true, false);
             }
             _ => {}
         };
@@ -193,19 +194,17 @@ impl From<&str> for Dependency {
     fn from (input: &str) -> Dependency {
         let mut name = String::new();
         let mode: DependencyMode;
-
-        match input {
-            _ if sscanf!(input, "{}.todo", name).is_ok() => {
+        if input.is_empty() {
+            mode = DependencyMode::None;
+        } else {
+            name = String::from(input);
+            if input.ends_with(".todo") {
                 mode = DependencyMode::TodoList;
-                name = format!("{name}.todo");
-            }
-            _ if sscanf!(input, "{}", name).is_ok() && !name.is_empty() => {
+            } else {
                 mode = DependencyMode::Note;
             }
-            _ => {
-                mode = DependencyMode::None;
-            }
-        };
+        }
+
 
         Dependency::new(name, mode, false)
     }

@@ -48,11 +48,6 @@ impl Search {
     }
 
     #[inline]
-    pub fn indices(&self) -> Vec<usize>{
-        self.indices.clone()
-    }
-
-    #[inline]
     pub fn next(&mut self) -> Option<usize> {
         if self.indices.is_empty() {
             return None;
