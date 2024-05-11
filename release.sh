@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 . ./.shell-methods.sh
 
-LAST_TAG=$(git tag | tail -n 1)
+LAST_TAG=$(git tag | tail -n 2 | head -n 1)
 
 PACKAGE_NAME=c3
 USERNAME=nimaaskarian
@@ -43,7 +43,6 @@ release() {
   cd "$WD" || echo_exit "cding back to previous working directory in release() failed"
 }
 
-push_tag
 BIN_MD5=$(md5sum target/release/$PACKAGE_NAME | cut -f 1 -d ' ')
 release_package
 release ./aur/c3 "$SOURCE_MD5"
