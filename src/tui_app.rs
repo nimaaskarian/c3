@@ -5,7 +5,7 @@ use std::process::Command;
 // }}}
 // lib {{{
 use crossterm::{
-    event::{self, Event::Key, KeyCode::{self, Char}, KeyModifiers, ModifierKeyCode}, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand
+    event::{self, Event::Key, KeyCode::{self, Char}, KeyModifiers}, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}, ExecutableCommand
 };
 use tui_textarea::{Input, TextArea, CursorMove};
 use ratatui::{prelude::*, widgets::*};
@@ -272,7 +272,7 @@ impl<'a>TuiApp<'a>{
     #[inline]
     pub fn nnn_output_todo(&mut self) {
         if let Some(path) = Self::nnn_path() {
-            self.todo_app.output_list_to_path(PathBuf::from(path));
+            let _ = self.todo_app.output_list_to_path(PathBuf::from(path));
         }
     }
 
