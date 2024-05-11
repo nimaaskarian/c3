@@ -248,9 +248,10 @@ impl<'a>TuiApp<'a>{
         let exit_status = output.wait().expect("Failed to wait on nnn.");
         if exit_status.success() {
             let reader = BufReader::new(output.stdout.unwrap());
-            let first_line = reader.lines().nth(0);
-            let path = first_line.unwrap().unwrap();
-            return Some(PathBuf::from(path))
+            if let Some(line) = reader.lines().nth(0) {
+                let path = line.unwrap();
+                return Some(PathBuf::from(path))
+            }
         }
         None
     }

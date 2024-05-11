@@ -71,8 +71,8 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | P | enable module |
 | / | search current list for todo |
 | ? | search the whole tree for todo |
-| O | open nnn file picker to choose a file to append to current list |
-| o | open nnn file picker to choose a file to output current list to |
+| o | open nnn file picker to choose a file to append to current list |
+| O | open nnn file picker to choose a file to output current list to |
 | Ctrl+o | open nnn file picker to choose a file to open |
 | n | search next |
 | N | search previous |
