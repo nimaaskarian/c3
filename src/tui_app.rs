@@ -236,7 +236,7 @@ impl<'a>TuiApp<'a>{
         self.set_text_mode(Self::on_reminder, "Date reminder", "");
     }
 
-    fn nnn_path() -> Option<PathBuf> {
+    fn nnn_paths() -> Vec<PathBuf> {
          let mut output = Command::new("nnn")
         .args(["-p", "-"])
         .stdin(Stdio::inherit())
@@ -248,30 +248,27 @@ impl<'a>TuiApp<'a>{
         let exit_status = output.wait().expect("Failed to wait on nnn.");
         if exit_status.success() {
             let reader = BufReader::new(output.stdout.unwrap());
-            if let Some(line) = reader.lines().nth(0) {
-                let path = line.unwrap();
-                return Some(PathBuf::from(path))
-            }
+            return reader.lines().map(|x| PathBuf::from(x.unwrap_or(String::new()))).collect()
         }
-        None
+        vec![]
     }
 
     #[inline]
     pub fn nnn_append_todo(&mut self) {
-        if let Some(path) = Self::nnn_path() {
+        for path in Self::nnn_paths() {
             self.todo_app.append_list_from_path(PathBuf::from(path));
         }
     }
 
     pub fn nnn_open(&mut self) {
-        if let Some(path) = Self::nnn_path() {
+        for path in Self::nnn_paths() {
             self.todo_app.open_path(PathBuf::from(path));
         }
     }
 
     #[inline]
     pub fn nnn_output_todo(&mut self) {
-        if let Some(path) = Self::nnn_path() {
+        for path in Self::nnn_paths() {
             let _ = self.todo_app.output_list_to_path(PathBuf::from(path));
         }
     }
