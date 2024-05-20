@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+. ./.error-on-no-arg.sh
 . ./.shell-methods.sh
 TAG="$1"
 
