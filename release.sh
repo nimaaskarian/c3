@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+. ./.error-on-no-arg.sh
 . ./.shell-methods.sh
 
 LAST_TAG=$(git tag | tail -n 2 | head -n 1)

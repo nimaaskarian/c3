@@ -1,12 +1,5 @@
 #!/usr/bin/env sh
-
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-echo_exit() {
- echo -e "${RED}Error$NC: $*"
- exit 1 
-}
+. ./.shell-methods.sh
 
 CHROOT=$HOME/.chroot
 mkdir "$CHROOT"
