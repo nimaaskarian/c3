@@ -1,6 +1,7 @@
 #!/bin/sh
 
 clean() {
+  rm c3-bin
   rm $1/*.tar.gz
   rm $1/*.log
   rm $1/*.zst
