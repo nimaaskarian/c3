@@ -134,13 +134,7 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_prenote(&self, last_stack: Vec<bool>) {
-        for x in last_stack {
-            if x {
-                print!("│   ")
-            } else {
-                print!("    ")
-            }
-        }
+        self.print_preindention(last_stack);
         print!("    ")
     }
 
@@ -149,17 +143,24 @@ impl PrintTodoTree {
         if self.should_print_indention {
             return
         }
-        for x in self.last_stack.clone() {
+        self.print_preindention(self.last_stack.clone());
+        if self.is_last {
+            print!("└── ");
+        } else {
+            print!("├── ");
+        }
+    }
+
+    #[inline(always)]
+    fn print_preindention(&self, last_stack: Vec<bool>) {
+        let mut iter = last_stack.into_iter();
+        iter.next();
+        for x in iter {
             if x {
                 print!("│   ")
             } else {
                 print!("    ")
             }
-        }
-        if self.is_last {
-            print!("└── ");
-        } else {
-            print!("├── ");
         }
     }
 }
