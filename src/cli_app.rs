@@ -80,12 +80,18 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    pub fn tree_child(&self, what_to_push: bool) -> Self {
+    pub fn tree_child(&self) -> Self {
         let mut child = self.clone();
         child.depth+=1;
-        child.last_stack.push(!self.is_last && what_to_push);
+        child.last_stack.push(self.what_to_push());
 
         child
+    }
+
+    #[inline]
+    pub fn what_to_push(&self) -> bool {
+        let popped = self.last_stack.last();
+        !self.is_last && popped.is_some() && !self.last_stack.is_empty()
     }
 
     #[inline]
@@ -100,9 +106,7 @@ impl PrintTodoTree {
             self.print_todo(todo, display_args);
 
             if let Some(todo_list) = todo.dependency.todo_list() {
-                let popped = self.last_stack.last();
-                let what_to_push = popped.is_some() && !self.last_stack.is_empty();
-                let mut tree_child = self.tree_child(what_to_push);
+                let mut tree_child = self.tree_child();
                 tree_child.print_list(todo_list, display_args, restriction.clone());
             }
 
@@ -120,7 +124,7 @@ impl PrintTodoTree {
     #[inline]
     fn print_note(&mut self, note: &String) {
         let mut last_stack = self.last_stack.clone();
-        last_stack.push(!self.is_last);
+        last_stack.push(self.what_to_push());
 
         for line in note.lines() {
             self.print_prenote(last_stack.clone());
