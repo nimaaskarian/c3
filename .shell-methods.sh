@@ -1,4 +1,5 @@
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 if [ "$#" -ne 1 ]; then
@@ -11,3 +12,6 @@ echo_exit() {
  exit 1 
 }
 
+echo_warning() {
+ echo -e $YELLOW"Warning$NC: $*"
+}

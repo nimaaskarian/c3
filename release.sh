@@ -8,13 +8,10 @@ USERNAME=nimaaskarian
 TAG="$1"
 SOURCE_MD5=""
 
-push_tag() {
-  git tag "$TAG" || {
-    echo List of existing tags:
-    git tag
-    echo_exit tag exists.
+make_tag() {
+  git tag "$TAG" 2> /dev/null || {
+    echo_warning tag "$TAG" already exists.
   }
-  git push --tags
 }
 
 release_package() {
@@ -43,6 +40,7 @@ release() {
   cd "$WD" || echo_exit "cding back to previous working directory in release() failed"
 }
 
+make_tag
 BIN_MD5=$(md5sum target/release/$PACKAGE_NAME | cut -f 1 -d ' ')
 release_package
 release ./aur/c3 "$SOURCE_MD5"
