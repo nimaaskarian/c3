@@ -30,6 +30,7 @@ release() {
   FOLDER=$1
   MD5=$2
   sed -i "s/pkgver=$LAST_TAG/pkgver=$TAG/" $FOLDER/PKGBUILD || echo_exit changing version of $FOLDER/PKGBUILD failed
+  sed -i "s/pkgrel=.*/pkgrel=1/" $FOLDER/PKGBUILD || echo_exit setting rel of $FOLDER/PKGBUILD to 1 failed
   sed -i "s/md5sums=('.*')/md5sums=('$MD5')/" $FOLDER/PKGBUILD || echo_exit changing md5sum of $FOLDER/PKGBUILD failed
 
   cd $FOLDER || echo_exit cd to $FOLDER failed
