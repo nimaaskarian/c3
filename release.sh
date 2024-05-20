@@ -2,7 +2,7 @@
 . ./.error-on-no-arg.sh
 . ./.shell-methods.sh
 
-LAST_TAG=$(git tag | tail -n 2 | head -n 1)
+LAST_TAG=$(git tag | tail -n 1)
 
 PACKAGE_NAME=c3
 USERNAME=nimaaskarian
@@ -12,6 +12,7 @@ SOURCE_MD5=""
 make_tag() {
   git tag "$TAG" 2> /dev/null || {
     echo_warning tag "$TAG" already exists.
+    LAST_TAG=$(git tag | tail -n 2 | head -n 1)
   }
 }
 
