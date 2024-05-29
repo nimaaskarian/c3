@@ -96,7 +96,7 @@ pub struct Args {
     stdout: bool,
 
     /// Path to todo file (and notes sibling directory)
-    #[arg(short='p', long,default_value=get_todo_path().unwrap().into_os_string())]
+    #[arg(default_value=get_todo_path().unwrap().into_os_string())]
     todo_path: PathBuf,
 }
 
