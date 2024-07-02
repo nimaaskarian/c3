@@ -8,7 +8,7 @@ use std::process::Command;
 use std::env;
 
 #[inline(always)]
-pub fn open_temp_editor(content:Option<&String>, path: PathBuf) -> io::Result<String>{
+pub fn open_temp_editor(content:Option<&str>, path: PathBuf) -> io::Result<String>{
     let mut file = File::create(&path)?;
     if let Some(content) = content {
         write!(file, "{content}")?;

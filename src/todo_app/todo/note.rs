@@ -3,7 +3,7 @@ use std::io;
 use sha1::{Sha1, Digest};
 use crate::fileio::{temp_path, open_temp_editor};
 
-pub fn open_note_temp_editor(content:Option<&String>) -> io::Result<String>{
+pub fn open_note_temp_editor(content:Option<&str>) -> io::Result<String>{
     open_temp_editor(content,temp_note_path())
 }
 

@@ -119,7 +119,7 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    fn print_note(&mut self, note: &String) {
+    fn print_note(&mut self, note: &str) {
         let mut last_stack = self.last_stack.clone();
         last_stack.push(self.what_to_push());
 

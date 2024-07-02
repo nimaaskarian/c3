@@ -46,7 +46,7 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn note(&self) -> Option<&String> {
+    pub fn note(&self) -> Option<&str> {
         if self.is_note() {
             Some(&self.note)
         } else {
