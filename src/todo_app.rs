@@ -247,13 +247,13 @@ impl App {
 
     #[inline]
     pub fn prepend(&mut self, message:String) {
-        self.current_list_mut().prepend(Todo::default(message, 1));
+        self.current_list_mut().prepend(Todo::new(message, 1));
         self.go_top();
     }
 
     #[inline]
     pub fn append(&mut self, message:String) {
-        self.current_list_mut().push(Todo::default(message, 0));
+        self.current_list_mut().push(Todo::new(message, 0));
         self.index = self.current_list_mut().reorder_last();
     }
 

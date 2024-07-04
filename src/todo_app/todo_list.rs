@@ -327,7 +327,7 @@ mod tests {
     fn test_push() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-push/tmplist");
-        todo_list.push(Todo::default("Show me your warface".to_string(), 0));
+        todo_list.push(Todo::new("Show me your warface".to_string(), 0));
         todo_list.reorder_last();
         let _ = todo_list.write(&path, true);
 

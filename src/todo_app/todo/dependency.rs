@@ -21,22 +21,10 @@ pub struct Dependency {
 
 impl Dependency {
     #[inline]
-    pub fn default() -> Self {
-        Self::new(String::new(), DependencyMode::None, false)
-    }
-
     pub fn written() -> Self {
-        Self::new(String::new(), DependencyMode::None, true)
-    }
-
-    #[inline]
-    fn new(name: String, mode: DependencyMode, written: bool) -> Self {
-        Dependency {
-            written,
-            mode,
-            name,
-            note: String::new(),
-            todo_list: TodoList::new(),
+        Self {
+            written: true,
+            ..Default::default()
         }
     }
 
@@ -68,15 +56,21 @@ impl Dependency {
 
     #[inline]
     pub fn new_todo_list(hash: String) -> Self {
-        Dependency::new(format!("{}.todo", hash), DependencyMode::TodoList, false)
+        Self {
+            name: format!("{}.todo", hash),
+            mode: DependencyMode::TodoList,
+            ..Default::default()
+        }
     }
 
     #[inline]
     pub fn new_note(hash: String, note: String) -> Self {
-        let mut dependency = Dependency::new(format!("{}", hash), DependencyMode::Note, false);
-        dependency.note = note;
-
-        dependency
+        Self {
+            note,
+            name: format!("{}", hash),
+            mode: DependencyMode::Note,
+            ..Default::default()
+        }
     }
 
     #[inline]
@@ -205,8 +199,11 @@ impl From<&str> for Dependency {
             }
         }
 
-
-        Dependency::new(name, mode, false)
+        Self {
+            name,
+            mode,
+            ..Default::default()
+        }
     }
 }
 
