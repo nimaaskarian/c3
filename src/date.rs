@@ -5,12 +5,12 @@ const FORMAT: &str = "%Y-%m-%d";
 pub type Type = NaiveDate;
 
 #[inline]
-pub fn parse(date_string: &String) -> Result<Type, ParseError> {
-    NaiveDate::parse_from_str(date_string.as_str(), FORMAT)
+pub fn parse(date_string: &str) -> Result<Type, ParseError> {
+    NaiveDate::parse_from_str(date_string, FORMAT)
 }
 
 #[inline(always)]
-pub fn parse_user_input(date_string: &String) -> Result<Type, ParseError> {
+pub fn parse_user_input(date_string: &str) -> Result<Type, ParseError> {
     parse(date_string)
 }
 

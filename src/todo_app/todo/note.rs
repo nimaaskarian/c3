@@ -12,7 +12,7 @@ pub fn temp_note_path() -> PathBuf{
     temp_path("note")
 }
 
-pub fn sha1(str:&String) -> String{
+pub fn sha1(str:&str) -> String{
     let mut hasher = Sha1::new();
     hasher.update(str);
     let result = hasher.finalize();
