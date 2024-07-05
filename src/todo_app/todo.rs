@@ -138,17 +138,6 @@ impl TryFrom<&str> for Todo {
 
 impl Todo {
     #[inline]
-    pub fn written(message:String, priority:PriorityType, done:bool) -> Self {
-        Self {
-            message,
-            priority,
-            done,
-            dependency: Dependency::written(),
-            ..Default::default()
-        }
-    }
-
-    #[inline]
     pub fn matches(&self, query: &str) -> bool {
         self.message.contains(query) || self.message.to_lowercase().contains(query)
     }

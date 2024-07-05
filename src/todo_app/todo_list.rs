@@ -285,8 +285,11 @@ mod tests {
     #[test]
     fn test_todolist_read_undone() {
         let todo_list = get_todo_list();
-        let expected_undone = vec![Todo::written("this todo has prio 1".to_string(), 1, false)
-            ,Todo::written("this one has prio 2".to_string(), 2, false)];
+        let mut expected_undone = vec![Todo::new("this todo has prio 1".to_string(), 1)
+            ,Todo::new("this one has prio 2".to_string(), 2)];
+        for i in 0..expected_undone.len() {
+            let _ = expected_undone[i].dependency.write(&PathBuf::from("/dev/null"));
+        }
 
         assert_eq!(expected_undone, todo_list.todos.iter().filter(|todo| !todo.done()).cloned().collect::<Vec<Todo>>());
     }
@@ -294,7 +297,11 @@ mod tests {
     #[test]
     fn test_todolist_read_done() {
         let todo_list = get_todo_list();
-        let expected_done = vec![Todo::written("this one is 2 and done".to_string(), 2, true),Todo::written("this one is 0 and done".to_string(), 0, true)];
+        let mut expected_done = vec![Todo::new("this one is 2 and done".to_string(), 2),Todo::new("this one is 0 and done".to_string(), 0)];
+        for i in 0..expected_done.len() {
+            expected_done[i].toggle_done();
+            let _ = expected_done[i].dependency.write(&PathBuf::from("/dev/null"));
+        }
         assert_eq!(expected_done, todo_list.todos.iter().filter(|todo| todo.done()).cloned().collect::<Vec<Todo>>());
     }
 

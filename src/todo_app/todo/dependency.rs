@@ -21,14 +21,6 @@ pub struct Dependency {
 
 impl Dependency {
     #[inline]
-    pub fn written() -> Self {
-        Self {
-            written: true,
-            ..Default::default()
-        }
-    }
-
-    #[inline]
     pub fn is_written(&self) -> bool {
         self.written
     }
