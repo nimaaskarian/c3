@@ -135,6 +135,8 @@ impl Schedule {
         let inner_str = match self.current_date_diff_days() {
             ..=0 => String::new(),
             1 => String::from(", last done yesterday"),
+            7 => String::from(", last done a week ago"),
+            any if any%7 == 0 => format!(", last done {} weeks ago", any/7),
             any => format!(", last done {} days ago", any)
         };
         match self.day {
