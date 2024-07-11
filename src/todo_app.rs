@@ -63,6 +63,12 @@ impl App {
         app
     }
 
+    pub fn toggle_schedule(&mut self) {
+        if let Some(todo) = self.todo_mut() {
+            todo.schedule.toggle();
+        }
+    }
+
     pub fn restriction(&self) -> Restriction{
         self.restriction.clone()
     }

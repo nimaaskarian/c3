@@ -485,6 +485,7 @@ impl<'a>TuiApp<'a>{
                     Char('W') => self.todo_app.toggle_current_weekly(),
                     Char('S') => self.schedule_prompt(),
                     Char('m') => self.reminder_prompt(),
+                    Char('M') => self.todo_app.toggle_schedule(),
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('@') => self.priority_prompt(),
                     Char('y') => self.todo_app.yank_todo(),
