@@ -274,6 +274,7 @@ impl TodoList {
 #[cfg(test)]
 mod tests {
     use std::fs::{self, remove_dir_all, remove_file};
+    use std::str::FromStr;
 
     use super::*;
 
@@ -365,7 +366,7 @@ mod tests {
         let mut todo_list = get_todo_list();
         let _ = todo_list.todos[0].add_todo_dependency();
         let path = PathBuf::from("test-write-dependency/tmplist");
-        todo_list.todos[0].dependency.push(Todo::try_from("[0] Some dependency").unwrap());
+        todo_list.todos[0].dependency.push(Todo::from_str("[0] Some dependency").unwrap());
         let dependency_path = todo_list.write(&path, true)?;
         todo_list.write_dependencies(&dependency_path)?;
 

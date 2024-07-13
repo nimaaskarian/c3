@@ -1,7 +1,7 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
 use std::{io, path::PathBuf, fs::remove_file};
-use std::str;
+use std::str::{self, FromStr};
 //}}}
 // mod{{{
 mod note;
@@ -48,7 +48,7 @@ impl TryFrom<String> for Todo {
     type Error = TodoError;
 
     fn try_from(s:String) -> Result<Todo, Self::Error>{
-        Todo::try_from(s.as_str())
+        Todo::from_str(s.as_str())
     }
 }
 
@@ -60,10 +60,10 @@ enum State {
     Message,
 }
 
-impl TryFrom<&str> for Todo {
-    type Error = TodoError;
+impl FromStr for Todo {
+    type Err = TodoError;
 
-    fn try_from(input:&str) -> Result<Todo, Self::Error>{
+    fn from_str(input:&str) -> Result<Todo, Self::Err>{
         let mut state = State::default();
         let mut priority: u8 = 0;
         let mut done = false;
@@ -500,7 +500,7 @@ mod tests {
     #[test]
     fn test_from_string() {
         let input1 = "[1]>1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo Read for exams";
-        let todo = Todo::try_from(input1).unwrap();
+        let todo = Todo::from_str(input1).unwrap();
 
         let expected = Todo {
             removed_dependency: None,
@@ -516,7 +516,7 @@ mod tests {
     #[test]
     fn test_daily() {
         let input = "[-2] this one should be daily [D1(2023-09-05)]";
-        let todo = Todo::try_from(input).unwrap();
+        let todo = Todo::from_str(input).unwrap();
         let expected = Todo {
             removed_dependency: None,
             schedule: Schedule::from("D1(2023-09-05)"),
@@ -527,7 +527,7 @@ mod tests {
         };
         assert_eq!(todo, expected);
         let input = "[2] this one should be daily [D1(2023-09-05)]";
-        let todo = Todo::try_from(input).unwrap();
+        let todo = Todo::from_str(input).unwrap();
         assert_eq!(todo, expected);
     }
 
@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn test_weekly() {
         let input = "[-2] this one should be daily [D7(2023-09-05)]";
-        let todo = Todo::try_from(input).unwrap();
+        let todo = Todo::from_str(input).unwrap();
         let expected = Todo {
             removed_dependency: None,
             dependency: Dependency::default(),
@@ -560,7 +560,7 @@ mod tests {
         };
         assert_eq!(todo, expected);
         let input = "[2] this one should be daily [D7(2023-09-05)]";
-        let todo = Todo::try_from(input).unwrap();
+        let todo = Todo::from_str(input).unwrap();
         assert_eq!(todo, expected);
     }
 }
