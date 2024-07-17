@@ -1,3 +1,4 @@
+use std::path::Path;
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
 use std::{io, path::PathBuf, fs::remove_file};
@@ -26,14 +27,14 @@ pub struct Todo {
 }
 
 
-impl Into<String> for &Todo {
-    fn into(self) -> String{
-        let done_str = if self.done() {"-"} else {""};
-        let dep_str:String = (&self.dependency).into();
+impl From<&Todo> for String {
+    fn from(todo: &Todo) -> String {
+        let done_str = if todo.done() {"-"} else {""};
+        let dep_str:String = (&todo.dependency).into();
 
-        let schedule_str:String =(&self.schedule).into();
+        let schedule_str:String =(&todo.schedule).into();
 
-        format!("[{done_str}{}]{dep_str} {}{schedule_str}", self.priority, self.message)
+        format!("[{done_str}{}]{dep_str} {}{schedule_str}", todo.priority, todo.message)
     }
 }
 
@@ -42,14 +43,6 @@ pub enum TodoError {
     ReadFailed,
     NoteEmpty,
     DependencyCreationFailed,
-}
-
-impl TryFrom<String> for Todo {
-    type Error = TodoError;
-
-    fn try_from(s:String) -> Result<Todo, Self::Error>{
-        Todo::from_str(s.as_str())
-    }
 }
 
 #[derive(Default, PartialEq)]
@@ -71,7 +64,7 @@ impl FromStr for Todo {
         let mut schedule_string = String::new();
         let mut message = String::new();
         let mut schedule_start_index: Option<usize> = None;
-        if input.chars().last() == Some(']') {
+        if input.ends_with(']') {
             schedule_start_index = input.rfind('[');
             if let Some(start) = schedule_start_index {
                 let end = input.chars().count();
@@ -84,7 +77,7 @@ impl FromStr for Todo {
                 State::Priority => {
                     if c == '-' {
                         done = true;
-                    } else if c.is_digit(10) {
+                    } else if c.is_ascii_digit() {
                         priority = c.to_digit(10).unwrap() as PriorityType;
                     } else if c == ' ' {
                         state = State::Message;
@@ -185,14 +178,14 @@ impl Todo {
     }
 
     #[inline]
-    pub fn delete_dependency_file(&mut self, path: &PathBuf) -> io::Result<()> {
+    pub fn delete_dependency_file(&mut self, path: &Path) -> io::Result<()> {
         self.dependency.todo_list.remove_dependency_files(path)?;
         let _ = remove_file(path.join(self.dependency.get_name()));
         Ok(())
     }
 
     #[inline]
-    pub fn delete_removed_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
+    pub fn delete_removed_dependent_files(&mut self, path: &Path) -> io::Result<()>{
         if let Some(dependency) = &mut self.removed_dependency {
             let _ = dependency.todo_list.remove_dependency_files(path);
             let _ = remove_file(path.join(dependency.get_name()));
@@ -247,7 +240,7 @@ impl Todo {
     }
 
     #[inline]
-    pub fn dependency_path(&self, path: &PathBuf) -> Option<PathBuf> {
+    pub fn dependency_path(&self, path: &Path) -> Option<PathBuf> {
         self.dependency.path(path)
     }
 
@@ -397,7 +390,7 @@ mod tests {
             done: false,
         });
 
-        let result: Result<Todo, TodoError> = Todo::try_from(input.to_string());
+        let result: Result<Todo, TodoError> = input.to_string().parse();
 
         assert_eq!(result, expected);
     }

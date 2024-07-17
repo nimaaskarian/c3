@@ -49,7 +49,7 @@ T: ToString,
                     }
                 }
                 State::Days => {
-                    if c.is_digit(10) {
+                    if c.is_ascii_digit() {
                         day_str.push(c);
                     } else if c == '(' {
                         state = State::Date;
@@ -86,13 +86,13 @@ T: ToString,
     }
 }
 
-impl Into<String> for &Schedule {
-    fn into(self) -> String {
-        let date_str = date::format(self.date);
+impl From<&Schedule> for String {
+    fn from(schedule: &Schedule) -> String {
+        let date_str = date::format(schedule.date);
 
-        match self.mode {
+        match schedule.mode {
             ScheduleMode::Reminder => format!(" [R({date_str})]"),
-            ScheduleMode::Scheduled =>  format!(" [D{}({date_str})]", self.day),
+            ScheduleMode::Scheduled =>  format!(" [D{}({date_str})]", schedule.day),
             ScheduleMode::None => String::new(),
         }
     }
@@ -122,7 +122,7 @@ impl Schedule {
     fn display_reminder(&self) -> String {
         let date_str = date::display(self.date);
         match self.date_diff_days() {
-            any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str,-1*any),
+            any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str,-any),
             0 => format!(" (Reminder for today [{}])", date_str),
             1 => format!(" (Reminder for tomorrow [{}])", date_str),
             any => format!(" (Reminder for {date_str} [{any} days])"),

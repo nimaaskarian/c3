@@ -81,10 +81,7 @@ impl <'a> Module <'a> for Potato <'a> {
 impl<'a> Potato<'a> {
     #[inline]
     pub fn new(command_name: Option<&'a str>) -> Self {
-        let command = match command_name {
-            Some(str) => str,
-            None => "potctl",
-        };
+        let command = command_name.unwrap_or("potctl");
         Self { command, index: 0 }
     }
 

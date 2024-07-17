@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::str::Lines;
 use std::{io, path::PathBuf};
 mod clipboard;
@@ -197,7 +198,7 @@ impl App {
                 }
             }
         }
-        while let Some(message) = messages.next() {
+        for message in messages {
             changed = true;
             self.append(String::from(message))
         }
@@ -219,7 +220,7 @@ impl App {
 
     pub fn print_searched(&mut self) {
         for position in self.tree_search_positions.iter() {
-            self.tree_path = position.tree_path.clone();
+            self.tree_path.clone_from(&position.tree_path);
             let list = self.current_list();
             for index in position.matching_indices.clone() {
                 println!("{}",list.index(index,self.restriction.clone()).display(&self.args.display_args));
@@ -512,7 +513,7 @@ impl App {
     }
 
     #[inline]
-    pub fn handle_removed_todo_dependency_files(&mut self, dependency_path:&PathBuf) {
+    pub fn handle_removed_todo_dependency_files(&mut self, dependency_path:&Path) {
         for todo in &mut self.removed_todos {
             let _ = todo.delete_dependency_file(dependency_path);
         }
@@ -619,10 +620,10 @@ impl App {
         let size = self.len();
 
         if size <= index {
-            return Some(&current_list.index(size - 1, self.restriction.clone()));
+            return Some(current_list.index(size - 1, self.restriction.clone()));
         }
 
-        Some(&self.current_list().index(index, self.restriction.clone()))
+        Some(self.current_list().index(index, self.restriction.clone()))
     }
 
     #[inline]
@@ -701,19 +702,16 @@ impl App {
     #[inline]
     pub fn paste_todo(&mut self) {
         let todos_count = self.len();
-        match Todo::try_from(self.clipboard.get_text()) {
-            Ok(mut todo) => {
-                let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
-                let _ = todo.dependency.read(&todo_parent);
-                let bottom = self.bottom()+1;
-                let list = &mut self.current_list_mut();
-                list.push(todo);
-                if todos_count != 0 {
-                    self.index = list.reorder(bottom);
-                }
-            },
-            _ => {},
-        };
+        if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
+            let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
+            let _ = todo.dependency.read(&todo_parent);
+            let bottom = self.bottom()+1;
+            let list = &mut self.current_list_mut();
+            list.push(todo);
+            if todos_count != 0 {
+                self.index = list.reorder(bottom);
+            }
+        }
     }
 
     #[inline]
@@ -745,7 +743,7 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{self, remove_dir_all};
+    use std::{fs::{self, remove_dir_all}, path::Path};
 
     use clap::Parser;
     use crate::Args;
@@ -758,7 +756,7 @@ mod tests {
         Ok(path)
     }
 
-    fn write_test_todos(dir: &PathBuf) -> io::Result<App>{
+    fn write_test_todos(dir: &Path) -> io::Result<App>{
         let mut args = Args::parse();
         fs::create_dir_all(dir.join("notes"))?;
         args.todo_path = dir.join("todo");

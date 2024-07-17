@@ -115,7 +115,7 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_todo(&self, todo: &Todo, display_args: &DisplayArgs) {
-        println!("{}", todo.display(&display_args));
+        println!("{}", todo.display(display_args));
     }
 
     #[inline]
