@@ -169,4 +169,4 @@ index 16c5eda..8d89a33 100644
 +
  #[inline]
  pub fn diff_days(first: Option<Type>, next: Option<Type>) -> i64 {
-     if first.is_some() && next.is_some() {
+     match (first, next) {

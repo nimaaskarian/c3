@@ -34,10 +34,11 @@ pub fn display(input: Option<Type>) -> String {
 
 #[inline]
 pub fn diff_days(first: Option<Type>, next: Option<Type>) -> i64 {
-    if first.is_some() && next.is_some() {
-        (first.unwrap() - next.unwrap()).num_days()
-    } else {
-        0
+    match (first, next) {
+        (Some(first), Some(next)) => {
+            (first - next).num_days()
+        },
+        _ => 0
     }
 }
 
