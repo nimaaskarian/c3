@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::str::Lines;
+use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
@@ -38,6 +38,36 @@ pub struct App {
     x_index: usize,
     y_index: usize,
     restriction: Restriction,
+}
+
+#[derive(Debug)]
+struct IndexedLine {
+    message: String,
+    index: usize,
+}
+
+#[derive(Debug)]
+struct LineMalformed;
+
+impl FromStr for IndexedLine {
+    type Err = LineMalformed;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        let mut num_length = 0;
+        for c in input.chars() {
+            if c == ' ' {
+                break
+            }
+            num_length+=1;
+        }
+        let index = match input[..num_length].parse() {
+            Ok(index) => index,
+            Err(_) => return Err(LineMalformed),
+        };
+        Ok(Self {
+            index,
+            message: input[num_length+1..].to_string(),
+        })
+    }
 }
 
 impl App {
@@ -176,46 +206,78 @@ impl App {
 
     pub fn batch_editor_messages(&mut self) {
         let restriction = self.restriction().clone();
-        let content = self.current_list().messages(restriction).join("\n");
+        let content = self.current_list().messages(restriction)
+            .iter().enumerate()
+            .map(|(i, x)| format!("{i} {x}"))
+            .collect::<Vec<String>>()
+            .join("\n");
         let new_messages = open_temp_editor(Some(&content),temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
     }
 
     #[inline(always)]
-    fn batch_edit_current_list(&mut self, mut messages: Lines<'_>) {
+    fn batch_edit_current_list(&mut self, messages: Lines<'_>) {
         let mut changed = false;
+        let mut indexed_lines: Vec<IndexedLine> = messages.into_iter()
+            .flat_map(|message| message.parse())
+            .collect();
+
+        indexed_lines.sort_by_key(|a| a.index);
+        let mut indexed_lines_iter = indexed_lines.iter();
+        let mut current_line = indexed_lines_iter.next();
+        let mut delete_indices: Vec<usize> = vec![];
         if let Some(restriction) = self.restriction.clone() {
-            for todo in self.current_list_mut().todos.iter_mut().filter(|todo| restriction(todo)) {
-                if Self::batch_edit_helper(todo, messages.next()) {
-                    changed = true;
+            for (i, todo) in self.current_list_mut().todos.iter_mut().filter(|todo| restriction(todo)).enumerate() {
+                if let Some(indexed_line) = current_line {
+                    if indexed_line.index == i {
+                        if Self::batch_edit_helper(todo, &indexed_line.message) {
+                            changed = true;
+                        }
+                        current_line = indexed_lines_iter.next();
+                    } else {
+                        changed = true;
+                        delete_indices.push(i);
+                    }
+                } else {
+                    break
                 }
             }
         } else {
-            for todo in self.current_list_mut().todos.iter_mut() {
-                if Self::batch_edit_helper(todo, messages.next()) {
-                    changed = true;
+            for (i, todo) in self.current_list_mut().todos.iter_mut().enumerate() {
+                if let Some(indexed_line) = current_line {
+                    if indexed_line.index == i {
+                        if Self::batch_edit_helper(todo, &indexed_line.message) {
+                            changed = true;
+                        }
+                        current_line = indexed_lines_iter.next();
+                    } else {
+                        changed = true;
+                        delete_indices.push(i);
+                    }
+                } else {
+                    break
                 }
             }
         }
-        for message in messages {
-            changed = true;
-            self.append(String::from(message))
-        }
+        self.todo_list.set_todos(self.todo_list
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !delete_indices.contains(i))
+            .map(|(_, todo)| todo)
+            .cloned()
+            .collect());
         self.changed = changed;
     }
 
     #[inline(always)]
-    fn batch_edit_helper(todo: &mut Todo, message: Option<&str>) -> bool {
-        if let Some(message) = message {
-            let message = String::from(message);
-            if todo.message == message {
-                return false
-            }
-            todo.set_message(message);
-            return true
-        } 
-        false
+    fn batch_edit_helper(todo: &mut Todo, message: &str) -> bool {
+        let message = message.to_string();
+        if todo.message == message {
+            return false
+        }
+        todo.set_message(message);
+        true
     }
 
     pub fn print_searched(&mut self) {

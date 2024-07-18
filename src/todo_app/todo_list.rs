@@ -83,23 +83,23 @@ impl TodoList {
     }
 
     pub fn read(filename: &Path, read_dependencies: bool, is_root: bool) -> Self{
-        let mut todo_array = Self::new();
+        let mut todolist = Self::new();
         if !filename.is_file() {
-            return todo_array
+            return todolist
         }
         let file_data = read(filename).unwrap();
 
         for line in file_data.lines() {
             if let Ok(todo) = line.unwrap_or_default().parse::<Todo>() {
-                todo_array.push(todo);
+                todolist.push(todo);
             }
         }
-        todo_array.sort();
+        todolist.sort();
         if read_dependencies {
             let dependency_path = Self::dependency_parent(filename, is_root);
-            let _ = todo_array.read_dependencies(&dependency_path);
+            let _ = todolist.read_dependencies(&dependency_path);
         }
-        todo_array
+        todolist
     }
 
     fn read_dependencies(&mut self, path: &Path) -> io::Result<()>{
