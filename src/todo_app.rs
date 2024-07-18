@@ -43,7 +43,7 @@ pub struct App {
 #[derive(Debug)]
 struct IndexedLine {
     message: String,
-    index: usize,
+    index: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -59,13 +59,15 @@ impl FromStr for IndexedLine {
             }
             num_length+=1;
         }
-        let index = match input[..num_length].parse() {
-            Ok(index) => index,
-            Err(_) => return Err(LineMalformed),
+        let index = input[..num_length].parse().ok();
+        let message = if index.is_none() {
+            input.to_string()
+        } else {
+            input[num_length+1..].to_string()
         };
         Ok(Self {
             index,
-            message: input[num_length+1..].to_string(),
+            message,
         })
     }
 }
@@ -227,26 +229,15 @@ impl App {
         let mut indexed_lines_iter = indexed_lines.iter();
         let mut current_line = indexed_lines_iter.next();
         let mut delete_indices: Vec<usize> = vec![];
-        if let Some(restriction) = self.restriction.clone() {
-            for (i, todo) in self.current_list_mut().todos.iter_mut().filter(|todo| restriction(todo)).enumerate() {
-                if let Some(indexed_line) = current_line {
-                    if indexed_line.index == i {
-                        if Self::batch_edit_helper(todo, &indexed_line.message) {
-                            changed = true;
-                        }
-                        current_line = indexed_lines_iter.next();
-                    } else {
-                        changed = true;
-                        delete_indices.push(i);
-                    }
-                } else {
-                    break
-                }
-            }
+        let restriction = if let Some(restriction) = self.restriction.clone() {
+            restriction
         } else {
-            for (i, todo) in self.current_list_mut().todos.iter_mut().enumerate() {
-                if let Some(indexed_line) = current_line {
-                    if indexed_line.index == i {
+            Rc::new(|_: &Todo| false)
+        };
+        for (i, todo) in self.current_list_mut().todos.iter_mut().filter(|todo| restriction(todo)).enumerate() {
+            if let Some(indexed_line) = current_line {
+                if let Some(line_index) = indexed_line.index {
+                    if line_index == i {
                         if Self::batch_edit_helper(todo, &indexed_line.message) {
                             changed = true;
                         }
@@ -255,9 +246,9 @@ impl App {
                         changed = true;
                         delete_indices.push(i);
                     }
-                } else {
-                    break
                 }
+            } else {
+                break
             }
         }
         self.todo_list.set_todos(self.todo_list
@@ -267,6 +258,12 @@ impl App {
             .map(|(_, todo)| todo)
             .cloned()
             .collect());
+        for line in indexed_lines {
+            if line.index.is_none() {
+                self.current_list_mut().push(Todo::new(line.message, 0));
+                changed = true;
+            }
+        }
         self.changed = changed;
     }
 
