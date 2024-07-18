@@ -260,8 +260,7 @@ impl App {
 
     #[inline]
     pub fn append(&mut self, message:String) {
-        self.current_list_mut().push(Todo::new(message, 0));
-        self.index = self.current_list_mut().reorder_last();
+        self.index = self.current_list_mut().push(Todo::new(message, 0));
     }
 
     pub fn index(&self) -> usize {
@@ -344,6 +343,11 @@ impl App {
         } else {
             self.current_list_mut().sort();
         }
+        if self.is_undone_empty() {
+            while self.traverse_up() && !self.is_undone_empty(){
+                self.toggle_current_done()
+            }
+        }
     }
 
     #[inline]
@@ -421,10 +425,13 @@ impl App {
     }
 
     #[inline]
-    pub fn traverse_up(&mut self) {
+    pub fn traverse_up(&mut self) -> bool {
         if let Some(index) = self.tree_path.pop() {
             self.index = index;
             self.search(None);
+            true
+        } else {
+            false
         }
     }
 
@@ -443,11 +450,7 @@ impl App {
 
     #[inline]
     pub fn is_todos_empty(&self) -> bool{
-        if self.show_done() {
-            self.current_list().is_empty(self.restriction.clone())
-        } else {
-            self.is_undone_empty()
-        }
+        self.current_list().is_empty(self.restriction.clone())
     }
 
     #[inline]
@@ -562,12 +565,12 @@ impl App {
 
     #[inline]
     pub fn is_undone_empty(&self) -> bool{
-        self.current_list().is_empty(self.restriction.clone())
+        self.current_list().is_empty(Some(Rc::new(move |todo| !todo.done())))
     }
 
     #[inline]
     pub fn is_done_empty(&self) -> bool{
-        self.current_list().is_empty(self.restriction.clone())
+        self.current_list().is_empty(Some(Rc::new(move |todo| todo.done())))
     }
 
     #[inline(always)]
@@ -701,16 +704,11 @@ impl App {
 
     #[inline]
     pub fn paste_todo(&mut self) {
-        let todos_count = self.len();
         if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
             let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
             let _ = todo.dependency.read(&todo_parent);
-            let bottom = self.bottom()+1;
             let list = &mut self.current_list_mut();
-            list.push(todo);
-            if todos_count != 0 {
-                self.index = list.reorder(bottom);
-            }
+            self.index = list.push(todo);
         }
     }
 

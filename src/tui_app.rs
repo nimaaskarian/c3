@@ -34,11 +34,11 @@ pub enum TodoWidget<'a> {
     Paragraph(ratatui::widgets::Paragraph<'a>),
 }
 
-pub fn create_todo_widget (display_list:Vec<String>, title:String, highlight_symbol: &str) ->  TodoWidget<'_> {
+pub fn create_todo_widget(display_list:Vec<String>, title:String, highlight_symbol: &str) ->  TodoWidget<'_> {
     if display_list.is_empty() {
         TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
     } else {
-        TodoWidget::List(List::new((display_list).clone())
+        TodoWidget::List(List::new(display_list)
             .block(default_block(title))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
             .highlight_symbol(highlight_symbol)
@@ -498,7 +498,9 @@ impl<'a>TuiApp<'a>{
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up |Char('k') => self.todo_app.decrement(),
                     KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),
-                    KeyCode::Left | Char('h') => self.todo_app.traverse_up(),
+                    KeyCode::Left | Char('h') => {
+                        self.todo_app.traverse_up();
+                    },
                     KeyCode::Home | Char('g') => self.todo_app.go_top(),
                     KeyCode::End | Char('G') => self.todo_app.go_bottom(),
                     Char('w') => self.write()?,
