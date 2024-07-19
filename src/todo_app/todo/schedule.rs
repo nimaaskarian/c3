@@ -1,20 +1,19 @@
 use crate::date;
 
 #[derive(Debug, PartialEq, Clone, Default)]
-pub enum ScheduleType {
+pub enum ScheduleMode {
     Scheduled,
     Reminder,
     #[default]
     None,
 }
 
-type Type = ScheduleType;
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Schedule {
     day: i64,
     date: Option<date::Type>,
-    _type: Type,
-    pub last_type: Type,
+    mode: ScheduleMode,
+    pub last_mode: ScheduleMode,
 }
 
 #[derive(Default)]
@@ -33,24 +32,24 @@ T: ToString,
     fn from(input:T) -> Schedule {
         let mut date_string = String::new();
         let mut state = State::default();
-        let mut _type = Type::None;
+        let mut mode = ScheduleMode::None;
         let mut day_str = String::new();
 
         for c in input.to_string().chars() {
             match state {
                 State::Type => {
                     if c == 'D' {
-                        _type = Type::Scheduled;
+                        mode = ScheduleMode::Scheduled;
                         state = State::Days;
                     } else if c == 'R' {
-                        _type = Type::Reminder;
+                        mode = ScheduleMode::Reminder;
                         state = State::PreDate;
                     } else {
                         break;
                     }
                 }
                 State::Days => {
-                    if c.is_digit(10) {
+                    if c.is_ascii_digit() {
                         day_str.push(c);
                     } else if c == '(' {
                         state = State::Date;
@@ -81,20 +80,20 @@ T: ToString,
         Schedule {
             day,
             date,
-            _type,
-            last_type: Type::default(),
+            mode,
+            last_mode: ScheduleMode::default(),
         }
     }
 }
 
-impl Into<String> for &Schedule {
-    fn into(self) -> String {
-        let date_str = date::format(self.date);
+impl From<&Schedule> for String {
+    fn from(schedule: &Schedule) -> String {
+        let date_str = date::format(schedule.date);
 
-        match self._type {
-            Type::Reminder => format!(" [R({date_str})]"),
-            Type::Scheduled =>  format!(" [D{}({date_str})]", self.day),
-            Type::None => String::new(),
+        match schedule.mode {
+            ScheduleMode::Reminder => format!(" [R({date_str})]"),
+            ScheduleMode::Scheduled =>  format!(" [D{}({date_str})]", schedule.day),
+            ScheduleMode::None => String::new(),
         }
     }
 }
@@ -104,8 +103,8 @@ impl Schedule {
         Schedule {
             day: 0,
             date: None,
-            _type: Type::default(),
-            last_type: Type::default(),
+            mode: ScheduleMode::default(),
+            last_mode: ScheduleMode::default(),
         }
     }
 
@@ -123,7 +122,7 @@ impl Schedule {
     fn display_reminder(&self) -> String {
         let date_str = date::display(self.date);
         match self.date_diff_days() {
-            any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str,-1*any),
+            any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str,-any),
             0 => format!(" (Reminder for today [{}])", date_str),
             1 => format!(" (Reminder for tomorrow [{}])", date_str),
             any => format!(" (Reminder for {date_str} [{any} days])"),
@@ -135,6 +134,8 @@ impl Schedule {
         let inner_str = match self.current_date_diff_days() {
             ..=0 => String::new(),
             1 => String::from(", last done yesterday"),
+            7 => String::from(", last done a week ago"),
+            any if any%7 == 0 => format!(", last done {} weeks ago", any/7),
             any => format!(", last done {} days ago", any)
         };
         match self.day {
@@ -146,16 +147,16 @@ impl Schedule {
     }
 
     pub fn display(&self) -> String{
-        match self._type {
-            Type::Reminder => self.display_reminder(),
-            Type::Scheduled => self.display_scheduled(),
-            Type::None => String::new(),
+        match self.mode {
+            ScheduleMode::Reminder => self.display_reminder(),
+            ScheduleMode::Scheduled => self.display_scheduled(),
+            ScheduleMode::None => String::new(),
         }
     }
 
     pub fn add_days_to_date(&mut self, days:i64) {
         if let Some(date) = self.date {
-            if days > 0 && self._type == Type::Scheduled && self.current_date_diff_days() <= 0 {
+            if days > 0 && self.mode == ScheduleMode::Scheduled && self.current_date_diff_days() <= 0 {
                 return
             }
             self.date = Some(date::add_days(date, days))
@@ -189,38 +190,38 @@ impl Schedule {
     }
 
     pub fn set_current_date(&mut self) {
-        if self._type == Type::Scheduled {
+        if self.mode == ScheduleMode::Scheduled {
             self.date = Some(date::current())
         }
     }
 
     pub fn toggle(&mut self) {
-        match self._type.clone() {
-            Type::None => self._type = self.last_type.clone(),
+        match self.mode.clone() {
+            ScheduleMode::None => self.mode = self.last_mode.clone(),
             any => {
-                self.last_type = any;
-                self._type = Type::None;
+                self.last_mode = any;
+                self.mode = ScheduleMode::None;
             }
         };
     }
 
     pub fn enable_schedule(&mut self) {
-        self._type = Type::Scheduled;
+        self.mode = ScheduleMode::Scheduled;
     }
 
     pub fn enable_reminder(&mut self, date: date::Type){
-        self._type = Type::Reminder;
+        self.mode = ScheduleMode::Reminder;
         self.date = Some(date);
     }
 
     #[inline(always)]
     pub fn is_reminder(&self) -> bool {
-        self._type == Type::Reminder
+        self.mode == ScheduleMode::Reminder
     }
 
     #[inline(always)]
     pub fn is_scheduled(&self) -> bool {
-        self._type == Type::Scheduled
+        self.mode == ScheduleMode::Scheduled
     }
 
     #[inline(always)]
@@ -229,16 +230,16 @@ impl Schedule {
     }
 
     pub fn should_undone(&self) -> bool {
-        match self._type {
-            Type::Reminder => self.reminder_should_undone(),
-            Type::Scheduled => self.current_date_diff_days() >= self.day,
-            Type::None => false,
+        match self.mode {
+            ScheduleMode::Reminder => self.reminder_should_undone(),
+            ScheduleMode::Scheduled => self.current_date_diff_days() >= self.day,
+            ScheduleMode::None => false,
         }
     }
 
     pub fn should_done(&self) -> bool {
-        match self._type {
-            Type::Reminder => !self.reminder_should_undone(),
+        match self.mode {
+            ScheduleMode::Reminder => !self.reminder_should_undone(),
             _ => false
         }
     }

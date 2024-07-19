@@ -65,7 +65,6 @@ struct PrintTodoTree {
     last_stack: Vec<bool>,
     should_print_indention: bool,
     is_last: bool,
-    depth: usize,
 }
 
 impl PrintTodoTree {
@@ -74,7 +73,6 @@ impl PrintTodoTree {
         PrintTodoTree {
             last_stack: vec![],
             is_last: false,
-            depth: 0,
             should_print_indention,
         }
     }
@@ -82,7 +80,6 @@ impl PrintTodoTree {
     #[inline]
     pub fn tree_child(&self) -> Self {
         let mut child = self.clone();
-        child.depth+=1;
         child.last_stack.push(self.what_to_push());
 
         child
@@ -118,11 +115,11 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_todo(&self, todo: &Todo, display_args: &DisplayArgs) {
-        println!("{}", todo.display(&display_args));
+        println!("{}", todo.display(display_args));
     }
 
     #[inline]
-    fn print_note(&mut self, note: &String) {
+    fn print_note(&mut self, note: &str) {
         let mut last_stack = self.last_stack.clone();
         last_stack.push(self.what_to_push());
 
@@ -153,9 +150,9 @@ impl PrintTodoTree {
 
     #[inline(always)]
     fn print_preindention(&self, last_stack: Vec<bool>) {
-        let mut iter = last_stack.into_iter();
-        iter.next();
-        for x in iter {
+        let mut stack_iter = last_stack.into_iter();
+        stack_iter.next();
+        for x in stack_iter {
             if x {
                 print!("│   ")
             } else {

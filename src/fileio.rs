@@ -1,14 +1,14 @@
 use std::fs::{File, remove_dir, remove_file};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::io::{prelude::*, self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use home::home_dir;
 
 use std::process::Command;
 use std::env;
 
 #[inline(always)]
-pub fn open_temp_editor(content:Option<&String>, path: PathBuf) -> io::Result<String>{
+pub fn open_temp_editor(content:Option<&str>, path: PathBuf) -> io::Result<String>{
     let mut file = File::create(&path)?;
     if let Some(content) = content {
         write!(file, "{content}")?;
@@ -60,7 +60,7 @@ pub fn temp_path(name: &str) -> PathBuf{
 }
 
 #[inline(always)]
-pub fn file_content(path:&PathBuf) -> io::Result<String> {
+pub fn file_content(path:&Path) -> io::Result<String> {
     let mut content = String::new();
     let mut file = File::open(path)?;
     file.read_to_string(&mut content)?;

@@ -1,7 +1,8 @@
+use std::path::Path;
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
 use std::{io, path::PathBuf, fs::remove_file};
-use std::str;
+use std::str::{self, FromStr};
 //}}}
 // mod{{{
 mod note;
@@ -26,14 +27,14 @@ pub struct Todo {
 }
 
 
-impl Into<String> for &Todo {
-    fn into(self) -> String{
-        let done_str = if self.done() {"-"} else {""};
-        let dep_str:String = (&self.dependency).into();
+impl From<&Todo> for String {
+    fn from(todo: &Todo) -> String {
+        let done_str = if todo.done() {"-"} else {""};
+        let dep_str:String = (&todo.dependency).into();
 
-        let schedule_str:String =(&self.schedule).into();
+        let schedule_str:String =(&todo.schedule).into();
 
-        format!("[{done_str}{}]{dep_str} {}{schedule_str}", self.priority, self.message)
+        format!("[{done_str}{}]{dep_str} {}{schedule_str}", todo.priority, todo.message)
     }
 }
 
@@ -44,14 +45,6 @@ pub enum TodoError {
     DependencyCreationFailed,
 }
 
-impl TryFrom<String> for Todo {
-    type Error = TodoError;
-
-    fn try_from(s:String) -> Result<Todo, Self::Error>{
-        Todo::try_from(s.as_str())
-    }
-}
-
 #[derive(Default, PartialEq)]
 enum State {
     #[default]
@@ -60,10 +53,10 @@ enum State {
     Message,
 }
 
-impl TryFrom<&str> for Todo {
-    type Error = TodoError;
+impl FromStr for Todo {
+    type Err = TodoError;
 
-    fn try_from(input:&str) -> Result<Todo, Self::Error>{
+    fn from_str(input:&str) -> Result<Todo, Self::Err>{
         let mut state = State::default();
         let mut priority: u8 = 0;
         let mut done = false;
@@ -71,7 +64,7 @@ impl TryFrom<&str> for Todo {
         let mut schedule_string = String::new();
         let mut message = String::new();
         let mut schedule_start_index: Option<usize> = None;
-        if input.chars().last() == Some(']') {
+        if input.ends_with(']') {
             schedule_start_index = input.rfind('[');
             if let Some(start) = schedule_start_index {
                 let end = input.chars().count();
@@ -84,7 +77,7 @@ impl TryFrom<&str> for Todo {
                 State::Priority => {
                     if c == '-' {
                         done = true;
-                    } else if c.is_digit(10) {
+                    } else if c.is_ascii_digit() {
                         priority = c.to_digit(10).unwrap() as PriorityType;
                     } else if c == ' ' {
                         state = State::Message;
@@ -138,15 +131,6 @@ impl TryFrom<&str> for Todo {
 
 impl Todo {
     #[inline]
-    pub fn default(message:String, priority:PriorityType) -> Self {
-        Self::new(message, priority, false, Dependency::default())
-    }
-
-    pub fn written(message:String, priority:PriorityType, done:bool) -> Self {
-        Self::new(message, priority, done, Dependency::written())
-    }
-
-    #[inline]
     pub fn matches(&self, query: &str) -> bool {
         self.message.contains(query) || self.message.to_lowercase().contains(query)
     }
@@ -156,14 +140,11 @@ impl Todo {
         self.priority
     }
     #[inline]
-    pub fn new(message:String, priority:PriorityType, done: bool, dependency: Dependency) -> Self {
+    pub fn new(message:String, priority:PriorityType) -> Self {
         Todo {
-            schedule: Schedule::new(),
-            dependency,
-            removed_dependency: None,
             message,
-            priority: Todo::fixed_priority(priority),
-            done,
+            priority,
+            ..Default::default()
         }
     }
 
@@ -197,14 +178,14 @@ impl Todo {
     }
 
     #[inline]
-    pub fn delete_dependency_file(&mut self, path: &PathBuf) -> io::Result<()> {
+    pub fn delete_dependency_file(&mut self, path: &Path) -> io::Result<()> {
         self.dependency.todo_list.remove_dependency_files(path)?;
         let _ = remove_file(path.join(self.dependency.get_name()));
         Ok(())
     }
 
     #[inline]
-    pub fn delete_removed_dependent_files(&mut self, path: &PathBuf) -> io::Result<()>{
+    pub fn delete_removed_dependent_files(&mut self, path: &Path) -> io::Result<()>{
         if let Some(dependency) = &mut self.removed_dependency {
             let _ = dependency.todo_list.remove_dependency_files(path);
             let _ = remove_file(path.join(dependency.get_name()));
@@ -259,7 +240,7 @@ impl Todo {
     }
 
     #[inline]
-    pub fn dependency_path(&self, path: &PathBuf) -> Option<PathBuf> {
+    pub fn dependency_path(&self, path: &Path) -> Option<PathBuf> {
         self.dependency.path(path)
     }
 
@@ -388,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_todo_into_string() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
         let _ = todo.set_note("Note".to_string());
 
         let expected = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
@@ -409,7 +390,7 @@ mod tests {
             done: false,
         });
 
-        let result: Result<Todo, TodoError> = Todo::try_from(input.to_string());
+        let result: Result<Todo, TodoError> = input.to_string().parse();
 
         assert_eq!(result, expected);
     }
@@ -419,7 +400,7 @@ mod tests {
         let message = "New Todo";
         let priority = 2;
 
-        let todo = Todo::default(message.to_string(), priority);
+        let todo = Todo::new(message.to_string(), priority);
 
         assert_eq!(todo.message, message);
         assert_eq!(todo.priority, 2);
@@ -428,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_dependency_name() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
@@ -438,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_dependency_type() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
         todo.add_todo_dependency();
 
         assert!(todo.dependency.is_list());
@@ -446,7 +427,7 @@ mod tests {
 
     #[test]
     fn test_add_todo() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
@@ -456,7 +437,7 @@ mod tests {
 
     #[test]
     fn test_add_note_type() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
         todo.set_note("Note".to_string()).expect("Error setting note");
 
         assert!(todo.dependency.is_note());
@@ -464,7 +445,7 @@ mod tests {
 
     #[test]
     fn test_add_note_name() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
         todo.set_note("Note".to_string()).expect("Error setting note");
 
         assert_eq!(todo.dependency.get_name(), "2c924e3088204ee77ba681f72be3444357932fca");
@@ -472,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_remove_note() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
         todo.set_note("Note".to_string()).expect("Error setting note");
         todo.remove_note();
 
@@ -481,7 +462,7 @@ mod tests {
 
     #[test]
     fn test_add_dependency() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
 
         todo.add_todo_dependency();
 
@@ -490,7 +471,7 @@ mod tests {
 
     #[test]
     fn test_remove_dependency() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
         todo.add_todo_dependency();
 
         todo.remove_dependency();
@@ -500,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_toggle_done() {
-        let mut todo = Todo::default("Test".to_string(), 1);
+        let mut todo = Todo::new("Test".to_string(), 1);
 
         todo.toggle_done();
         assert_eq!(todo.done(), true);
@@ -512,7 +493,7 @@ mod tests {
     #[test]
     fn test_from_string() {
         let input1 = "[1]>1BE348656D84993A6DF0DB0DECF2E95EF2CF461c.todo Read for exams";
-        let todo = Todo::try_from(input1).unwrap();
+        let todo = Todo::from_str(input1).unwrap();
 
         let expected = Todo {
             removed_dependency: None,
@@ -528,7 +509,7 @@ mod tests {
     #[test]
     fn test_daily() {
         let input = "[-2] this one should be daily [D1(2023-09-05)]";
-        let todo = Todo::try_from(input).unwrap();
+        let todo = Todo::from_str(input).unwrap();
         let expected = Todo {
             removed_dependency: None,
             schedule: Schedule::from("D1(2023-09-05)"),
@@ -539,7 +520,7 @@ mod tests {
         };
         assert_eq!(todo, expected);
         let input = "[2] this one should be daily [D1(2023-09-05)]";
-        let todo = Todo::try_from(input).unwrap();
+        let todo = Todo::from_str(input).unwrap();
         assert_eq!(todo, expected);
     }
 
@@ -561,7 +542,7 @@ mod tests {
     #[test]
     fn test_weekly() {
         let input = "[-2] this one should be daily [D7(2023-09-05)]";
-        let todo = Todo::try_from(input).unwrap();
+        let todo = Todo::from_str(input).unwrap();
         let expected = Todo {
             removed_dependency: None,
             dependency: Dependency::default(),
@@ -572,7 +553,7 @@ mod tests {
         };
         assert_eq!(todo, expected);
         let input = "[2] this one should be daily [D7(2023-09-05)]";
-        let todo = Todo::try_from(input).unwrap();
+        let todo = Todo::from_str(input).unwrap();
         assert_eq!(todo, expected);
     }
 }

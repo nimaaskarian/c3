@@ -103,8 +103,8 @@ index 16c5eda..8d89a33 100644
  const FORMAT: &str = "%Y-%m-%d";
  
  pub type Type = NaiveDate;
-@@ -9,9 +11,43 @@ pub fn parse(date_string: &String) -> Result<Type, ParseError> {
-     NaiveDate::parse_from_str(date_string.as_str(), FORMAT)
+@@ -9,9 +11,43 @@ pub fn parse(date_string: &str) -> Result<Type, ParseError> {
+     NaiveDate::parse_from_str(date_string, FORMAT)
  }
  
 +#[inline]
@@ -123,9 +123,9 @@ index 16c5eda..8d89a33 100644
 +    ParseFailed,
 +}
  #[inline(always)]
--pub fn parse_user_input(date_string: &String) -> Result<Type, ParseError> {
+-pub fn parse_user_input(date_string: &str) -> Result<Type, ParseError> {
 -    parse(date_string)
-+pub fn parse_user_input(date_string: &String) -> Result<Type, Error> {
++pub fn parse_user_input(date_string: &str) -> Result<Type, Error> {
 +    let mut j_year = 0;
 +    let mut j_month = 0;
 +    let mut j_day = 0;
@@ -169,4 +169,4 @@ index 16c5eda..8d89a33 100644
 +
  #[inline]
  pub fn diff_days(first: Option<Type>, next: Option<Type>) -> i64 {
-     if first.is_some() && next.is_some() {
+     match (first, next) {

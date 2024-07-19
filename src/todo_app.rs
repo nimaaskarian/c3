@@ -1,4 +1,5 @@
-use std::str::Lines;
+use std::path::Path;
+use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
@@ -39,6 +40,38 @@ pub struct App {
     restriction: Restriction,
 }
 
+#[derive(Debug)]
+struct IndexedLine {
+    message: String,
+    index: Option<usize>,
+}
+
+#[derive(Debug)]
+struct LineMalformed;
+
+impl FromStr for IndexedLine {
+    type Err = LineMalformed;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        let mut num_length = 0;
+        for c in input.chars() {
+            if c == ' ' {
+                break
+            }
+            num_length+=1;
+        }
+        let index = input[..num_length].parse().ok();
+        let message = if index.is_none() {
+            input.to_string()
+        } else {
+            input[num_length+1..].to_string()
+        };
+        Ok(Self {
+            index,
+            message,
+        })
+    }
+}
+
 impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
@@ -61,6 +94,12 @@ impl App {
         };
         app.update_show_done_restriction();
         app
+    }
+
+    pub fn toggle_schedule(&mut self) {
+        if let Some(todo) = self.todo_mut() {
+            todo.schedule.toggle();
+        }
     }
 
     pub fn restriction(&self) -> Restriction{
@@ -169,51 +208,78 @@ impl App {
 
     pub fn batch_editor_messages(&mut self) {
         let restriction = self.restriction().clone();
-        let content = self.current_list().messages(restriction).join("\n");
+        let content = self.current_list().messages(restriction)
+            .iter().enumerate()
+            .map(|(i, x)| format!("{i} {x}"))
+            .collect::<Vec<String>>()
+            .join("\n");
         let new_messages = open_temp_editor(Some(&content),temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
     }
 
     #[inline(always)]
-    fn batch_edit_current_list(&mut self, mut messages: Lines<'_>) {
+    fn batch_edit_current_list(&mut self, messages: Lines<'_>) {
         let mut changed = false;
-        if let Some(restriction) = self.restriction.clone() {
-            for todo in self.current_list_mut().todos.iter_mut().filter(|todo| restriction(todo)) {
-                if Self::batch_edit_helper(todo, messages.next()) {
-                    changed = true;
-                }
-            }
+        let mut indexed_lines: Vec<IndexedLine> = messages.into_iter()
+            .flat_map(|message| message.parse())
+            .collect();
+
+        indexed_lines.sort_by_key(|a| a.index);
+        let mut indexed_lines_iter = indexed_lines.iter();
+        let mut current_line = indexed_lines_iter.next();
+        let mut delete_indices: Vec<usize> = vec![];
+        let restriction = if let Some(restriction) = self.restriction.clone() {
+            restriction
         } else {
-            for todo in self.current_list_mut().todos.iter_mut() {
-                if Self::batch_edit_helper(todo, messages.next()) {
-                    changed = true;
+            Rc::new(|_: &Todo| false)
+        };
+        for (i, todo) in self.current_list_mut().todos.iter_mut().filter(|todo| restriction(todo)).enumerate() {
+            if let Some(indexed_line) = current_line {
+                if let Some(line_index) = indexed_line.index {
+                    if line_index == i {
+                        if Self::batch_edit_helper(todo, &indexed_line.message) {
+                            changed = true;
+                        }
+                        current_line = indexed_lines_iter.next();
+                    } else {
+                        changed = true;
+                        delete_indices.push(i);
+                    }
                 }
+            } else {
+                break
             }
         }
-        while let Some(message) = messages.next() {
-            changed = true;
-            self.append(String::from(message))
+        self.todo_list.set_todos(self.todo_list
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !delete_indices.contains(i))
+            .map(|(_, todo)| todo)
+            .cloned()
+            .collect());
+        for line in indexed_lines {
+            if line.index.is_none() {
+                self.current_list_mut().push(Todo::new(line.message, 0));
+                changed = true;
+            }
         }
         self.changed = changed;
     }
 
     #[inline(always)]
-    fn batch_edit_helper(todo: &mut Todo, message: Option<&str>) -> bool {
-        if let Some(message) = message {
-            let message = String::from(message);
-            if todo.message == message {
-                return false
-            }
-            todo.set_message(message);
-            return true
-        } 
-        false
+    fn batch_edit_helper(todo: &mut Todo, message: &str) -> bool {
+        let message = message.to_string();
+        if todo.message == message {
+            return false
+        }
+        todo.set_message(message);
+        true
     }
 
     pub fn print_searched(&mut self) {
         for position in self.tree_search_positions.iter() {
-            self.tree_path = position.tree_path.clone();
+            self.tree_path.clone_from(&position.tree_path);
             let list = self.current_list();
             for index in position.matching_indices.clone() {
                 println!("{}",list.index(index,self.restriction.clone()).display(&self.args.display_args));
@@ -247,14 +313,13 @@ impl App {
 
     #[inline]
     pub fn prepend(&mut self, message:String) {
-        self.current_list_mut().prepend(Todo::default(message, 1));
+        self.current_list_mut().prepend(Todo::new(message, 1));
         self.go_top();
     }
 
     #[inline]
     pub fn append(&mut self, message:String) {
-        self.current_list_mut().push(Todo::default(message, 0));
-        self.index = self.current_list_mut().reorder_last();
+        self.index = self.current_list_mut().push(Todo::new(message, 0));
     }
 
     pub fn index(&self) -> usize {
@@ -337,6 +402,11 @@ impl App {
         } else {
             self.current_list_mut().sort();
         }
+        if self.is_undone_empty() {
+            while self.traverse_up() && !self.is_undone_empty(){
+                self.toggle_current_done()
+            }
+        }
     }
 
     #[inline]
@@ -414,10 +484,13 @@ impl App {
     }
 
     #[inline]
-    pub fn traverse_up(&mut self) {
+    pub fn traverse_up(&mut self) -> bool {
         if let Some(index) = self.tree_path.pop() {
             self.index = index;
             self.search(None);
+            true
+        } else {
+            false
         }
     }
 
@@ -436,11 +509,7 @@ impl App {
 
     #[inline]
     pub fn is_todos_empty(&self) -> bool{
-        if self.show_done() {
-            self.current_list().is_empty(self.restriction.clone())
-        } else {
-            self.is_undone_empty()
-        }
+        self.current_list().is_empty(self.restriction.clone())
     }
 
     #[inline]
@@ -506,7 +575,7 @@ impl App {
     }
 
     #[inline]
-    pub fn handle_removed_todo_dependency_files(&mut self, dependency_path:&PathBuf) {
+    pub fn handle_removed_todo_dependency_files(&mut self, dependency_path:&Path) {
         for todo in &mut self.removed_todos {
             let _ = todo.delete_dependency_file(dependency_path);
         }
@@ -555,12 +624,12 @@ impl App {
 
     #[inline]
     pub fn is_undone_empty(&self) -> bool{
-        self.current_list().is_empty(self.restriction.clone())
+        self.current_list().is_empty(Some(Rc::new(move |todo| !todo.done())))
     }
 
     #[inline]
     pub fn is_done_empty(&self) -> bool{
-        self.current_list().is_empty(self.restriction.clone())
+        self.current_list().is_empty(Some(Rc::new(move |todo| todo.done())))
     }
 
     #[inline(always)]
@@ -613,10 +682,10 @@ impl App {
         let size = self.len();
 
         if size <= index {
-            return Some(&current_list.index(size - 1, self.restriction.clone()));
+            return Some(current_list.index(size - 1, self.restriction.clone()));
         }
 
-        Some(&self.current_list().index(index, self.restriction.clone()))
+        Some(self.current_list().index(index, self.restriction.clone()))
     }
 
     #[inline]
@@ -694,20 +763,12 @@ impl App {
 
     #[inline]
     pub fn paste_todo(&mut self) {
-        let todos_count = self.len();
-        match Todo::try_from(self.clipboard.get_text()) {
-            Ok(mut todo) => {
-                let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
-                let _ = todo.dependency.read(&todo_parent);
-                let bottom = self.bottom()+1;
-                let list = &mut self.current_list_mut();
-                list.push(todo);
-                if todos_count != 0 {
-                    self.index = list.reorder(bottom);
-                }
-            },
-            _ => {},
-        };
+        if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
+            let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
+            let _ = todo.dependency.read(&todo_parent);
+            let list = &mut self.current_list_mut();
+            self.index = list.push(todo);
+        }
     }
 
     #[inline]
@@ -739,7 +800,7 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{self, remove_dir_all};
+    use std::{fs::{self, remove_dir_all}, path::Path};
 
     use clap::Parser;
     use crate::Args;
@@ -752,7 +813,7 @@ mod tests {
         Ok(path)
     }
 
-    fn write_test_todos(dir: &PathBuf) -> io::Result<App>{
+    fn write_test_todos(dir: &Path) -> io::Result<App>{
         let mut args = Args::parse();
         fs::create_dir_all(dir.join("notes"))?;
         args.todo_path = dir.join("todo");

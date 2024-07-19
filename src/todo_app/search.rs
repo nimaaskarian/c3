@@ -40,8 +40,8 @@ impl Search {
         self.indices = Vec::new();
 
         // TODO: implement fuzzy matching 
-        for i in 0..haystack.len() {
-            if haystack[i].contains(self.last_query.as_str()) || haystack[i].to_lowercase().contains(self.last_query.as_str()) {
+        for (i, hay) in haystack.iter().enumerate() {
+            if hay.contains(self.last_query.as_str()) || hay.to_lowercase().contains(self.last_query.as_str()) {
                 self.indices.push(i);
             }
         }

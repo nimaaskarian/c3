@@ -34,11 +34,11 @@ pub enum TodoWidget<'a> {
     Paragraph(ratatui::widgets::Paragraph<'a>),
 }
 
-pub fn create_todo_widget<'a>(display_list:&Vec<String>, title:String, highlight_symbol: &'a str) ->  TodoWidget<'a> {
+pub fn create_todo_widget(display_list:Vec<String>, title:String, highlight_symbol: &str) ->  TodoWidget<'_> {
     if display_list.is_empty() {
         TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
     } else {
-        TodoWidget::List(List::new((*display_list).clone())
+        TodoWidget::List(List::new(display_list)
             .block(default_block(title))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
             .highlight_symbol(highlight_symbol)
@@ -248,7 +248,7 @@ impl<'a>TuiApp<'a>{
         let exit_status = output.wait().expect("Failed to wait on nnn.");
         if exit_status.success() {
             let reader = BufReader::new(output.stdout.unwrap());
-            return reader.lines().map(|x| PathBuf::from(x.unwrap_or(String::new()))).collect()
+            return reader.lines().map(|x| PathBuf::from(x.unwrap_or_default())).collect()
         }
         vec![]
     }
@@ -256,20 +256,20 @@ impl<'a>TuiApp<'a>{
     #[inline]
     pub fn nnn_append_todo(&mut self) {
         for path in Self::nnn_paths() {
-            self.todo_app.append_list_from_path(PathBuf::from(path));
+            self.todo_app.append_list_from_path(path);
         }
     }
 
     pub fn nnn_open(&mut self) {
         for path in Self::nnn_paths() {
-            self.todo_app.open_path(PathBuf::from(path));
+            self.todo_app.open_path(path);
         }
     }
 
     #[inline]
     pub fn nnn_output_todo(&mut self) {
         for path in Self::nnn_paths() {
-            let _ = self.todo_app.output_list_to_path(PathBuf::from(path));
+            let _ = self.todo_app.output_list_to_path(path);
         }
     }
 
@@ -284,10 +284,7 @@ impl<'a>TuiApp<'a>{
 
     #[inline]
     pub fn edit_prompt(&mut self, start: bool) {
-        let todo_message = match self.todo_app.get_message() {
-            Some(message)=>message,
-            None=> String::new(),
-        };
+        let todo_message = self.todo_app.get_message().unwrap_or_default();
 
         self.set_text_mode(Self::on_edit_todo, "Edit todo", todo_message.as_str());
         self.textarea.insert_str(todo_message);
@@ -328,12 +325,10 @@ impl<'a>TuiApp<'a>{
         if str.is_empty() {
             return self.todo_app.update_show_done_restriction();
         }
-        let show_done = if str.chars().last().unwrap() == 'd' {
+        let show_done = str.ends_with('d');
+        if show_done {
             str.pop();
-            true
-        } else {
-            false
-        };
+        }
         let priority = str.parse::<u8>().ok();
         if let Some(priority) = priority {
             if show_done {
@@ -347,9 +342,9 @@ impl<'a>TuiApp<'a>{
     #[inline]
     fn on_save_prompt(&mut self, str:HandlerParameter) {
         let lower = str.to_lowercase();
-        if lower.starts_with("y") {
+        if lower.starts_with('y') {
             let _ = self.todo_app.write();
-        } else if lower.starts_with("c") {
+        } else if lower.starts_with('c') {
             return;
         }
         let _ = self.quit();
@@ -485,6 +480,7 @@ impl<'a>TuiApp<'a>{
                     Char('W') => self.todo_app.toggle_current_weekly(),
                     Char('S') => self.schedule_prompt(),
                     Char('m') => self.reminder_prompt(),
+                    Char('M') => self.todo_app.toggle_schedule(),
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('@') => self.priority_prompt(),
                     Char('y') => self.todo_app.yank_todo(),
@@ -502,7 +498,9 @@ impl<'a>TuiApp<'a>{
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up |Char('k') => self.todo_app.decrement(),
                     KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),
-                    KeyCode::Left | Char('h') => self.todo_app.traverse_up(),
+                    KeyCode::Left | Char('h') => {
+                        self.todo_app.traverse_up();
+                    },
                     KeyCode::Home | Char('g') => self.todo_app.go_top(),
                     KeyCode::End | Char('G') => self.todo_app.go_bottom(),
                     Char('w') => self.write()?,
@@ -538,7 +536,7 @@ impl<'a>TuiApp<'a>{
                         self.todo_app.batch_editor_messages();
                         return Ok(Operation::Restart);
                     },
-                    Char(c) if c.is_digit(10) => {
+                    Char(c) if c.is_ascii_digit() => {
                         let priority = c.to_digit(10).unwrap();
                         self.todo_app.set_current_priority(priority as PriorityType);
                     }
@@ -595,7 +593,7 @@ impl<'a>TuiApp<'a>{
                 frame.render_widget(note_widget, dependency_layout);
             } 
             if let Some(todo_list) = todo.dependency.todo_list() {
-                Self::render_todos_widget(self.highlight_string(), frame, None, dependency_layout, &self.todo_app.display_list(todo_list), String::from("Todo dependencies"))
+                Self::render_todos_widget(self.highlight_string(), frame, None, dependency_layout, self.todo_app.display_list(todo_list), String::from("Todo dependencies"))
             }
         }
     }
@@ -603,11 +601,11 @@ impl<'a>TuiApp<'a>{
     #[inline(always)]
     fn render_current_todos_widget(&mut self, frame: &mut Frame, list_state: &mut ListState, todo_layout: Rect) {
         let title = self.title();
-        Self::render_todos_widget(self.highlight_string(),frame, Some(list_state), todo_layout, &self.todo_app.display_current(), title)
+        Self::render_todos_widget(self.highlight_string(),frame, Some(list_state), todo_layout, self.todo_app.display_current(), title)
     }
 
     #[inline(always)]
-    fn render_todos_widget(highlight_symbol: &str,frame: &mut Frame, list_state: Option<&mut ListState>, todo_layout: Rect, display_list:&Vec<String>, title: String) {
+    fn render_todos_widget(highlight_symbol: &str,frame: &mut Frame, list_state: Option<&mut ListState>, todo_layout: Rect, display_list:Vec<String>, title: String) {
         match create_todo_widget(display_list, title, highlight_symbol) {
             TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout),
             TodoWidget::List(widget) => {

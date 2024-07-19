@@ -1,4 +1,4 @@
-use std::{io::{self, Write}, path::PathBuf, fs::File};
+use std::{fs::File, io::{self, Write}, path::{Path, PathBuf}};
 use super::TodoList;
 use super::Todo;
 
@@ -21,32 +21,12 @@ pub struct Dependency {
 
 impl Dependency {
     #[inline]
-    pub fn default() -> Self {
-        Self::new(String::new(), DependencyMode::None, false)
-    }
-
-    pub fn written() -> Self {
-        Self::new(String::new(), DependencyMode::None, true)
-    }
-
-    #[inline]
-    fn new(name: String, mode: DependencyMode, written: bool) -> Self {
-        Dependency {
-            written,
-            mode,
-            name,
-            note: String::new(),
-            todo_list: TodoList::new(),
-        }
-    }
-
-    #[inline]
     pub fn is_written(&self) -> bool {
         self.written
     }
 
     #[inline]
-    pub fn note(&self) -> Option<&String> {
+    pub fn note(&self) -> Option<&str> {
         if self.is_note() {
             Some(&self.note)
         } else {
@@ -68,19 +48,25 @@ impl Dependency {
 
     #[inline]
     pub fn new_todo_list(hash: String) -> Self {
-        Dependency::new(format!("{}.todo", hash), DependencyMode::TodoList, false)
+        Self {
+            name: format!("{}.todo", hash),
+            mode: DependencyMode::TodoList,
+            ..Default::default()
+        }
     }
 
     #[inline]
     pub fn new_note(hash: String, note: String) -> Self {
-        let mut dependency = Dependency::new(format!("{}", hash), DependencyMode::Note, false);
-        dependency.note = note;
-
-        dependency
+        Self {
+            note,
+            name: hash,
+            mode: DependencyMode::Note,
+            ..Default::default()
+        }
     }
 
     #[inline]
-    pub fn read(&mut self, path: &PathBuf)  -> io::Result<()> {
+    pub fn read(&mut self, path: &Path)  -> io::Result<()> {
         let file_path = path.join(&self.name);
         let name_todo = format!("{}.todo", self.name);
         match self.mode {
@@ -124,7 +110,7 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn write(&mut self, path: &PathBuf) -> io::Result<()> {
+    pub fn write(&mut self, path: &Path) -> io::Result<()> {
         let name = self.name.clone();
         match self.mode.clone() {
             DependencyMode::TodoList => {
@@ -141,11 +127,8 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn path(&self ,path: &PathBuf) -> Option<PathBuf>{
-        match path.parent() {
-            Some(path) => Some(TodoList::dependency_parent(&path.to_path_buf(), false)),
-            None => None,
-        }
+    pub fn path(&self ,path: &Path) -> Option<PathBuf>{
+        path.parent().map(|path| TodoList::dependency_parent(path, false))
     }
 
     #[inline]
@@ -179,12 +162,12 @@ impl Dependency {
 }
 
 
-impl Into<String> for &Dependency {
+impl From<&Dependency> for String {
     #[inline]
-    fn into (self) -> String {
-        match self.mode {
+    fn from (dependency: &Dependency) -> String {
+        match dependency.mode {
             DependencyMode::None => String::new(),
-            _ => format!(">{}", self.name),
+            _ => format!(">{}", dependency.name),
         }
     }
 }
@@ -205,8 +188,11 @@ impl From<&str> for Dependency {
             }
         }
 
-
-        Dependency::new(name, mode, false)
+        Self {
+            name,
+            mode,
+            ..Default::default()
+        }
     }
 }
 
