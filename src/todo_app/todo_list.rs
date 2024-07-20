@@ -6,7 +6,7 @@ use std::io;
 use super::{App, Todo, Restriction};
 use crate::DisplayArgs;
 
-#[derive(Debug,PartialEq, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TodoList {
     pub todos: Vec<Todo>,
 }
@@ -208,8 +208,7 @@ impl TodoList {
 
     #[inline(always)]
     fn reorder_low_high(&self, index:usize) -> (usize, usize){
-        let priority = self.todos[index].comparison_priority();
-        if index+1 < self.todos.len() && priority > self.todos[index+1].comparison_priority() {
+        if index+1 < self.todos.len() && self.todos[index] > self.todos[index+1] {
             (index+1, self.todos.len()-1)
         } else {
             (0, index)
@@ -223,17 +222,14 @@ impl TodoList {
 
 
     pub fn reorder(&mut self, index:usize) -> usize {
-        let priority = self.todos[index].comparison_priority();
-
-        if priority < self.todos[0].comparison_priority() {
+        if self.todos[index] < self.todos[0] {
             return self.move_index(index, 0, 1)
         }
 
         let (low, high) = self.reorder_low_high(index);
-        for middle in low..high {
-            if priority < self.todos[middle+1].comparison_priority() &&
-            priority >= self.todos[middle].comparison_priority() {
-                return self.move_index(index, middle, 0);
+        for i in low..high {
+            if self.todos[index] < self.todos[i+1] && self.todos[index] >= self.todos[i] {
+                return self.move_index(index, i, 0);
             }
         }
         self.move_index(index, high, 0)
@@ -263,7 +259,7 @@ impl TodoList {
 
     #[inline(always)]
     pub fn sort (&mut self) {
-        self.todos.sort_by_key(|a| a.comparison_priority())
+        self.todos.sort()
     }
 }
 

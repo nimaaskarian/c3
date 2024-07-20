@@ -2,7 +2,7 @@ use std::{fs::File, io::{self, Write}, path::{Path, PathBuf}};
 use super::TodoList;
 use super::Todo;
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 enum DependencyMode {
     #[default]
     None,
@@ -10,7 +10,7 @@ enum DependencyMode {
     Note,
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Dependency {
     name: String,
     mode: DependencyMode,

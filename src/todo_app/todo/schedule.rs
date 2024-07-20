@@ -1,6 +1,6 @@
 use crate::date;
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Eq, Debug, PartialEq, Clone, Default)]
 pub enum ScheduleMode {
     Scheduled,
     Reminder,
@@ -8,7 +8,7 @@ pub enum ScheduleMode {
     None,
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Eq, Debug, PartialEq, Clone, Default)]
 pub struct Schedule {
     day: i64,
     date: Option<date::Type>,

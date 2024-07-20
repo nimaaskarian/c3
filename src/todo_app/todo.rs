@@ -16,7 +16,7 @@ use crate::DisplayArgs;
 //}}}
 
 pub type PriorityType = u8;
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Todo {
     pub message: String,
     priority: PriorityType,
@@ -26,6 +26,17 @@ pub struct Todo {
     pub schedule: Schedule,
 }
 
+impl Ord for Todo {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.cmp_value().cmp(&other.cmp_value())
+    }
+}
+
+impl PartialOrd for Todo {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl From<&Todo> for String {
     fn from(todo: &Todo) -> String {
@@ -334,7 +345,7 @@ impl Todo {
     }
 
     #[inline(always)]
-    pub fn comparison_priority(&self) -> PriorityType {
+    fn cmp_value(&self) -> PriorityType {
         let mut priority = self.standardized_priority()*2;
         if self.schedule.is_reminder() {
             priority-=1;
