@@ -95,9 +95,9 @@ index 16c5eda..8d89a33 100644
 --- a/src/date.rs
 +++ b/src/date.rs
 @@ -1,5 +1,7 @@
--use chrono::{Local ,NaiveDate, Duration};
-+use chrono::{Datelike, Duration, Local, NaiveDate};
  use chrono::format::ParseError;
+-use chrono::{Duration, Local, NaiveDate};
++use chrono::{Datelike, Duration, Local, NaiveDate};
 +use jalali_date::{jalali_to_gregorian, to_jalali, JalaliDate};
 +use scanf::sscanf;
  const FORMAT: &str = "%Y-%m-%d";
