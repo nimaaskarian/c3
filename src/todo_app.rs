@@ -22,7 +22,6 @@ struct SearchPosition {
 }
 
 pub type RestrictionFunction = Rc<dyn Fn(&Todo) -> bool>;
-pub type Restriction = Option<RestrictionFunction>;
 pub struct App {
     selected: Vec<usize>,
     clipboard: Clipboard,
@@ -37,7 +36,7 @@ pub struct App {
     last_query: String,
     x_index: usize,
     y_index: usize,
-    restriction: Restriction,
+    restriction: RestrictionFunction,
 }
 
 #[derive(Debug)]
@@ -87,7 +86,7 @@ impl App {
             changed: false,
             args,
             search: Search::new(),
-            restriction: None,
+            restriction: Self::no_restriction(),
         };
         app.update_show_done_restriction();
         app
@@ -99,14 +98,15 @@ impl App {
         }
     }
 
-    pub fn restriction(&self) -> Restriction {
-        self.restriction.clone()
-    }
-
     #[inline]
     pub fn append_list_from_path(&mut self, path: PathBuf) {
         let todo_list = TodoList::read(&path, !self.args.no_tree, true);
         self.append_list(todo_list)
+    }
+
+    #[inline]
+    pub fn restriction(&self) -> &RestrictionFunction {
+        &self.restriction
     }
 
     #[inline]
@@ -175,7 +175,7 @@ impl App {
 
     fn add_to_tree_positions(&mut self, list: &TodoList, prior_indices: &[usize]) {
         let mut matching_indices: Vec<usize> = vec![];
-        for (i, todo) in list.todos(self.restriction.clone()).iter().enumerate() {
+        for (i, todo) in list.todos(&self.restriction).iter().enumerate() {
             if todo.matches(self.last_query.as_str()) {
                 matching_indices.push(i)
             }
@@ -208,7 +208,7 @@ impl App {
     }
 
     pub fn batch_editor_messages(&mut self) {
-        let restriction = self.restriction().clone();
+        let restriction = &self.restriction;
         let content = self
             .current_list()
             .messages(restriction)
@@ -234,11 +234,7 @@ impl App {
         let mut indexed_lines_iter = indexed_lines.iter();
         let mut current_line = indexed_lines_iter.next();
         let mut delete_indices: Vec<usize> = vec![];
-        let restriction = if let Some(restriction) = self.restriction.clone() {
-            restriction
-        } else {
-            Rc::new(|_: &Todo| false)
-        };
+        let restriction = self.restriction.clone();
         for (i, todo) in self
             .current_list_mut()
             .todos
@@ -297,7 +293,7 @@ impl App {
             for index in position.matching_indices.clone() {
                 println!(
                     "{}",
-                    list.index(index, self.restriction.clone())
+                    list.index(index, &self.restriction)
                         .display(&self.args.display_args)
                 );
             }
@@ -345,7 +341,7 @@ impl App {
 
     #[inline]
     pub fn search(&mut self, query: Option<String>) {
-        let todo_messages = self.current_list().messages(self.restriction.clone());
+        let todo_messages = self.current_list().messages(&self.restriction);
         self.search.search(query, todo_messages);
     }
 
@@ -436,7 +432,7 @@ impl App {
 
     #[inline]
     pub fn fix_index(&mut self) {
-        let size = self.current_list().len(self.restriction.clone());
+        let size = self.current_list().len(&self.restriction);
         self.index = match size {
             0 => 0,
             _ => self.index.min(size - 1),
@@ -494,7 +490,7 @@ impl App {
                     let restriction = self.restriction.clone();
                     let true_index = self
                         .current_list()
-                        .true_position_in_list(index, restriction);
+                        .true_position_in_list(index, &restriction);
                     self.tree_path.push(true_index);
                     self.go_top();
                     self.search(None);
@@ -530,7 +526,7 @@ impl App {
 
     #[inline]
     pub fn is_todos_empty(&self) -> bool {
-        self.current_list().is_empty(self.restriction.clone())
+        self.current_list().is_empty(&self.restriction)
     }
 
     #[inline]
@@ -543,18 +539,18 @@ impl App {
         let res_cloned = self.restriction.clone();
 
         if size <= index {
-            return Some(self.current_list_mut().index_mut(size - 1, res_cloned));
+            return Some(self.current_list_mut().index_mut(size - 1, &res_cloned));
         }
 
-        Some(self.current_list_mut().index_mut(index, res_cloned))
+        Some(self.current_list_mut().index_mut(index, &res_cloned))
     }
 
     #[inline]
     pub fn cut_todo(&mut self) {
-        let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
+            let restriction = self.restriction.clone();
             let index = self.index;
-            let todo = self.current_list_mut().cut(index, restriction);
+            let todo = self.current_list_mut().cut(index, &restriction);
             let todo_string: String = (&todo).into();
             self.clipboard.set_text(todo_string);
         }
@@ -562,7 +558,7 @@ impl App {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.current_list().len(self.restriction.clone())
+        self.current_list().len(&self.restriction)
     }
 
     #[inline]
@@ -646,24 +642,31 @@ impl App {
 
     #[inline]
     pub fn is_undone_empty(&self) -> bool {
+        let restriction: RestrictionFunction = Rc::new(move |todo| !todo.done());
         self.current_list()
-            .is_empty(Some(Rc::new(move |todo| !todo.done())))
+            .is_empty(&restriction)
     }
 
     #[inline]
     pub fn is_done_empty(&self) -> bool {
+        let restriction: RestrictionFunction = Rc::new(move |todo| todo.done());
         self.current_list()
-            .is_empty(Some(Rc::new(move |todo| todo.done())))
+            .is_empty(&restriction)
+    }
+
+    #[inline(always)]
+    pub fn no_restriction() -> RestrictionFunction {
+        Rc::new(|_| true)
     }
 
     #[inline(always)]
     pub fn unset_restriction(&mut self) {
-        self.restriction = None;
+        self.restriction = Self::no_restriction();
     }
 
     #[inline(always)]
     pub fn set_restriction(&mut self, restriction: RestrictionFunction) {
-        self.restriction = Some(restriction);
+        self.restriction = restriction;
         self.fix_index();
     }
 
@@ -708,10 +711,10 @@ impl App {
         let size = self.len();
 
         if size <= index {
-            return Some(current_list.index(size - 1, self.restriction.clone()));
+            return Some(current_list.index(size - 1, &self.restriction));
         }
 
-        Some(self.current_list().index(index, self.restriction.clone()))
+        Some(self.current_list().index(index, &self.restriction))
     }
 
     #[inline]
@@ -725,7 +728,7 @@ impl App {
         let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
-            let todo = self.current_list_mut().cut(index, restriction);
+            let todo = self.current_list_mut().cut(index, &restriction);
             self.removed_todos.push(todo);
         }
     }
@@ -737,7 +740,7 @@ impl App {
 
     #[inline]
     pub fn display_list(&self, todo_list: &TodoList) -> Vec<String> {
-        todo_list.display(&self.args.display_args, self.restriction.clone())
+        todo_list.display(&self.args.display_args, &self.restriction)
     }
 
     #[inline]
@@ -822,7 +825,7 @@ impl App {
             println!(
                 "{}",
                 self.todo_list
-                    .index(index, self.restriction.clone())
+                    .index(index, &self.restriction)
                     .display(&self.args.display_args)
             );
         }

@@ -3,7 +3,7 @@ use std::io;
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-use super::{App, Restriction, Todo};
+use super::{App, RestrictionFunction, Todo};
 use crate::DisplayArgs;
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -17,36 +17,24 @@ impl TodoList {
         TodoList { todos: Vec::new() }
     }
 
-    pub fn index(&self, index: usize, restriction: Restriction) -> &Output {
-        if let Some(restriction) = restriction {
-            self.todos
-                .iter()
-                .filter(|todo| restriction(todo))
-                .nth(index)
-                .unwrap()
-        } else {
-            self.todos.get(index).unwrap()
-        }
+    pub fn index(&self, index: usize, restriction: &RestrictionFunction) -> &Output {
+        self.todos
+            .iter()
+            .filter(|todo| restriction(todo))
+            .nth(index)
+            .unwrap()
     }
 
-    pub fn index_mut(&mut self, index: usize, restriction: Restriction) -> &mut Output {
-        if let Some(restriction) = restriction {
-            self.todos
-                .iter_mut()
-                .filter(|todo| restriction(todo))
-                .nth(index)
-                .unwrap()
-        } else {
-            self.todos.get_mut(index).unwrap()
-        }
+    pub fn index_mut(&mut self, index: usize, restriction: &RestrictionFunction) -> &mut Output {
+        self.todos
+            .iter_mut()
+            .filter(|todo| restriction(todo))
+            .nth(index)
+            .unwrap()
     }
 
-    pub fn todos(&self, restriction: Restriction) -> Vec<&Todo> {
-        if let Some(restriction) = restriction {
-            self.todos.iter().filter(|todo| restriction(todo)).collect()
-        } else {
-            self.todos.iter().collect()
-        }
+    pub fn todos(&self, restriction: &RestrictionFunction) -> Vec<&Todo> {
+        self.todos.iter().filter(|todo| restriction(todo)).collect()
     }
 
     #[inline]
@@ -174,29 +162,29 @@ impl TodoList {
         self.todos.iter_mut()
     }
 
-    pub fn messages(&self, restriction: Restriction) -> Vec<String> {
+    pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<String> {
         self.todos(restriction)
             .iter()
             .map(|todo| todo.message.clone())
             .collect()
     }
 
-    pub fn display(&self, args: &DisplayArgs, restriction: Restriction) -> Vec<String> {
+    pub fn display(&self, args: &DisplayArgs, restriction: &RestrictionFunction) -> Vec<String> {
         self.todos(restriction)
             .iter()
             .map(|todo| todo.display(args))
             .collect()
     }
 
-    pub fn len(&self, restriction: Restriction) -> usize {
+    pub fn len(&self, restriction: &RestrictionFunction) -> usize {
         self.todos(restriction).len()
     }
 
-    pub fn is_empty(&self, restriction: Restriction) -> bool {
+    pub fn is_empty(&self, restriction: &RestrictionFunction) -> bool {
         self.todos(restriction).is_empty()
     }
 
-    pub fn remove(&mut self, index: usize, restriction: Restriction) {
+    pub fn remove(&mut self, index: usize, restriction: &RestrictionFunction) {
         let mut binding = self.todos(restriction);
         let filtered: Vec<_> = binding.iter_mut().collect();
         self.todos = self
@@ -207,7 +195,7 @@ impl TodoList {
             .collect();
     }
 
-    pub fn true_position_in_list(&self, index: usize, restriction: Restriction) -> usize {
+    pub fn true_position_in_list(&self, index: usize, restriction: &RestrictionFunction) -> usize {
         let mut binding = self.todos(restriction);
         let filtered: Vec<_> = binding.iter_mut().collect();
         self.todos
@@ -216,7 +204,7 @@ impl TodoList {
             .unwrap_or_default()
     }
 
-    pub fn cut(&mut self, index: usize, restriction: Restriction) -> Todo {
+    pub fn cut(&mut self, index: usize, restriction: &RestrictionFunction) -> Todo {
         let index_in_vec = self.true_position_in_list(index, restriction);
         self.todos.remove(index_in_vec)
     }
@@ -349,7 +337,7 @@ mod tests {
     #[test]
     fn test_len() {
         let todo_list = get_todo_list();
-        assert_eq!(todo_list.len(None), 4);
+        assert_eq!(todo_list.len(&App::no_restriction()), 4);
     }
 
     #[test]

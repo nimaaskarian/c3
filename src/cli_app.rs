@@ -1,4 +1,4 @@
-use super::todo_app::{App, Restriction, Todo, TodoList};
+use super::todo_app::{App, RestrictionFunction, Todo, TodoList};
 use crate::DisplayArgs;
 use std::io;
 
@@ -98,9 +98,9 @@ impl PrintTodoTree {
         &mut self,
         todo_list: &TodoList,
         display_args: &DisplayArgs,
-        restriction: Restriction,
+        restriction: &RestrictionFunction,
     ) {
-        let todos = todo_list.todos(restriction.clone());
+        let todos = todo_list.todos(restriction);
 
         for (index, todo) in todos.iter().enumerate() {
             self.is_last = index == todos.len() - 1;
@@ -111,7 +111,7 @@ impl PrintTodoTree {
 
             if let Some(todo_list) = todo.dependency.todo_list() {
                 let mut tree_child = self.tree_child();
-                tree_child.print_list(todo_list, display_args, restriction.clone());
+                tree_child.print_list(todo_list, display_args, restriction);
             }
 
             if let Some(note) = todo.dependency.note() {
