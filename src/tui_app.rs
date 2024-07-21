@@ -547,7 +547,7 @@ impl<'a> TuiApp<'a> {
                     }
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up | Char('k') => self.todo_app.decrement(),
-                    KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),
+                    KeyCode::Right | Char('l') | KeyCode::Enter => self.todo_app.add_dependency_traverse_down(),
                     KeyCode::Left | Char('h') => {
                         self.todo_app.traverse_up();
                     }
@@ -568,7 +568,7 @@ impl<'a> TuiApp<'a> {
                     }
                     Char('R') => self.todo_app.read(),
                     Char('T') => self.todo_app.remove_current_dependent(),
-                    KeyCode::Enter => self.todo_app.toggle_current_done(),
+                    Char(' ') => self.todo_app.toggle_current_done(),
                     Char('n') => self.todo_app.search_next(),
                     Char('N') => self.todo_app.search_prev(),
                     Char('a') => self.prepend_prompt(),
