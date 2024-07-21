@@ -212,7 +212,7 @@ impl<'a> TuiApp<'a> {
         const TITLE: &str = "Restrict search todo";
         const PLACEHOLDER: &str = "Enter search query";
         self.set_responsive_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
-        self.on_submit = Some(Self::on_restrict_search);
+        self.on_submit = Some(Self::on_restrict_search_confirm);
     }
 
     #[inline]
@@ -233,6 +233,15 @@ impl<'a> TuiApp<'a> {
     #[inline]
     fn on_restrict_search(&mut self, str: String) {
         self.todo_app.set_query_restriction(str)
+    }
+
+    #[inline]
+    fn on_restrict_search_confirm(&mut self, str: String) {
+        if str.is_empty() {
+            self.todo_app.update_show_done_restriction();
+        } else {
+            self.on_restrict_search(str);
+        }
     }
 
     #[inline]

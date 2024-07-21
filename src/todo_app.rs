@@ -131,13 +131,8 @@ impl App {
     }
 
     pub fn set_query_restriction(&mut self, query: String) {
-        if self.show_done() {
-            self.set_restriction(Rc::new(move |todo| todo.matches(query.as_str())))
-        } else {
-            self.set_restriction(Rc::new(move |todo| {
-                todo.matches(query.as_str()) && !todo.done()
-            }))
-        }
+        let last_restriction = self.restriction.clone();
+        self.set_restriction(Rc::new(move |todo| todo.matches(query.as_str()) && last_restriction(todo)))
     }
 
     pub fn do_commands_on_selected(&mut self) {
@@ -502,6 +497,7 @@ impl App {
 
     #[inline]
     pub fn traverse_up(&mut self) -> bool {
+        self.update_show_done_restriction();
         if let Some(index) = self.tree_path.pop() {
             self.index = index;
             self.search(None);
@@ -801,6 +797,7 @@ impl App {
     #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
         if self.is_tree() {
+            self.update_show_done_restriction();
             // The reason we are using a self.todo() here, is that if we don't want to
             // change anything, we won't borrow mutable and set the self.changed=true
             if let Some(todo) = self.todo() {
