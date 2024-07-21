@@ -643,15 +643,13 @@ impl App {
     #[inline]
     pub fn is_undone_empty(&self) -> bool {
         let restriction: RestrictionFunction = Rc::new(move |todo| !todo.done());
-        self.current_list()
-            .is_empty(&restriction)
+        self.current_list().is_empty(&restriction)
     }
 
     #[inline]
     pub fn is_done_empty(&self) -> bool {
         let restriction: RestrictionFunction = Rc::new(move |todo| todo.done());
-        self.current_list()
-            .is_empty(&restriction)
+        self.current_list().is_empty(&restriction)
     }
 
     #[inline(always)]
