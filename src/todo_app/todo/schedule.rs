@@ -25,11 +25,11 @@ enum State {
     Date,
 }
 
-impl<T> From<T> for Schedule 
+impl<T> From<T> for Schedule
 where
-T: ToString,
+    T: ToString,
 {
-    fn from(input:T) -> Schedule {
+    fn from(input: T) -> Schedule {
         let mut date_string = String::new();
         let mut state = State::default();
         let mut mode = ScheduleMode::None;
@@ -70,11 +70,11 @@ T: ToString,
             }
         }
 
-        let day:i64 = day_str.parse().unwrap_or(0);
+        let day: i64 = day_str.parse().unwrap_or(0);
 
         let date = match date::parse(&date_string) {
             Ok(value) => Some(value),
-            Err(_) => None
+            Err(_) => None,
         };
 
         Schedule {
@@ -92,7 +92,7 @@ impl From<&Schedule> for String {
 
         match schedule.mode {
             ScheduleMode::Reminder => format!(" [R({date_str})]"),
-            ScheduleMode::Scheduled =>  format!(" [D{}({date_str})]", schedule.day),
+            ScheduleMode::Scheduled => format!(" [D{}({date_str})]", schedule.day),
             ScheduleMode::None => String::new(),
         }
     }
@@ -122,7 +122,7 @@ impl Schedule {
     fn display_reminder(&self) -> String {
         let date_str = date::display(self.date);
         match self.date_diff_days() {
-            any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str,-any),
+            any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str, -any),
             0 => format!(" (Reminder for today [{}])", date_str),
             1 => format!(" (Reminder for tomorrow [{}])", date_str),
             any => format!(" (Reminder for {date_str} [{any} days])"),
@@ -135,18 +135,18 @@ impl Schedule {
             ..=0 => String::new(),
             1 => String::from(", last done yesterday"),
             7 => String::from(", last done a week ago"),
-            any if any%7 == 0 => format!(", last done {} weeks ago", any/7),
-            any => format!(", last done {} days ago", any)
+            any if any % 7 == 0 => format!(", last done {} weeks ago", any / 7),
+            any => format!(", last done {} days ago", any),
         };
         match self.day {
-            1 =>format!(" (Daily{inner_str})"),
+            1 => format!(" (Daily{inner_str})"),
             7 => format!(" (Weekly{inner_str})"),
-            day if day%7 == 0 => format!(" (Each {} weeks{inner_str})", day/7),
-            day =>format!(" (Each {day} days{inner_str})"),
+            day if day % 7 == 0 => format!(" (Each {} weeks{inner_str})", day / 7),
+            day => format!(" (Each {day} days{inner_str})"),
         }
     }
 
-    pub fn display(&self) -> String{
+    pub fn display(&self) -> String {
         match self.mode {
             ScheduleMode::Reminder => self.display_reminder(),
             ScheduleMode::Scheduled => self.display_scheduled(),
@@ -154,13 +154,16 @@ impl Schedule {
         }
     }
 
-    pub fn add_days_to_date(&mut self, days:i64) {
+    pub fn add_days_to_date(&mut self, days: i64) {
         if let Some(date) = self.date {
-            if days > 0 && self.mode == ScheduleMode::Scheduled && self.current_date_diff_days() <= 0 {
-                return
+            if days > 0
+                && self.mode == ScheduleMode::Scheduled
+                && self.current_date_diff_days() <= 0
+            {
+                return;
             }
             self.date = Some(date::add_days(date, days))
-        } 
+        }
     }
 
     pub fn set_daily(&mut self) {
@@ -209,7 +212,7 @@ impl Schedule {
         self.mode = ScheduleMode::Scheduled;
     }
 
-    pub fn enable_reminder(&mut self, date: date::Type){
+    pub fn enable_reminder(&mut self, date: date::Type) {
         self.mode = ScheduleMode::Reminder;
         self.date = Some(date);
     }
@@ -240,7 +243,7 @@ impl Schedule {
     pub fn should_done(&self) -> bool {
         match self.mode {
             ScheduleMode::Reminder => !self.reminder_should_undone(),
-            _ => false
+            _ => false,
         }
     }
 }

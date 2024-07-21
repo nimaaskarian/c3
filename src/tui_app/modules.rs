@@ -1,7 +1,7 @@
 pub mod potato;
 use ratatui::widgets::Paragraph;
 
-pub trait Module <'a>{
+pub trait Module<'a> {
     fn update_time_ms(&self) -> u64;
     fn get_widget(&self) -> Paragraph<'a>;
     fn on_space(&mut self);

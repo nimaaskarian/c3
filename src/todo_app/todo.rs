@@ -1,18 +1,18 @@
 use std::path::Path;
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
-use std::{io, path::PathBuf, fs::remove_file};
 use std::str::{self, FromStr};
+use std::{fs::remove_file, io, path::PathBuf};
 //}}}
 // mod{{{
+mod dependency;
 mod note;
 pub mod schedule;
-mod dependency;
-use dependency::Dependency;
-use schedule::Schedule;
-use note::{sha1, open_note_temp_editor};
 use super::TodoList;
 use crate::DisplayArgs;
+use dependency::Dependency;
+use note::{open_note_temp_editor, sha1};
+use schedule::Schedule;
 //}}}
 
 pub type PriorityType = u8;
@@ -22,7 +22,7 @@ pub struct Todo {
     priority: PriorityType,
     pub dependency: Dependency,
     removed_dependency: Option<Dependency>,
-    done:bool,
+    done: bool,
     pub schedule: Schedule,
 }
 
@@ -40,12 +40,15 @@ impl PartialOrd for Todo {
 
 impl From<&Todo> for String {
     fn from(todo: &Todo) -> String {
-        let done_str = if todo.done() {"-"} else {""};
-        let dep_str:String = (&todo.dependency).into();
+        let done_str = if todo.done() { "-" } else { "" };
+        let dep_str: String = (&todo.dependency).into();
 
-        let schedule_str:String =(&todo.schedule).into();
+        let schedule_str: String = (&todo.schedule).into();
 
-        format!("[{done_str}{}]{dep_str} {}{schedule_str}", todo.priority, todo.message)
+        format!(
+            "[{done_str}{}]{dep_str} {}{schedule_str}",
+            todo.priority, todo.message
+        )
     }
 }
 
@@ -67,7 +70,7 @@ enum State {
 impl FromStr for Todo {
     type Err = TodoError;
 
-    fn from_str(input:&str) -> Result<Todo, Self::Err>{
+    fn from_str(input: &str) -> Result<Todo, Self::Err> {
         let mut state = State::default();
         let mut priority: u8 = 0;
         let mut done = false;
@@ -79,7 +82,7 @@ impl FromStr for Todo {
             schedule_start_index = input.rfind('[');
             if let Some(start) = schedule_start_index {
                 let end = input.chars().count();
-                schedule_string = input[start+1..end-1].chars().collect();
+                schedule_string = input[start + 1..end - 1].chars().collect();
             }
         }
 
@@ -107,7 +110,7 @@ impl FromStr for Todo {
                     message.push(c);
                 }
                 State::Message => {
-                    if i == schedule_start_index.unwrap()-1 {
+                    if i == schedule_start_index.unwrap() - 1 {
                         break;
                     } else {
                         message.push(c);
@@ -116,7 +119,6 @@ impl FromStr for Todo {
             }
         }
         if state == State::Message && !message.is_empty() {
-
             let schedule = Schedule::from(schedule_string);
             let dependency = Dependency::from(dependency_string.as_str());
 
@@ -147,11 +149,11 @@ impl Todo {
     }
 
     #[inline]
-    pub fn priority(&self) -> PriorityType{
+    pub fn priority(&self) -> PriorityType {
         self.priority
     }
     #[inline]
-    pub fn new(message:String, priority:PriorityType) -> Self {
+    pub fn new(message: String, priority: PriorityType) -> Self {
         Todo {
             message,
             priority,
@@ -196,7 +198,7 @@ impl Todo {
     }
 
     #[inline]
-    pub fn delete_removed_dependent_files(&mut self, path: &Path) -> io::Result<()>{
+    pub fn delete_removed_dependent_files(&mut self, path: &Path) -> io::Result<()> {
         if let Some(dependency) = &mut self.removed_dependency {
             let _ = dependency.todo_list.remove_dependency_files(path);
             let _ = remove_file(path.join(dependency.get_name()));
@@ -222,7 +224,10 @@ impl Todo {
         };
         let note_string = self.dependency.display();
         let daily_str = self.schedule.display();
-        format!("{done_string}{}{note_string} {}{daily_str}", self.priority, self.message)
+        format!(
+            "{done_string}{}{note_string} {}{daily_str}",
+            self.priority, self.message
+        )
     }
 
     #[inline]
@@ -234,13 +239,13 @@ impl Todo {
     }
 
     #[inline]
-    pub fn set_note(&mut self, note:String) -> io::Result<()>{
+    pub fn set_note(&mut self, note: String) -> io::Result<()> {
         self.dependency = Dependency::new_note(sha1(&note), note);
         Ok(())
     }
 
     #[inline]
-    pub fn edit_note(&mut self)-> io::Result<()>{
+    pub fn edit_note(&mut self) -> io::Result<()> {
         if !self.dependency.is_list() {
             let note = open_note_temp_editor(self.dependency.note())?;
             if !note.is_empty() {
@@ -256,12 +261,12 @@ impl Todo {
     }
 
     #[inline]
-    pub fn set_message(&mut self, message:String) {
+    pub fn set_message(&mut self, message: String) {
         self.message = message;
     }
 
     #[inline]
-    pub fn hash(&self) -> String{
+    pub fn hash(&self) -> String {
         sha1(&format!("{} {}", self.priority, self.message))
     }
 
@@ -297,13 +302,13 @@ impl Todo {
     }
 
     #[inline]
-    pub fn set_done(&mut self, done:bool) {
+    pub fn set_done(&mut self, done: bool) {
         self.schedule.set_current_date();
         self.done = done;
     }
 
     #[inline(always)]
-    fn standardize_priority(priority:PriorityType) -> PriorityType {
+    fn standardize_priority(priority: PriorityType) -> PriorityType {
         match priority {
             0 => 10,
             any => any,
@@ -318,23 +323,23 @@ impl Todo {
     #[inline]
     pub fn decrease_priority(&mut self) {
         if self.standardized_priority() < 9 {
-            self.priority+=1
+            self.priority += 1
         } else {
-            self.priority=0
+            self.priority = 0
         }
     }
 
     #[inline]
     pub fn increase_priority(&mut self) {
         if self.standardized_priority() > 1 {
-            self.priority=self.standardized_priority()-1
+            self.priority = self.standardized_priority() - 1
         } else {
-            self.priority=1
+            self.priority = 1
         }
     }
 
     #[inline]
-    pub fn set_priority(&mut self, priority:PriorityType) {
+    pub fn set_priority(&mut self, priority: PriorityType) {
         self.priority = priority;
         self.fix_priority();
     }
@@ -346,12 +351,12 @@ impl Todo {
 
     #[inline(always)]
     fn cmp_value(&self) -> PriorityType {
-        let mut priority = self.standardized_priority()*2;
+        let mut priority = self.standardized_priority() * 2;
         if self.schedule.is_reminder() {
-            priority-=1;
+            priority -= 1;
         }
         if self.done() {
-            priority+=Self::standardize_priority(0)*2;
+            priority += Self::standardize_priority(0) * 2;
         }
 
         priority
@@ -362,12 +367,12 @@ impl Todo {
         match priority {
             10.. => 0,
             0 => 0,
-            _ => priority
+            _ => priority,
         }
     }
 
     #[inline]
-    pub fn as_string(&self) -> String{
+    pub fn as_string(&self) -> String {
         self.into()
     }
 }
@@ -395,7 +400,10 @@ mod tests {
         let expected = Ok(Todo {
             removed_dependency: None,
             schedule: Schedule::new(),
-            dependency:Dependency::new_note("2c924e3088204ee77ba681f72be3444357932fca".to_string(), "".to_string()),
+            dependency: Dependency::new_note(
+                "2c924e3088204ee77ba681f72be3444357932fca".to_string(),
+                "".to_string(),
+            ),
             message: "Test".to_string(),
             priority: 1,
             done: false,
@@ -449,7 +457,8 @@ mod tests {
     #[test]
     fn test_add_note_type() {
         let mut todo = Todo::new("Test".to_string(), 1);
-        todo.set_note("Note".to_string()).expect("Error setting note");
+        todo.set_note("Note".to_string())
+            .expect("Error setting note");
 
         assert!(todo.dependency.is_note());
     }
@@ -457,15 +466,20 @@ mod tests {
     #[test]
     fn test_add_note_name() {
         let mut todo = Todo::new("Test".to_string(), 1);
-        todo.set_note("Note".to_string()).expect("Error setting note");
+        todo.set_note("Note".to_string())
+            .expect("Error setting note");
 
-        assert_eq!(todo.dependency.get_name(), "2c924e3088204ee77ba681f72be3444357932fca");
+        assert_eq!(
+            todo.dependency.get_name(),
+            "2c924e3088204ee77ba681f72be3444357932fca"
+        );
     }
 
     #[test]
     fn test_remove_note() {
         let mut todo = Todo::new("Test".to_string(), 1);
-        todo.set_note("Note".to_string()).expect("Error setting note");
+        todo.set_note("Note".to_string())
+            .expect("Error setting note");
         todo.remove_note();
 
         assert!(todo.dependency.is_none());
@@ -509,7 +523,9 @@ mod tests {
         let expected = Todo {
             removed_dependency: None,
             schedule: Schedule::new(),
-            dependency: Dependency::new_todo_list( "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c".to_string()),
+            dependency: Dependency::new_todo_list(
+                "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c".to_string(),
+            ),
             message: "Read for exams".to_string(),
             priority: 1,
             done: false,

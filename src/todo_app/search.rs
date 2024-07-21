@@ -7,7 +7,7 @@ pub(super) struct Search {
 
 impl Search {
     #[inline]
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         Search {
             last_query: String::new(),
             indices: vec![],
@@ -21,7 +21,7 @@ impl Search {
             return None;
         }
         for i in self.indices.clone() {
-            if i > index{
+            if i > index {
                 return Some(i);
             }
         }
@@ -30,7 +30,7 @@ impl Search {
     }
 
     #[inline]
-    pub fn search(&mut self, needle:Option<String>, haystack: Vec<String>) {
+    pub fn search(&mut self, needle: Option<String>, haystack: Vec<String>) {
         if let Some(query) = needle {
             self.last_query = query;
         }
@@ -39,9 +39,11 @@ impl Search {
         }
         self.indices = Vec::new();
 
-        // TODO: implement fuzzy matching 
+        // TODO: implement fuzzy matching
         for (i, hay) in haystack.iter().enumerate() {
-            if hay.contains(self.last_query.as_str()) || hay.to_lowercase().contains(self.last_query.as_str()) {
+            if hay.contains(self.last_query.as_str())
+                || hay.to_lowercase().contains(self.last_query.as_str())
+            {
                 self.indices.push(i);
             }
         }
@@ -52,10 +54,10 @@ impl Search {
         if self.indices.is_empty() {
             return None;
         }
-        if self.search_index+1 < self.indices.len() {
-            self.search_index+=1
+        if self.search_index + 1 < self.indices.len() {
+            self.search_index += 1
         } else {
-            self.search_index=0
+            self.search_index = 0
         }
         Some(self.indices[self.search_index])
     }
@@ -66,9 +68,9 @@ impl Search {
             return None;
         }
         if self.search_index != 0 {
-            self.search_index-=1
+            self.search_index -= 1
         } else {
-            self.search_index=self.indices.len()-1
+            self.search_index = self.indices.len() - 1
         }
         Some(self.indices[self.search_index])
     }

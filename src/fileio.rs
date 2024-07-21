@@ -1,14 +1,14 @@
-use std::fs::{File, remove_dir, remove_file};
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::io::{prelude::*, self, Write};
-use std::path::{Path, PathBuf};
 use home::home_dir;
+use std::fs::{remove_dir, remove_file, File};
+use std::io::{self, prelude::*, Write};
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use std::process::Command;
 use std::env;
+use std::process::Command;
 
 #[inline(always)]
-pub fn open_temp_editor(content:Option<&str>, path: PathBuf) -> io::Result<String>{
+pub fn open_temp_editor(content: Option<&str>, path: PathBuf) -> io::Result<String> {
     let mut file = File::create(&path)?;
     if let Some(content) = content {
         write!(file, "{content}")?;
@@ -16,19 +16,22 @@ pub fn open_temp_editor(content:Option<&str>, path: PathBuf) -> io::Result<Strin
     let editor = if cfg!(windows) {
         String::from("notepad")
     } else {
-         match env::var("EDITOR") {
+        match env::var("EDITOR") {
             Ok(editor) => editor,
-            Err(_) => String::from("vi")
+            Err(_) => String::from("vi"),
         }
     };
-    Command::new(editor).arg(&path).status().expect("Couldn't open the editor.");
+    Command::new(editor)
+        .arg(&path)
+        .status()
+        .expect("Couldn't open the editor.");
     let content = file_content(&path)?;
     remove_file(path).unwrap();
     Ok(content)
 }
 
 #[inline(always)]
-pub fn append_home_dir(vec:[&str; 4]) -> PathBuf {
+pub fn append_home_dir(vec: [&str; 4]) -> PathBuf {
     let mut path = home_dir().unwrap().to_path_buf();
     for item in vec {
         path = path.join(item);
@@ -39,7 +42,7 @@ pub fn append_home_dir(vec:[&str; 4]) -> PathBuf {
 
 #[inline(always)]
 pub fn get_todo_path() -> io::Result<PathBuf> {
-    let file = append_home_dir([".local","share","calcurse","todo"]);
+    let file = append_home_dir([".local", "share", "calcurse", "todo"]);
     if file.is_dir() {
         remove_dir(&file)?;
     }
@@ -49,9 +52,9 @@ pub fn get_todo_path() -> io::Result<PathBuf> {
 }
 
 #[inline(always)]
-pub fn temp_path(name: &str) -> PathBuf{
+pub fn temp_path(name: &str) -> PathBuf {
     let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Err(_)=>12345,
+        Err(_) => 12345,
         Ok(some) => some.as_secs(),
     };
     let filename = format!("c3-{name}.{time}");
@@ -60,10 +63,9 @@ pub fn temp_path(name: &str) -> PathBuf{
 }
 
 #[inline(always)]
-pub fn file_content(path:&Path) -> io::Result<String> {
+pub fn file_content(path: &Path) -> io::Result<String> {
     let mut content = String::new();
     let mut file = File::open(path)?;
     file.read_to_string(&mut content)?;
     Ok(content)
 }
-

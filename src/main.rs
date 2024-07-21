@@ -7,20 +7,20 @@ use std::path::PathBuf;
 use clap::Parser;
 // }}}
 //mod{{{
-pub(crate) mod fileio;
-pub(crate) mod date;
-pub(crate) mod todo_app;
 pub(crate) mod cli_app;
+pub(crate) mod date;
+pub(crate) mod fileio;
+pub(crate) mod todo_app;
 pub(crate) mod tui_app;
-use todo_app::App;
 use fileio::get_todo_path;
+use todo_app::App;
 //}}}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-pub struct DisplayArgs{
+pub struct DisplayArgs {
     /// Show done todos too
-    #[arg(short='d', long, default_value_t=false)]
+    #[arg(short = 'd', long, default_value_t = false)]
     show_done: bool,
 
     /// String before done todos
@@ -37,11 +37,11 @@ pub struct DisplayArgs{
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// Performance mode, don't read dependencies
-    #[arg(short='n', long)]
+    #[arg(short = 'n', long)]
     no_tree: bool,
 
     /// Search and select todo. Used for batch change operations
-    #[arg(short='S', long)]
+    #[arg(short = 'S', long)]
     search_and_select: Vec<String>,
 
     /// String behind highlighted todo in TUI mode
@@ -68,11 +68,11 @@ pub struct Args {
     display_args: DisplayArgs,
 
     /// A todo message to append
-    #[arg(short='a', long)]
+    #[arg(short = 'a', long)]
     append_todo: Vec<String>,
 
     /// A todo message to prepend
-    #[arg(short='A', long)]
+    #[arg(short = 'A', long)]
     prepend_todo: Vec<String>,
 
     /// A todo file to append to current list
@@ -80,19 +80,19 @@ pub struct Args {
     append_file: Option<PathBuf>,
 
     /// Minimal tree with no tree graphics
-    #[arg(short='M', long)]
+    #[arg(short = 'M', long)]
     minimal_tree: bool,
 
     /// List todos (non interactive)
-    #[arg(short='l', long)]
+    #[arg(short = 'l', long)]
     list: bool,
 
     /// Enable TUI module at startup
-    #[arg(short='m', long)]
+    #[arg(short = 'm', long)]
     enable_module: bool,
 
     /// Write contents of todo file in the stdout (non interactive)
-    #[arg(short='s', long)]
+    #[arg(short = 's', long)]
     stdout: bool,
 
     /// Path to todo file (and notes sibling directory)
@@ -102,8 +102,13 @@ pub struct Args {
 
 impl Args {
     pub fn is_cli(&self) -> bool {
-        self.stdout || self.minimal_tree || self.list ||
-        !self.search_and_select.is_empty() || !self.prepend_todo.is_empty() || !self.append_todo.is_empty() || self.append_file.is_some()
+        self.stdout
+            || self.minimal_tree
+            || self.list
+            || !self.search_and_select.is_empty()
+            || !self.prepend_todo.is_empty()
+            || !self.append_todo.is_empty()
+            || self.append_file.is_some()
     }
 }
 
@@ -116,7 +121,7 @@ fn main() -> io::Result<()> {
         cli_app::run(&mut app)
     } else {
         match tui_app::run(&mut app) {
-            Ok(_)=>{Ok(())}
+            Ok(_) => Ok(()),
             err => {
                 tui_app::shutdown()?;
                 err

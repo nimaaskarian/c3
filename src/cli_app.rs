@@ -1,9 +1,9 @@
-use std::io;
-use super::todo_app::{App, TodoList, Todo, Restriction};
+use super::todo_app::{App, Restriction, Todo, TodoList};
 use crate::DisplayArgs;
+use std::io;
 
 #[inline]
-pub fn run(app: &mut App) -> io::Result<()>{
+pub fn run(app: &mut App) -> io::Result<()> {
     let app = CliApp::new(app);
     app.print()?;
     Ok(())
@@ -13,7 +13,7 @@ pub struct CliApp<'a> {
     todo_app: &'a App,
 }
 
-impl <'a>CliApp <'a>{
+impl<'a> CliApp<'a> {
     #[inline]
     pub fn new(app: &'a mut App) -> Self {
         for message in app.args.append_todo.clone() {
@@ -27,9 +27,7 @@ impl <'a>CliApp <'a>{
         }
         app.do_commands_on_selected();
         let _ = app.write();
-        CliApp {
-            todo_app: app,
-        }
+        CliApp { todo_app: app }
     }
 
     #[inline]
@@ -40,18 +38,22 @@ impl <'a>CliApp <'a>{
     }
 
     #[inline]
-    pub fn print(&self) -> io::Result<()>{
+    pub fn print(&self) -> io::Result<()> {
         if !self.todo_app.args.search_and_select.is_empty() {
             self.todo_app.print_selected();
-            return Ok(())
+            return Ok(());
         }
         if self.todo_app.args.stdout {
             self.todo_app.print()?;
-            return Ok(())
+            return Ok(());
         }
         if self.todo_app.is_tree() {
             let mut print_todo = PrintTodoTree::new(self.todo_app.args.minimal_tree);
-            print_todo.print_list(&self.todo_app.todo_list, &self.todo_app.args.display_args, self.todo_app.restriction());
+            print_todo.print_list(
+                &self.todo_app.todo_list,
+                &self.todo_app.args.display_args,
+                self.todo_app.restriction(),
+            );
         } else {
             self.print_list()
         }
@@ -59,7 +61,7 @@ impl <'a>CliApp <'a>{
     }
 }
 
-// TODO: Use traverse_tree instead of this struct for printing todo tree. 
+// TODO: Use traverse_tree instead of this struct for printing todo tree.
 #[derive(Clone)]
 struct PrintTodoTree {
     last_stack: Vec<bool>,
@@ -69,7 +71,7 @@ struct PrintTodoTree {
 
 impl PrintTodoTree {
     #[inline]
-    pub fn new(should_print_indention:bool) -> Self {
+    pub fn new(should_print_indention: bool) -> Self {
         PrintTodoTree {
             last_stack: vec![],
             is_last: false,
@@ -92,7 +94,12 @@ impl PrintTodoTree {
     }
 
     #[inline]
-    pub fn print_list(&mut self, todo_list: &TodoList, display_args: &DisplayArgs, restriction: Restriction) {
+    pub fn print_list(
+        &mut self,
+        todo_list: &TodoList,
+        display_args: &DisplayArgs,
+        restriction: Restriction,
+    ) {
         let todos = todo_list.todos(restriction.clone());
 
         for (index, todo) in todos.iter().enumerate() {
@@ -138,7 +145,7 @@ impl PrintTodoTree {
     #[inline]
     fn print_indention(&self) {
         if self.should_print_indention {
-            return
+            return;
         }
         self.print_preindention(self.last_stack.clone());
         if self.is_last {

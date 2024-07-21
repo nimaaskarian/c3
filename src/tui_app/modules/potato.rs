@@ -1,22 +1,22 @@
+use super::super::default_block;
+use super::Module;
 use ratatui::widgets::Paragraph;
 use std::io;
 use std::process::{Command, Output};
-use super::Module;
-use super::super::default_block;
 
-pub struct Potato<'a>{
-    command: &'a str, 
+pub struct Potato<'a> {
+    command: &'a str,
     index: usize,
 }
 
-impl <'a> Module <'a> for Potato <'a> {
+impl<'a> Module<'a> for Potato<'a> {
     #[inline]
     fn get_widget(&self) -> Paragraph<'a> {
         let args = vec!["+%m\n%t\n%p".to_string(), self.resolve_arg("1")];
 
         let time_str = match self.output(args) {
             Ok(output) => String::from_utf8(output.stdout).unwrap(),
-            Err(_) => String::from("potctl command not found at path.")
+            Err(_) => String::from("potctl command not found at path."),
         };
 
         Paragraph::new(time_str).block(default_block("Potato"))
@@ -86,27 +86,25 @@ impl<'a> Potato<'a> {
     }
 
     #[inline]
-    fn run(&self, args:Vec<String>) {
+    fn run(&self, args: Vec<String>) {
         let _ = Command::new(self.command).args(args).status();
     }
 
     #[inline]
-    fn output(&self, args:Vec<String>) -> io::Result<Output>{
+    fn output(&self, args: Vec<String>) -> io::Result<Output> {
         Command::new(self.command).args(args).output()
     }
 
     #[inline]
     fn len(&self) -> usize {
         match self.output(vec![]) {
-            Ok(output) => {
-                String::from_utf8(output.stdout).unwrap().lines().count()-1
-            }
-            Err(_) => 0
+            Ok(output) => String::from_utf8(output.stdout).unwrap().lines().count() - 1,
+            Err(_) => 0,
         }
     }
 
     #[inline]
-    fn resolve_arg(&self, arg:&str) -> String {
+    fn resolve_arg(&self, arg: &str) -> String {
         format!("-{arg}{}", self.index)
     }
 
