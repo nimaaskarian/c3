@@ -203,13 +203,8 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    pub fn search_prompt(&mut self) {
-        self.set_text_mode(Self::on_search, "Search todo", "Enter search query")
-    }
-
-    #[inline]
     pub fn restrict_search_prompt(&mut self) {
-        const TITLE: &str = "Restrict search todo";
+        const TITLE: &str = "Search todo";
         const PLACEHOLDER: &str = "Enter search query";
         self.set_responsive_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
         self.on_submit = Some(Self::on_restrict_search_confirm);
@@ -222,12 +217,6 @@ impl<'a> TuiApp<'a> {
             "Search the whole tree for todo",
             "Enter search query",
         )
-    }
-
-    #[inline]
-    fn on_search(&mut self, str: String) {
-        self.todo_app.search(Some(str));
-        self.todo_app.search_init();
     }
 
     #[inline]
@@ -569,12 +558,10 @@ impl<'a> TuiApp<'a> {
                     Char('R') => self.todo_app.read(),
                     Char('T') => self.todo_app.remove_current_dependent(),
                     Char(' ') => self.todo_app.toggle_current_done(),
-                    Char('n') => self.todo_app.search_next(),
-                    Char('N') => self.todo_app.search_prev(),
-                    Char('a') => self.prepend_prompt(),
-                    Char('/') => self.search_prompt(),
+                    KeyCode::Tab => self.todo_app.search_next(),
+                    Char('n') | Char('a') => self.prepend_prompt(),
+                    Char('/') => self.restrict_search_prompt(),
                     Char('?') => self.tree_search_prompt(),
-                    Char('\\') => self.restrict_search_prompt(),
                     Char('A') => self.append_prompt(),
                     Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
                     Char('q') => self.quit_save_prompt(),
@@ -587,10 +574,10 @@ impl<'a> TuiApp<'a> {
                         self.todo_app.set_current_priority(priority as PriorityType);
                     }
 
-                    Char(' ') => self.module.on_space(),
                     Char('s') => self.module.on_s(),
                     Char('H') => self.module.on_capital_h(),
                     Char('c') => self.module.on_c(),
+                    Char('C') => self.module.on_capital_c(),
                     Char('L') => self.module.on_capital_l(),
                     Char('r') => self.module.on_r(),
                     Char('+') | Char('=') => self.module.on_plus(),

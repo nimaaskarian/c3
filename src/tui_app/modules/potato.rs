@@ -29,12 +29,12 @@ impl<'a> Module<'a> for Potato<'a> {
 
     #[inline]
     fn on_c(&mut self) {
-        self.quit()
+        self.toggle_pause()
     }
 
     #[inline]
-    fn on_space(&mut self) {
-        self.toggle_pause()
+    fn on_capital_c(&mut self) {
+        self.quit()
     }
 
     #[inline]

@@ -3,12 +3,10 @@ use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
-mod search;
 mod todo;
 mod todo_list;
 use crate::fileio::{open_temp_editor, temp_path};
 use crate::Args;
-use search::Search;
 use std::rc::Rc;
 pub use todo::Todo;
 
@@ -31,7 +29,6 @@ pub struct App {
     changed: bool,
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
-    search: Search,
     tree_search_positions: Vec<SearchPosition>,
     last_query: String,
     x_index: usize,
@@ -85,7 +82,6 @@ impl App {
             tree_path: vec![],
             changed: false,
             args,
-            search: Search::new(),
             restriction: Self::no_restriction(),
         };
         app.update_show_done_restriction();
@@ -335,19 +331,6 @@ impl App {
     }
 
     #[inline]
-    pub fn search(&mut self, query: Option<String>) {
-        let todo_messages = self.current_list().messages(&self.restriction);
-        self.search.search(query, todo_messages);
-    }
-
-    #[inline]
-    pub fn search_init(&mut self) {
-        if let Some(index) = self.search.first_greater_than(self.index) {
-            self.index = index;
-        }
-    }
-
-    #[inline]
     pub fn show_done(&self) -> bool {
         self.args.display_args.show_done
     }
@@ -368,11 +351,7 @@ impl App {
 
     #[inline]
     pub fn search_next(&mut self) {
-        if self.tree_search_positions.is_empty() {
-            if let Some(index) = self.search.next() {
-                self.index = index
-            }
-        } else {
+        if !self.tree_search_positions.is_empty() {
             let x_size = self.tree_search_positions.len();
             let y_size = self.tree_search_positions[self.x_index]
                 .matching_indices
@@ -394,13 +373,6 @@ impl App {
         let item = self.tree_search_positions[self.x_index].clone();
         self.tree_path = item.tree_path;
         self.index = item.matching_indices[self.y_index];
-    }
-
-    #[inline]
-    pub fn search_prev(&mut self) {
-        if let Some(index) = self.search.prev() {
-            self.index = index
-        }
     }
 
     #[inline]
@@ -488,7 +460,6 @@ impl App {
                         .true_position_in_list(index, &restriction);
                     self.tree_path.push(true_index);
                     self.go_top();
-                    self.search(None);
                 }
                 _ => {}
             }
@@ -500,7 +471,6 @@ impl App {
         self.update_show_done_restriction();
         if let Some(index) = self.tree_path.pop() {
             self.index = index;
-            self.search(None);
             true
         } else {
             false
