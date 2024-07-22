@@ -26,6 +26,7 @@ use tui_textarea::{CursorMove, Input, TextArea};
 
 mod modules;
 use super::todo_app::{App, Todo};
+use crate::todo_app::RestrictionFunction;
 use crate::{date, todo_app::PriorityType};
 use modules::{potato::Potato, Module};
 // }}}
@@ -114,14 +115,16 @@ enum EditorOperation {
     Cancel,
     Submit,
     Input,
-    Ignore,
+    Delete(String),
 }
 
 type HandlerParameter = String;
 pub struct TuiApp<'a> {
+    last_restriction: Option<RestrictionFunction>,
     show_right: bool,
     text_mode: bool,
     on_submit: Option<fn(&mut Self, HandlerParameter) -> ()>,
+    on_delete: Option<fn(&mut Self, HandlerParameter, String) -> ()>,
     on_input: Option<fn(&mut Self, HandlerParameter) -> ()>,
     module_enabled: bool,
     module: &'a mut dyn Module<'a>,
@@ -140,9 +143,11 @@ impl<'a> TuiApp<'a> {
             module,
             on_submit: None,
             on_input: None,
+            on_delete: None,
             show_right: true,
             text_mode: false,
             module_enabled,
+            last_restriction: None,
         }
     }
 
@@ -206,8 +211,9 @@ impl<'a> TuiApp<'a> {
     pub fn restrict_search_prompt(&mut self) {
         const TITLE: &str = "Search todo";
         const PLACEHOLDER: &str = "Enter search query";
+        self.last_restriction = Some(self.todo_app.restriction().clone());
         self.set_responsive_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
-        self.on_submit = Some(Self::on_restrict_search_confirm);
+        self.on_delete = Some(Self::on_restrict_search_delete);
     }
 
     #[inline]
@@ -221,15 +227,15 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_restrict_search(&mut self, str: String) {
-        self.todo_app.set_query_restriction(str)
+        self.todo_app.set_query_restriction(str, self.last_restriction.clone())
     }
 
     #[inline]
-    fn on_restrict_search_confirm(&mut self, str: String) {
-        if str.is_empty() {
-            self.todo_app.update_show_done_restriction();
+    fn on_restrict_search_delete(&mut self, str: String, old: String) {
+        if old.is_empty() {
+            self.todo_app.update_show_done_restriction()
         } else {
-            self.on_restrict_search(str);
+            self.on_restrict_search(str)
         }
     }
 
@@ -426,7 +432,12 @@ impl<'a> TuiApp<'a> {
             EditorOperation::Cancel => {
                 self.turn_off_text_mode();
             }
-            EditorOperation::Ignore => {}
+            EditorOperation::Delete(before_delete) => {
+                if let Some(on_delete) = self.on_delete {
+                    let message = self.current_textarea_message();
+                    on_delete(self, message, before_delete);
+                }
+            }
         }
         Ok(())
     }
@@ -461,12 +472,19 @@ impl<'a> TuiApp<'a> {
                 ctrl: true,
                 ..
             } => {
+                let before_delete = self.current_textarea_message();
                 self.textarea.delete_line_by_head();
-                Ok(EditorOperation::Ignore)
+                Ok(EditorOperation::Delete(before_delete))
             }
             input => {
+                let is_backspace = input.key == tui_textarea::Key::Backspace;
+                let before_delete = self.current_textarea_message();
                 self.textarea.input(input);
-                Ok(EditorOperation::Input)
+                if is_backspace {
+                    Ok(EditorOperation::Delete(before_delete))
+                } else {
+                    Ok(EditorOperation::Input)
+                }
             }
         }
     }
@@ -536,7 +554,11 @@ impl<'a> TuiApp<'a> {
                     }
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up | Char('k') => self.todo_app.decrement(),
-                    KeyCode::Right | Char('l') | KeyCode::Enter => self.todo_app.add_dependency_traverse_down(),
+                    KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),
+                    KeyCode::Enter => {
+                        self.todo_app.update_show_done_restriction();
+                        self.todo_app.traverse_down()
+                    },
                     KeyCode::Left | Char('h') => {
                         self.todo_app.traverse_up();
                     }

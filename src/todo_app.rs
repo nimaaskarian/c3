@@ -126,8 +126,8 @@ impl App {
         self.current_list_mut().append_list(todo_list)
     }
 
-    pub fn set_query_restriction(&mut self, query: String) {
-        let last_restriction = self.restriction.clone();
+    pub fn set_query_restriction(&mut self, query: String, last_restriction: Option<RestrictionFunction>) {
+        let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
         self.set_restriction(Rc::new(move |todo| todo.matches(query.as_str()) && last_restriction(todo)))
     }
 
@@ -873,7 +873,7 @@ mod tests {
         let dir = dir("test-set-restrictions-query")?;
         let mut app = write_test_todos(&dir)?;
         assert_eq!(app.len(), 1);
-        app.set_query_restriction(String::from("hello"));
+        app.set_query_restriction(String::from("hello"), None);
         assert_eq!(app.len(), 1);
         app.unset_restriction();
         assert_eq!(app.len(), 1);
