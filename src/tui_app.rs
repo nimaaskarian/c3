@@ -555,10 +555,7 @@ impl<'a> TuiApp<'a> {
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up | Char('k') => self.todo_app.decrement(),
                     KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),
-                    KeyCode::Enter => {
-                        self.todo_app.update_show_done_restriction();
-                        self.todo_app.traverse_down()
-                    },
+                    KeyCode::Enter => self.todo_app.traverse_down(),
                     KeyCode::Left | Char('h') => {
                         self.todo_app.traverse_up();
                     }

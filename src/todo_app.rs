@@ -460,6 +460,7 @@ impl App {
                         .true_position_in_list(index, &restriction);
                     self.tree_path.push(true_index);
                     self.go_top();
+                    self.update_show_done_restriction();
                 }
                 _ => {}
             }
@@ -767,7 +768,6 @@ impl App {
     #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
         if self.is_tree() {
-            self.update_show_done_restriction();
             // The reason we are using a self.todo() here, is that if we don't want to
             // change anything, we won't borrow mutable and set the self.changed=true
             if let Some(todo) = self.todo() {
@@ -821,6 +821,8 @@ mod tests {
         args.todo_path = dir.join("todo");
         let mut app = App::new(args);
         app.append(String::from("Hello"));
+        app.append(String::from("Goodbye"));
+        app.append(String::from("Hello there"));
         let dependencies = vec![
             "Is there anybody outthere?",
             "Just nod if you can here me",
@@ -859,11 +861,11 @@ mod tests {
         let dir = dir("test-set-restrictions-done")?;
         let mut app = write_test_todos(&dir)?;
         app.toggle_current_done();
-        assert_eq!(app.len(), 0);
+        assert_eq!(app.len(), 2);
         app.toggle_show_done();
-        assert_eq!(app.len(), 1);
+        assert_eq!(app.len(), 3);
         app.toggle_show_done();
-        assert_eq!(app.len(), 0);
+        assert_eq!(app.len(), 2);
         remove_dir_all(dir)?;
         Ok(())
     }
@@ -872,10 +874,17 @@ mod tests {
     fn test_set_restrictions_query() -> io::Result<()> {
         let dir = dir("test-set-restrictions-query")?;
         let mut app = write_test_todos(&dir)?;
-        assert_eq!(app.len(), 1);
+        assert_eq!(app.len(), 3);
         app.set_query_restriction(String::from("hello"), None);
-        assert_eq!(app.len(), 1);
+        assert_eq!(app.len(), 2);
+        assert_eq!(app.index, 1);
+        app.traverse_down();
         app.unset_restriction();
+        app.traverse_up();
+        app.set_query_restriction(String::from("hello"), None);
+        assert_eq!(app.len(), 2);
+        assert_eq!(app.index, 1);
+        app.add_dependency_traverse_down();
         assert_eq!(app.len(), 1);
         remove_dir_all(dir)?;
         Ok(())
@@ -886,11 +895,11 @@ mod tests {
         let dir = dir("test-set-restrictions-priority")?;
         let mut app = write_test_todos(&dir)?;
         app.set_current_priority(2);
-        assert_eq!(app.len(), 1);
+        assert_eq!(app.len(), 3);
         app.set_priority_restriction(2);
         assert_eq!(app.len(), 1);
         app.set_priority_restriction(0);
-        assert_eq!(app.len(), 0);
+        assert_eq!(app.len(), 2);
         remove_dir_all(dir)?;
         Ok(())
     }
@@ -903,7 +912,7 @@ mod tests {
         let query = String::from("nod");
         app.tree_search(Some(query));
         let position = &app.tree_search_positions[1];
-        assert_eq!(position.tree_path, vec![0, 0]);
+        assert_eq!(position.tree_path, vec![2, 0]);
         assert_eq!(position.matching_indices, vec![0]);
         Ok(())
     }
@@ -917,8 +926,8 @@ mod tests {
             .collect::<Result<Vec<_>, io::Error>>()?;
 
         let expected_names = vec![
-            "275549796be6d9a9c6b45d71df4714bfd934c0ba.todo",
             "560b05afe5e03eae9f8ad475b0b8b73ea6911272.todo",
+            "63c5498f09d086fca6d870345350bfb210945790.todo",
             "b3942ad1c555625b7f60649fe50853830b6cdb04.todo",
         ];
         let mut expected_names: Vec<String> =
@@ -960,7 +969,7 @@ mod tests {
             _ => Ok(vec![]),
         };
         let string = fs::read_to_string(&dir.join("todo"))?;
-        let expected_string = String::from("[0] Hello\n");
+        let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0] Hello there\n");
         remove_dir_all(dir)?;
         assert!(names?.is_empty());
         assert_eq!(string, expected_string);
