@@ -39,6 +39,7 @@ pub struct App {
 #[derive(Debug)]
 struct IndexedLine {
     message: String,
+    priority: u8,
     index: Option<usize>,
 }
 
@@ -48,20 +49,27 @@ struct LineMalformed;
 impl FromStr for IndexedLine {
     type Err = LineMalformed;
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let mut num_length = 0;
-        for c in input.chars() {
-            if c == ' ' {
-                break;
-            }
-            num_length += 1;
+        let (priority, message) = nth_word_parse(input, 0);
+        let (index, message) = nth_word_parse(message.as_str(), 0);
+
+        Ok(Self {
+            index,
+            message,
+            priority: priority.unwrap_or_default(),
+        })
+    }
+}
+
+fn nth_word_parse<T: FromStr>(input: &str, n: usize) -> (Option<T>, String) {
+    let word = input.split_whitespace().nth(n).unwrap_or_default();
+    match word.parse::<T>() {
+        Ok(num) => {
+            let rest: String = input.split_whitespace().skip(n+1).collect::<Vec<&str>>().join(" ");
+            (Some(num), rest)
         }
-        let index = input[..num_length].parse().ok();
-        let message = if index.is_none() {
-            input.to_string()
-        } else {
-            input[num_length + 1..].to_string()
-        };
-        Ok(Self { index, message })
+        Err(_) => {
+            (None, input.to_string())
+        }
     }
 }
 
@@ -202,10 +210,10 @@ impl App {
         let restriction = &self.restriction;
         let content = self
             .current_list()
-            .messages(restriction)
+            .todos(restriction)
             .iter()
             .enumerate()
-            .map(|(i, x)| format!("{i} {x}"))
+            .map(|(i, x)| format!("{} {i} {}",x.priority(),x.message))
             .collect::<Vec<String>>()
             .join("\n");
         let new_messages = open_temp_editor(Some(&content), temp_path("messages")).unwrap();
@@ -236,7 +244,7 @@ impl App {
             if let Some(indexed_line) = current_line {
                 if let Some(line_index) = indexed_line.index {
                     if line_index == i {
-                        if Self::batch_edit_helper(todo, &indexed_line.message) {
+                        if Self::batch_edit_helper(todo, indexed_line) {
                             changed = true;
                         }
                         current_line = indexed_lines_iter.next();
@@ -260,7 +268,7 @@ impl App {
         );
         for line in indexed_lines {
             if line.index.is_none() {
-                self.current_list_mut().push(Todo::new(line.message, 0));
+                self.current_list_mut().push(Todo::new(line.message, line.priority));
                 changed = true;
             }
         }
@@ -268,12 +276,12 @@ impl App {
     }
 
     #[inline(always)]
-    fn batch_edit_helper(todo: &mut Todo, message: &str) -> bool {
-        let message = message.to_string();
-        if todo.message == message {
+    fn batch_edit_helper(todo: &mut Todo, line: &IndexedLine) -> bool {
+        if todo.message == line.message && todo.priority() == line.priority {
             return false;
         }
-        todo.set_message(message);
+        todo.set_message(line.message.clone());
+        todo.set_priority(line.priority);
         true
     }
 
