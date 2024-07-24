@@ -636,9 +636,9 @@ impl App {
     }
 
     #[inline]
-    pub fn set_priority_restriction(&mut self, priority: PriorityType) {
-        self.args.display_args.show_done = true;
-        self.set_restriction(Rc::new(move |todo| todo.priority() == priority))
+    pub fn set_priority_restriction(&mut self, priority: PriorityType, last_restriction: Option<RestrictionFunction>) {
+        let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
+        self.set_restriction(Rc::new(move |todo| todo.priority() == priority && last_restriction(todo)))
     }
 
     #[inline]
@@ -896,9 +896,12 @@ mod tests {
         let mut app = write_test_todos(&dir)?;
         app.set_current_priority(2);
         assert_eq!(app.len(), 3);
-        app.set_priority_restriction(2);
+        app.set_priority_restriction(2, None);
         assert_eq!(app.len(), 1);
-        app.set_priority_restriction(0);
+        app.set_priority_restriction(0, None);
+        assert_eq!(app.len(), 0);
+        app.update_show_done_restriction();
+        app.set_priority_restriction(0, None);
         assert_eq!(app.len(), 2);
         remove_dir_all(dir)?;
         Ok(())

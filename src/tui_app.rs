@@ -208,12 +208,12 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    pub fn restrict_search_prompt(&mut self) {
+    pub fn search_prompt(&mut self) {
         const TITLE: &str = "Search todo";
         const PLACEHOLDER: &str = "Enter search query";
         self.last_restriction = Some(self.todo_app.restriction().clone());
-        self.set_responsive_text_mode(Self::on_restrict_search, TITLE, PLACEHOLDER);
-        self.on_delete = Some(Self::on_restrict_search_delete);
+        self.set_responsive_text_mode(Self::on_search, TITLE, PLACEHOLDER);
+        self.on_delete = Some(Self::on_search_delete);
     }
 
     #[inline]
@@ -226,16 +226,24 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_restrict_search(&mut self, str: String) {
+    fn on_search(&mut self, str: String) {
         self.todo_app.set_query_restriction(str, self.last_restriction.clone())
     }
 
     #[inline]
-    fn on_restrict_search_delete(&mut self, str: String, old: String) {
+    fn on_priority_delete(&mut self, new: String, old: String) {
+        if new.is_empty() || old.is_empty() {
+            self.todo_app.update_show_done_restriction()
+        }
+    }
+
+
+    #[inline]
+    fn on_search_delete(&mut self, str: String, old: String) {
         if old.is_empty() {
             self.todo_app.update_show_done_restriction()
         } else {
-            self.on_restrict_search(str)
+            self.on_search(str)
         }
     }
 
@@ -334,8 +342,10 @@ impl<'a> TuiApp<'a> {
     pub fn priority_prompt(&mut self) {
         const TITLE: &str = "Limit priority";
         const PLACEHOLDER: &str = "Enter priority to show";
+        self.last_restriction = Some(self.todo_app.restriction().clone());
         self.set_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
         self.set_responsive_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
+        self.on_delete = Some(Self::on_priority_delete);
     }
 
     #[inline]
@@ -361,21 +371,13 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_priority_prompt(&mut self, mut str: String) {
+    fn on_priority_prompt(&mut self, str: String) {
         if str.is_empty() {
             return self.todo_app.update_show_done_restriction();
         }
-        let show_done = str.ends_with('d');
-        if show_done {
-            str.pop();
-        }
-        let priority = str.parse::<u8>().ok();
-        if let Some(priority) = priority {
-            if show_done {
-                self.todo_app.set_priority_restriction(priority)
-            } else {
-                self.todo_app.set_priority_limit_no_done(priority)
-            }
+        let priority = str.parse();
+        if let Ok(priority) = priority {
+            self.todo_app.set_priority_restriction(priority, self.last_restriction.clone())
         }
     }
 
@@ -579,7 +581,7 @@ impl<'a> TuiApp<'a> {
                     Char(' ') => self.todo_app.toggle_current_done(),
                     KeyCode::Tab => self.todo_app.search_next(),
                     Char('n') | Char('a') => self.prepend_prompt(),
-                    Char('/') => self.restrict_search_prompt(),
+                    Char('/') => self.search_prompt(),
                     Char('?') => self.tree_search_prompt(),
                     Char('A') => self.append_prompt(),
                     Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
