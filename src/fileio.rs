@@ -18,7 +18,7 @@ pub fn open_temp_editor(content: Option<&str>, path: PathBuf) -> io::Result<Stri
     } else {
         match env::var("EDITOR") {
             Ok(editor) => editor,
-            Err(_) => String::from("vi"),
+            Err(_) => String::from("vim"),
         }
     };
     Command::new(editor)
