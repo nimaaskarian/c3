@@ -1,20 +1,40 @@
 // vim:fileencoding=utf-8:foldmethod=marker
-// standard {{{
-use std::io::{self};
-use std::path::PathBuf;
-//}}}
-// lib {{{
-use clap::Parser;
-// }}}
-//mod{{{
+use clap::{Command, CommandFactory, Parser};
+use std::io;
 pub(crate) mod cli_app;
 pub(crate) mod date;
 pub(crate) mod fileio;
 pub(crate) mod todo_app;
 pub(crate) mod tui_app;
-use fileio::get_todo_path;
+use crate::fileio::get_todo_path;
+use clap_complete::{generate, Generator, Shell};
+use std::path::PathBuf;
 use todo_app::App;
-//}}}
+
+fn main() -> io::Result<()> {
+    let args = Args::parse();
+    let mode = args.mode();
+    let mut app = App::new(args);
+
+    match mode {
+        AppMode::Completion(generator) => {
+            print_completions(generator, &mut Args::command());
+            Ok(())
+        }
+        AppMode::Cli => cli_app::run(&mut app),
+        AppMode::Tui => match tui_app::run(&mut app) {
+            Ok(_) => Ok(()),
+            err => {
+                tui_app::shutdown()?;
+                err
+            }
+        },
+    }
+}
+
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -98,34 +118,34 @@ pub struct Args {
     /// Path to todo file (and notes sibling directory)
     #[arg(default_value=get_todo_path().unwrap().into_os_string())]
     todo_path: PathBuf,
+
+    #[arg(short = 'c', long)]
+    completion: Option<Shell>,
+}
+
+pub enum AppMode {
+    Cli,
+    Tui,
+    Completion(Shell),
 }
 
 impl Args {
-    pub fn is_cli(&self) -> bool {
-        self.stdout
+    pub fn mode(&self) -> AppMode {
+        if let Some(generator) = self.completion {
+            return AppMode::Completion(generator);
+        }
+
+        if self.stdout
             || self.minimal_tree
             || self.list
             || !self.search_and_select.is_empty()
             || !self.prepend_todo.is_empty()
             || !self.append_todo.is_empty()
             || self.append_file.is_some()
-    }
-}
-
-fn main() -> io::Result<()> {
-    let args = Args::parse();
-    let is_cli = args.is_cli();
-    let mut app = App::new(args);
-
-    if is_cli {
-        cli_app::run(&mut app)
-    } else {
-        match tui_app::run(&mut app) {
-            Ok(_) => Ok(()),
-            err => {
-                tui_app::shutdown()?;
-                err
-            }
+        {
+            AppMode::Cli
+        } else {
+            AppMode::Tui
         }
     }
 }

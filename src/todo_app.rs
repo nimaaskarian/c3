@@ -64,12 +64,14 @@ fn nth_word_parse<T: FromStr>(input: &str, n: usize) -> (Option<T>, String) {
     let word = input.split_whitespace().nth(n).unwrap_or_default();
     match word.parse::<T>() {
         Ok(num) => {
-            let rest: String = input.split_whitespace().skip(n+1).collect::<Vec<&str>>().join(" ");
+            let rest: String = input
+                .split_whitespace()
+                .skip(n + 1)
+                .collect::<Vec<&str>>()
+                .join(" ");
             (Some(num), rest)
         }
-        Err(_) => {
-            (None, input.to_string())
-        }
+        Err(_) => (None, input.to_string()),
     }
 }
 
@@ -134,9 +136,15 @@ impl App {
         self.current_list_mut().append_list(todo_list)
     }
 
-    pub fn set_query_restriction(&mut self, query: String, last_restriction: Option<RestrictionFunction>) {
+    pub fn set_query_restriction(
+        &mut self,
+        query: String,
+        last_restriction: Option<RestrictionFunction>,
+    ) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
-        self.set_restriction(Rc::new(move |todo| todo.matches(query.as_str()) && last_restriction(todo)))
+        self.set_restriction(Rc::new(move |todo| {
+            todo.matches(query.as_str()) && last_restriction(todo)
+        }))
     }
 
     pub fn do_commands_on_selected(&mut self) {
@@ -213,7 +221,7 @@ impl App {
             .todos(restriction)
             .iter()
             .enumerate()
-            .map(|(i, x)| format!("{} {i} {}",x.priority(),x.message))
+            .map(|(i, x)| format!("{} {i} {}", x.priority(), x.message))
             .collect::<Vec<String>>()
             .join("\n");
         let new_messages = open_temp_editor(Some(&content), temp_path("messages")).unwrap();
@@ -268,7 +276,8 @@ impl App {
         );
         for line in indexed_lines {
             if line.index.is_none() {
-                self.current_list_mut().push(Todo::new(line.message, line.priority));
+                self.current_list_mut()
+                    .push(Todo::new(line.message, line.priority));
                 changed = true;
             }
         }
@@ -644,9 +653,15 @@ impl App {
     }
 
     #[inline]
-    pub fn set_priority_restriction(&mut self, priority: PriorityType, last_restriction: Option<RestrictionFunction>) {
+    pub fn set_priority_restriction(
+        &mut self,
+        priority: PriorityType,
+        last_restriction: Option<RestrictionFunction>,
+    ) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
-        self.set_restriction(Rc::new(move |todo| todo.priority() == priority && last_restriction(todo)))
+        self.set_restriction(Rc::new(move |todo| {
+            todo.priority() == priority && last_restriction(todo)
+        }))
     }
 
     #[inline]

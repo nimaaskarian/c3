@@ -2,8 +2,9 @@ diff --git a/Cargo.lock b/Cargo.lock
 index 314718e..286bd3f 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -124,7 +124,9 @@ dependencies = [
+@@ -124,8 +124,10 @@ dependencies = [
   "clap",
+  "clap_complete",
   "crossterm",
   "home",
 + "jalali-date",
@@ -85,6 +86,7 @@ index 1e9f2ec..4e69d4a 100644
  tui-textarea = "0.4.0"
  chrono = "0.4.31"
  clap = { version = "4.4.18", features = ["derive", "string"] }
+ clap_complete = "4.5.9"
 +jalali-date = "0.2.0"
 +scanf = "1.2.1"
  

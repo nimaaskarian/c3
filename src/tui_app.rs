@@ -227,7 +227,8 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_search(&mut self, str: String) {
-        self.todo_app.set_query_restriction(str, self.last_restriction.clone())
+        self.todo_app
+            .set_query_restriction(str, self.last_restriction.clone())
     }
 
     #[inline]
@@ -236,7 +237,6 @@ impl<'a> TuiApp<'a> {
             self.todo_app.update_show_done_restriction()
         }
     }
-
 
     #[inline]
     fn on_search_delete(&mut self, str: String, old: String) {
@@ -377,7 +377,8 @@ impl<'a> TuiApp<'a> {
         }
         let priority = str.parse();
         if let Ok(priority) = priority {
-            self.todo_app.set_priority_restriction(priority, self.last_restriction.clone())
+            self.todo_app
+                .set_priority_restriction(priority, self.last_restriction.clone())
         }
     }
 
