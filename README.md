@@ -43,6 +43,7 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 |---|---|
 | a | add todo to bottom|
 | A | add todo to top|
+| space | toggle todo done |
 | e | edit todo |
 | E | edit todo (move cursor to start) |
 | ! | toggle show done |
@@ -63,7 +64,7 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | i | increase day done |
 | I | increase day done |
 | t | add todo dependency |
-| l | go in depedency/add todo dependency |
+| l, enter | go in depedency/add todo dependency |
 | h | go back to parent |
 | T | delete todo dependency/note |
 | x | cut todo to clipboard |
@@ -71,19 +72,18 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | p | paste todo from clipboard |
 | P | enable module |
 | / | search current list for todo |
-| ? | search the whole tree for todo |
+| ? | search the whole tree for todo (tree search) |
+| Tab | tree search next |
 | o | open nnn file picker to choose a file to append to current list |
 | O | open nnn file picker to choose a file to output current list to |
 | Ctrl+o | open nnn file picker to choose a file to open |
-| n | search next |
-| N | search previous |
 | w | write changes to file |
 | R | read from file (discard changes)|
 #### Modules
 TUI mode has a section called module. You can develop modules, and assign methods to Module trait methods.
 A very simple example has been done by default for [potato-c](https://github.com/nimaaskarian/potato-c).
 
-Keybinds that modules can use are **space, H, L, comma, period, +, -, s, r**
+Keybinds that modules can use are **C, c, H, L, comma, period, +, -, s, r**
 
 ### Non interactive mode
 For command line arguments and such, run `c3 -h` to see full usage.

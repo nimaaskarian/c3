@@ -1,26 +1,46 @@
 // vim:fileencoding=utf-8:foldmethod=marker
-// standard {{{
-use std::io::{self};
-use std::path::PathBuf;
-//}}}
-// lib {{{
-use clap::Parser;
-// }}}
-//mod{{{
-pub(crate) mod fileio;
-pub(crate) mod date;
-pub(crate) mod todo_app;
+use clap::{Command, CommandFactory, Parser};
+use std::io;
 pub(crate) mod cli_app;
+pub(crate) mod date;
+pub(crate) mod fileio;
+pub(crate) mod todo_app;
 pub(crate) mod tui_app;
+use crate::fileio::get_todo_path;
+use clap_complete::{generate, Generator, Shell};
+use std::path::PathBuf;
 use todo_app::App;
-use fileio::get_todo_path;
-//}}}
+
+fn main() -> io::Result<()> {
+    let args = Args::parse();
+    let mode = args.mode();
+    let mut app = App::new(args);
+
+    match mode {
+        AppMode::Completion(generator) => {
+            print_completions(generator, &mut Args::command());
+            Ok(())
+        }
+        AppMode::Cli => cli_app::run(&mut app),
+        AppMode::Tui => match tui_app::run(&mut app) {
+            Ok(_) => Ok(()),
+            err => {
+                tui_app::shutdown()?;
+                err
+            }
+        },
+    }
+}
+
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-pub struct DisplayArgs{
+pub struct DisplayArgs {
     /// Show done todos too
-    #[arg(short='d', long, default_value_t=false)]
+    #[arg(short = 'd', long, default_value_t = false)]
     show_done: bool,
 
     /// String before done todos
@@ -37,11 +57,11 @@ pub struct DisplayArgs{
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// Performance mode, don't read dependencies
-    #[arg(short='n', long)]
+    #[arg(short = 'n', long)]
     no_tree: bool,
 
     /// Search and select todo. Used for batch change operations
-    #[arg(short='S', long)]
+    #[arg(short = 'S', long)]
     search_and_select: Vec<String>,
 
     /// String behind highlighted todo in TUI mode
@@ -68,11 +88,11 @@ pub struct Args {
     display_args: DisplayArgs,
 
     /// A todo message to append
-    #[arg(short='a', long)]
+    #[arg(short = 'a', long)]
     append_todo: Vec<String>,
 
     /// A todo message to prepend
-    #[arg(short='A', long)]
+    #[arg(short = 'A', long)]
     prepend_todo: Vec<String>,
 
     /// A todo file to append to current list
@@ -80,47 +100,52 @@ pub struct Args {
     append_file: Option<PathBuf>,
 
     /// Minimal tree with no tree graphics
-    #[arg(short='M', long)]
+    #[arg(short = 'M', long)]
     minimal_tree: bool,
 
     /// List todos (non interactive)
-    #[arg(short='l', long)]
+    #[arg(short = 'l', long)]
     list: bool,
 
     /// Enable TUI module at startup
-    #[arg(short='m', long)]
+    #[arg(short = 'm', long)]
     enable_module: bool,
 
     /// Write contents of todo file in the stdout (non interactive)
-    #[arg(short='s', long)]
+    #[arg(short = 's', long)]
     stdout: bool,
 
     /// Path to todo file (and notes sibling directory)
     #[arg(default_value=get_todo_path().unwrap().into_os_string())]
     todo_path: PathBuf,
+
+    #[arg(short = 'c', long)]
+    completion: Option<Shell>,
+}
+
+pub enum AppMode {
+    Cli,
+    Tui,
+    Completion(Shell),
 }
 
 impl Args {
-    pub fn is_cli(&self) -> bool {
-        self.stdout || self.minimal_tree || self.list ||
-        !self.search_and_select.is_empty() || !self.prepend_todo.is_empty() || !self.append_todo.is_empty() || self.append_file.is_some()
-    }
-}
+    pub fn mode(&self) -> AppMode {
+        if let Some(generator) = self.completion {
+            return AppMode::Completion(generator);
+        }
 
-fn main() -> io::Result<()> {
-    let args = Args::parse();
-    let is_cli = args.is_cli();
-    let mut app = App::new(args);
-
-    if is_cli {
-        cli_app::run(&mut app)
-    } else {
-        match tui_app::run(&mut app) {
-            Ok(_)=>{Ok(())}
-            err => {
-                tui_app::shutdown()?;
-                err
-            }
+        if self.stdout
+            || self.minimal_tree
+            || self.list
+            || !self.search_and_select.is_empty()
+            || !self.prepend_todo.is_empty()
+            || !self.append_todo.is_empty()
+            || self.append_file.is_some()
+        {
+            AppMode::Cli
+        } else {
+            AppMode::Tui
         }
     }
 }

@@ -1,8 +1,12 @@
-use std::{fs::File, io::{self, Write}, path::{Path, PathBuf}};
-use super::TodoList;
 use super::Todo;
+use super::TodoList;
+use std::{
+    fs::File,
+    io::{self, Write},
+    path::{Path, PathBuf},
+};
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 enum DependencyMode {
     #[default]
     None,
@@ -10,7 +14,7 @@ enum DependencyMode {
     Note,
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Dependency {
     name: String,
     mode: DependencyMode,
@@ -40,7 +44,7 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn push(&mut self, todo:Todo) {
+    pub fn push(&mut self, todo: Todo) {
         if self.is_list() {
             self.todo_list.push(todo);
         }
@@ -66,14 +70,14 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn read(&mut self, path: &Path)  -> io::Result<()> {
+    pub fn read(&mut self, path: &Path) -> io::Result<()> {
         let file_path = path.join(&self.name);
         let name_todo = format!("{}.todo", self.name);
         match self.mode {
             DependencyMode::Note if path.join(&self.name).is_file() => {
                 self.note = std::fs::read_to_string(file_path)?;
             }
-            DependencyMode::Note | DependencyMode::TodoList 
+            DependencyMode::Note | DependencyMode::TodoList
                 // Sometimes calcurse likes to remove the extra .todo from the file name
                 // That's why we have the first part of the if statement. c3 itself usually writes
                 // the list files to a <sha1>.todo format in notes directory
@@ -127,8 +131,9 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn path(&self ,path: &Path) -> Option<PathBuf>{
-        path.parent().map(|path| TodoList::dependency_parent(path, false))
+    pub fn path(&self, path: &Path) -> Option<PathBuf> {
+        path.parent()
+            .map(|path| TodoList::dependency_parent(path, false))
     }
 
     #[inline]
@@ -161,10 +166,9 @@ impl Dependency {
     }
 }
 
-
 impl From<&Dependency> for String {
     #[inline]
-    fn from (dependency: &Dependency) -> String {
+    fn from(dependency: &Dependency) -> String {
         match dependency.mode {
             DependencyMode::None => String::new(),
             _ => format!(">{}", dependency.name),
@@ -174,7 +178,7 @@ impl From<&Dependency> for String {
 
 impl From<&str> for Dependency {
     #[inline]
-    fn from (input: &str) -> Dependency {
+    fn from(input: &str) -> Dependency {
         let mut name = String::new();
         let mode: DependencyMode;
         if input.is_empty() {
@@ -195,4 +199,3 @@ impl From<&str> for Dependency {
         }
     }
 }
-

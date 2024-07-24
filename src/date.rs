@@ -1,5 +1,5 @@
-use chrono::{Local ,NaiveDate, Duration};
 use chrono::format::ParseError;
+use chrono::{Duration, Local, NaiveDate};
 const FORMAT: &str = "%Y-%m-%d";
 
 pub type Type = NaiveDate;
@@ -22,7 +22,7 @@ pub fn current() -> Type {
 #[inline]
 pub fn format(input: Option<Type>) -> String {
     match input {
-        Some(date)=> date.format(FORMAT).to_string(),
+        Some(date) => date.format(FORMAT).to_string(),
         None => String::new(),
     }
 }
@@ -35,13 +35,11 @@ pub fn display(input: Option<Type>) -> String {
 #[inline]
 pub fn diff_days(first: Option<Type>, next: Option<Type>) -> i64 {
     match (first, next) {
-        (Some(first), Some(next)) => {
-            (first - next).num_days()
-        },
-        _ => 0
+        (Some(first), Some(next)) => (first - next).num_days(),
+        _ => 0,
     }
 }
 
 pub fn add_days(date: Type, days: i64) -> Type {
-    date+Duration::days(days)
+    date + Duration::days(days)
 }

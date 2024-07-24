@@ -1,12 +1,12 @@
 #[derive(Debug)]
 pub struct Clipboard {
-    buffer:String,
+    buffer: String,
 }
 
 impl Clipboard {
     pub fn new() -> Self {
         Clipboard {
-            buffer:String::new(),
+            buffer: String::new(),
         }
     }
 
