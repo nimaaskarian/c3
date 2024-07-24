@@ -156,7 +156,7 @@ impl Todo {
     pub fn new(message: String, priority: PriorityType) -> Self {
         Todo {
             message,
-            priority,
+            priority: Self::fixed_priority(priority),
             ..Default::default()
         }
     }
