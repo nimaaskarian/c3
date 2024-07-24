@@ -49,8 +49,12 @@ struct LineMalformed;
 impl FromStr for IndexedLine {
     type Err = LineMalformed;
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let (priority, message) = nth_word_parse(input, 0);
-        let (index, message) = nth_word_parse(message.as_str(), 0);
+        let (mut index, message) = nth_word_parse(input, 0);
+        let (mut priority, message) = nth_word_parse(message.as_str(), 0);
+        if priority.is_none() {
+            priority = index.and_then(|val| Some(val as u8));
+            index = None;
+        }
 
         Ok(Self {
             index,
@@ -216,14 +220,14 @@ impl App {
 
     pub fn batch_editor_messages(&mut self) {
         let restriction = &self.restriction;
-        let content = self
+        let content = String::from("# index priority message\n") + self
             .current_list()
             .todos(restriction)
             .iter()
             .enumerate()
-            .map(|(i, x)| format!("{} {i} {}", x.priority(), x.message))
+            .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
             .collect::<Vec<String>>()
-            .join("\n");
+            .join("\n").as_str();
         let new_messages = open_temp_editor(Some(&content), temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
@@ -234,6 +238,7 @@ impl App {
         let mut changed = false;
         let mut indexed_lines: Vec<IndexedLine> = messages
             .into_iter()
+            .filter(|message| !message.starts_with('#'))
             .flat_map(|message| message.parse())
             .collect();
 
