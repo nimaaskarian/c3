@@ -119,6 +119,7 @@ pub struct Args {
     #[arg(default_value=get_todo_path().unwrap().into_os_string())]
     todo_path: PathBuf,
 
+    /// Generate completion for a certain shell
     #[arg(short = 'c', long)]
     completion: Option<Shell>,
 }
