@@ -582,9 +582,10 @@ impl<'a> TuiApp<'a> {
                     Char('/') => self.search_prompt(),
                     Char('?') => self.tree_search_prompt(),
                     Char('A') => self.append_prompt(),
-                    Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
+                    Char('e') | Char('E') => self.edit_prompt(key.code == Char('E')),
+                    Char('r') if key.modifiers == KeyModifiers::CONTROL => self.edit_prompt(false),
                     Char('q') => self.quit_save_prompt(),
-                    Char('b') => {
+                    Char('r') => {
                         self.todo_app.batch_editor_messages();
                         return Ok(Operation::Restart);
                     }
@@ -598,7 +599,7 @@ impl<'a> TuiApp<'a> {
                     Char('c') => self.module.on_c(),
                     Char('C') => self.module.on_capital_c(),
                     Char('L') => self.module.on_capital_l(),
-                    Char('r') => self.module.on_r(),
+                    Char('f') => self.module.on_f(),
                     Char('+') | Char('=') => self.module.on_plus(),
                     Char('-') => self.module.on_minus(),
                     Char('.') => self.module.on_dot(),
