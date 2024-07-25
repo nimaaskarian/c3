@@ -235,7 +235,7 @@ impl Todo {
         if self.dependency.is_written() {
             self.removed_dependency = Some(self.dependency.clone());
         }
-        self.dependency.remove();
+        self.dependency = Dependency::default();
     }
 
     #[inline]

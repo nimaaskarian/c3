@@ -83,7 +83,10 @@ fn nth_word_parse<T: FromStr>(input: &str, n: usize) -> (Option<T>, String) {
 impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
-        let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
+        let mut todo_list = TodoList::read(&args.todo_path);
+        if !args.no_tree {
+            todo_list.read_dependencies(&args.todo_path);
+        }
         let mut app = App {
             x_index: 0,
             y_index: 0,
@@ -111,7 +114,10 @@ impl App {
 
     #[inline]
     pub fn append_list_from_path(&mut self, path: PathBuf) {
-        let todo_list = TodoList::read(&path, !self.args.no_tree, true);
+        let todo_list = TodoList::read(&path);
+        if !self.args.no_tree {
+            self.todo_list.read_dependencies(&path);
+        }
         self.append_list(todo_list)
     }
 
@@ -122,14 +128,17 @@ impl App {
 
     #[inline]
     pub fn open_path(&mut self, path: PathBuf) {
-        self.todo_list = TodoList::read(&path, !self.args.no_tree, true);
+        self.todo_list = TodoList::read(&path);
+        if !self.args.no_tree {
+            self.todo_list.read_dependencies(&path);
+        }
         self.args.todo_path = path;
     }
 
     #[inline]
     pub fn output_list_to_path(&mut self, path: PathBuf) -> io::Result<()> {
         let list = self.current_list_mut();
-        let dependency_path = TodoList::dependency_parent(&path, true);
+        let dependency_path = TodoList::dependency_parent(&path);
         list.write(&path)?;
 
         list.write_dependencies(&dependency_path)?;
@@ -426,7 +435,8 @@ impl App {
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = TodoList::read(&self.args.todo_path, true, true);
+        self.todo_list = TodoList::read(&self.args.todo_path);
+        self.todo_list.read_dependencies(&self.args.todo_path);
     }
 
     #[inline]
@@ -600,16 +610,16 @@ impl App {
 
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
-        let dependency_path = TodoList::dependency_parent(&self.args.todo_path, true);
+        let note_dir = TodoList::append_notes_to_dir(&self.args.todo_path);
 
-        create_dir_all(&dependency_path)?;
+        create_dir_all(&note_dir)?;
         let todo_path = self.args.todo_path.clone();
-        self.handle_removed_todo_dependency_files(&dependency_path);
+        self.handle_removed_todo_dependency_files(&note_dir);
         self.todo_list.write(&todo_path)?;
         self.todo_list
-            .delete_removed_dependent_files(&dependency_path)?;
+            .delete_removed_dependent_files(&note_dir)?;
         if self.is_tree() {
-            self.todo_list.write_dependencies(&dependency_path)?;
+            self.todo_list.write_dependencies(&note_dir)?;
         }
         self.changed = false;
         Ok(())
@@ -796,7 +806,7 @@ impl App {
     #[inline]
     pub fn paste_todo(&mut self) {
         if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
-            let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
+            let todo_parent = TodoList::dependency_parent(&self.args.todo_path);
             let _ = todo.dependency.read(&todo_parent);
             let list = &mut self.current_list_mut();
             self.index = list.push(todo);

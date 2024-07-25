@@ -86,7 +86,8 @@ impl Dependency {
                         self.name = name_todo;
                         self.mode = DependencyMode::TodoList;
                     }
-                    self.todo_list = TodoList::read(&path.join(&self.name), true, false);
+                    self.todo_list = TodoList::read(&path.join(&self.name));
+                    self.todo_list.read_recursive_dependencies(&path);
             }
             _ => {}
         };
@@ -133,7 +134,7 @@ impl Dependency {
     #[inline]
     pub fn path(&self, path: &Path) -> Option<PathBuf> {
         path.parent()
-            .map(|path| TodoList::dependency_parent(path, false))
+            .map(|path| TodoList::append_notes_to_dir(path))
     }
 
     #[inline]
