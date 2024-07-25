@@ -153,7 +153,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn title(&mut self) -> String {
-        let changed_str = if self.todo_app.is_changed() { "*" } else { "" };
+        let changed_str = if self.todo_app.is_current_changed() { "*" } else { "" };
         let size = self.todo_app.len();
         let todo_string = format!("Todos ({size}){changed_str}");
 
@@ -359,7 +359,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn quit_save_prompt(&mut self) {
-        if self.todo_app.is_changed() {
+        if self.todo_app.is_changed() || self.todo_app.is_current_changed() {
             self.set_text_mode(
                 Self::on_save_prompt,
                 "You have done changes. You wanna save? [n: no, y: yes, c: cancel] (default: n)",
@@ -520,10 +520,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn write(&mut self) -> io::Result<()> {
-        if !self.todo_app.write()? {
-            self.todo_app.read();
-        }
-        Ok(())
+        self.todo_app.write()
     }
 
     #[inline]

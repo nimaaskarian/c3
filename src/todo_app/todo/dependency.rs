@@ -116,17 +116,17 @@ impl Dependency {
     #[inline]
     pub fn write(&mut self, path: &Path) -> io::Result<()> {
         let name = self.name.clone();
-        match self.mode.clone() {
-            DependencyMode::TodoList => {
-                self.todo_list.write(&path.join(&self.name), false)?;
-            }
-            DependencyMode::Note => {
-                let mut file = File::create(path.join(name))?;
-                write!(file, "{}", self.note)?;
-            }
-            _ => {}
-        };
-        self.written = true;
+            match self.mode.clone() {
+                DependencyMode::TodoList => {
+                    self.todo_list.write(&path.join(&self.name))?;
+                }
+                DependencyMode::Note if !self.written => {
+                    let mut file = File::create(path.join(name))?;
+                    write!(file, "{}", self.note)?;
+                }
+                _ => {}
+            };
+            self.written = true;
         Ok(())
     }
 

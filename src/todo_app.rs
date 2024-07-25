@@ -1,3 +1,4 @@
+use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
@@ -25,8 +26,8 @@ pub struct App {
     clipboard: Clipboard,
     pub(super) todo_list: TodoList,
     index: usize,
-    tree_path: Vec<usize>,
     changed: bool,
+    tree_path: Vec<usize>,
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
     tree_search_positions: Vec<SearchPosition>,
@@ -127,11 +128,11 @@ impl App {
 
     #[inline]
     pub fn output_list_to_path(&mut self, path: PathBuf) -> io::Result<()> {
-        let changed = self.changed;
         let list = self.current_list_mut();
-        let dependency_path = list.write(&path, true)?;
+        let dependency_path = TodoList::dependency_parent(&path, true);
+        list.write(&path)?;
+
         list.write_dependencies(&dependency_path)?;
-        self.changed = changed;
         Ok(())
     }
 
@@ -152,9 +153,10 @@ impl App {
     }
 
     pub fn do_commands_on_selected(&mut self) {
+        let mut changed = false;
         for query in self.args.search_and_select.iter() {
             if self.args.delete_selected {
-                self.changed = true;
+                changed = true;
                 self.todo_list.set_todos(
                     self.todo_list
                         .iter()
@@ -165,7 +167,7 @@ impl App {
                 continue;
             }
             for todo in self.todo_list.iter_mut().filter(|todo| todo.matches(query)) {
-                self.changed = true;
+                changed = true;
                 if let Some(priority) = self.args.set_selected_priority {
                     todo.set_priority(priority as PriorityType);
                 }
@@ -177,6 +179,7 @@ impl App {
                 }
             }
         }
+        self.todo_list.changed = changed;
         self.args.search_and_select = vec![];
     }
 
@@ -286,7 +289,7 @@ impl App {
                 changed = true;
             }
         }
-        self.changed = changed;
+        self.todo_list.changed = changed;
     }
 
     #[inline(always)]
@@ -316,6 +319,11 @@ impl App {
     #[inline]
     pub fn is_tree(&self) -> bool {
         !self.args.no_tree
+    }
+
+    #[inline]
+    pub fn is_current_changed(&self) -> bool {
+        self.current_list().changed
     }
 
     #[inline]
@@ -552,7 +560,6 @@ impl App {
 
     #[inline]
     pub fn current_list_mut(&mut self) -> &mut TodoList {
-        self.changed = true;
         let is_root = self.is_root();
         let mut list = &mut self.todo_list;
         if is_root {
@@ -561,6 +568,7 @@ impl App {
         for index in self.tree_path.clone() {
             list = &mut list.todos[index].dependency.todo_list
         }
+        self.changed = true;
         list
     }
 
@@ -589,20 +597,20 @@ impl App {
     }
 
     #[inline]
-    pub fn write(&mut self) -> io::Result<bool> {
-        if self.changed {
-            self.changed = false;
-            let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
-            self.handle_removed_todo_dependency_files(&dependency_path);
-            self.todo_list
-                .delete_removed_dependent_files(&dependency_path)?;
-            if self.is_tree() {
-                self.todo_list.write_dependencies(&dependency_path)?;
-            }
-            Ok(true)
-        } else {
-            Ok(false)
+    pub fn write(&mut self) -> io::Result<()> {
+        let dependency_path = TodoList::dependency_parent(&self.args.todo_path, true);
+
+        create_dir_all(&dependency_path)?;
+        let todo_path = self.args.todo_path.clone();
+        self.handle_removed_todo_dependency_files(&dependency_path);
+        self.todo_list.write(&todo_path)?;
+        self.todo_list
+            .delete_removed_dependent_files(&dependency_path)?;
+        if self.is_tree() {
+            self.todo_list.write_dependencies(&dependency_path)?;
         }
+        self.changed = false;
+        Ok(())
     }
 
     #[inline]
@@ -871,15 +879,15 @@ mod tests {
     fn test_is_changed() -> io::Result<()> {
         let dir = dir("test-is-changed")?;
         let mut app = write_test_todos(&dir)?;
-        assert_eq!(app.is_changed(), false);
+        assert_eq!(app.is_current_changed(), false);
         app.todo_mut();
-        assert_eq!(app.is_changed(), true);
+        assert_eq!(app.is_current_changed(), true);
         app.write()?;
-        assert_eq!(app.is_changed(), false);
+        assert_eq!(app.is_current_changed(), false);
         app.current_list_mut();
-        assert_eq!(app.is_changed(), true);
+        assert_eq!(app.is_current_changed(), true);
         app.read();
-        assert_eq!(app.is_changed(), false);
+        assert_eq!(app.is_current_changed(), false);
         remove_dir_all(dir)?;
         Ok(())
     }
