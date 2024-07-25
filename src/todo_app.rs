@@ -273,8 +273,10 @@ impl App {
                 break;
             }
         }
-        self.todo_list.set_todos(
-            self.todo_list
+        let list = self.current_list().clone();
+        let list_mut = self.current_list_mut();
+        list_mut.set_todos(
+            list
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| !delete_indices.contains(i))
@@ -284,12 +286,12 @@ impl App {
         );
         for line in indexed_lines {
             if line.index.is_none() {
-                self.current_list_mut()
+                list_mut
                     .push(Todo::new(line.message, line.priority));
                 changed = true;
             }
         }
-        self.todo_list.changed = changed;
+        list_mut.changed = changed;
     }
 
     #[inline(always)]
@@ -560,6 +562,7 @@ impl App {
 
     #[inline]
     pub fn current_list_mut(&mut self) -> &mut TodoList {
+        self.changed = true;
         let is_root = self.is_root();
         let mut list = &mut self.todo_list;
         if is_root {
@@ -568,7 +571,6 @@ impl App {
         for index in self.tree_path.clone() {
             list = &mut list.todos[index].dependency.todo_list
         }
-        self.changed = true;
         list
     }
 
@@ -879,15 +881,15 @@ mod tests {
     fn test_is_changed() -> io::Result<()> {
         let dir = dir("test-is-changed")?;
         let mut app = write_test_todos(&dir)?;
-        assert_eq!(app.is_current_changed(), false);
+        assert_eq!(app.is_changed(), false);
         app.todo_mut();
-        assert_eq!(app.is_current_changed(), true);
+        assert_eq!(app.is_changed(), true);
         app.write()?;
-        assert_eq!(app.is_current_changed(), false);
+        assert_eq!(app.is_changed(), false);
         app.current_list_mut();
-        assert_eq!(app.is_current_changed(), true);
+        assert_eq!(app.is_changed(), true);
         app.read();
-        assert_eq!(app.is_current_changed(), false);
+        assert_eq!(app.is_changed(), false);
         remove_dir_all(dir)?;
         Ok(())
     }

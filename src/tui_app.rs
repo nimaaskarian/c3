@@ -233,7 +233,12 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_priority_delete(&mut self, new: String, old: String) {
-        if new.is_empty() || old.is_empty() {
+        if new.is_empty() {
+            if let Some(restriction) = self.last_restriction.clone() {
+                self.todo_app.set_restriction(restriction)
+            }
+        }
+        if old.is_empty() {
             self.todo_app.update_show_done_restriction()
         }
     }

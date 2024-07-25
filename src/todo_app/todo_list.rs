@@ -303,7 +303,7 @@ impl TodoList {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{self, remove_dir_all, remove_file};
+    use std::fs::{self, create_dir_all, remove_dir_all, remove_file};
     use std::str::FromStr;
 
     use super::*;
@@ -371,6 +371,10 @@ mod tests {
     fn test_write() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-write/tmplist");
+        let dependency_path = TodoList::dependency_parent(&path, true);
+        let _ = create_dir_all(&dependency_path);
+        todo_list.changed = true;
+
         let _ = todo_list.write(&path);
 
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
@@ -389,6 +393,8 @@ mod tests {
     fn test_push() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-push/tmplist");
+        let dependency_path = TodoList::dependency_parent(&path, true);
+        let _ = create_dir_all(&dependency_path);
         todo_list.push(Todo::new("Show me your warface".to_string(), 0));
         todo_list.reorder_last();
         let _ = todo_list.write(&path);
@@ -411,6 +417,7 @@ mod tests {
         let todo_list = get_todo_list();
         let mut sorted_list = todo_list.clone();
         sorted_list.sort();
+        sorted_list.changed = false;
 
         assert_eq!(todo_list, sorted_list)
     }
@@ -419,7 +426,11 @@ mod tests {
     fn test_write_dependencies() -> io::Result<()> {
         let mut todo_list = get_todo_list();
         let _ = todo_list.todos[0].add_todo_dependency();
+
         let path = PathBuf::from("test-write-dependency/tmplist");
+        let dependency_path = TodoList::dependency_parent(&path, true);
+        let _ = create_dir_all(&dependency_path);
+
         todo_list.todos[0]
             .dependency
             .push(Todo::from_str("[0] Some dependency").unwrap());
