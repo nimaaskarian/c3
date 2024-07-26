@@ -887,6 +887,7 @@ mod tests {
             app.add_dependency_traverse_down();
             app.append(String::from(dependency));
         }
+        app.todo_mut().unwrap().set_note("Heaven from hell".to_string()).unwrap();
         for _ in 0..3 {
             app.traverse_up();
         }
@@ -984,6 +985,7 @@ mod tests {
             .collect::<Result<Vec<_>, io::Error>>()?;
 
         let expected_names = vec![
+            "33a25a20dcf8d607bcac45120f26ab158d5dbdd2",
             "560b05afe5e03eae9f8ad475b0b8b73ea6911272.todo",
             "63c5498f09d086fca6d870345350bfb210945790.todo",
             "b3942ad1c555625b7f60649fe50853830b6cdb04.todo",
