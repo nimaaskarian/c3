@@ -185,6 +185,18 @@ impl TodoList {
         self.todos = todos
     }
 
+    #[inline(always)]
+    pub(super) fn filter_indices(&mut self, indices: Vec<usize>) {
+        self.todos = self.todos
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !indices.contains(i))
+                .map(|(_, todo)| todo)
+                .cloned()
+                .collect()
+
+    }
+
     pub fn iter(&self) -> std::slice::Iter<Todo> {
         self.todos.iter()
     }
@@ -194,10 +206,10 @@ impl TodoList {
         self.todos.iter_mut()
     }
 
-    pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<String> {
+    pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<&str> {
         self.todos(restriction)
             .iter()
-            .map(|todo| todo.message.clone())
+            .map(|todo| todo.message.as_str())
             .collect()
     }
 

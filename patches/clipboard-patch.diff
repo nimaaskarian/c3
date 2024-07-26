@@ -34,8 +34,8 @@ index 9ad8932..d173736 100644
          }
      }
  
--    pub fn get_text(&self) -> String {
--        self.buffer.clone()
+-    pub fn get_text(&self) -> &str {
+-        &self.buffer
 +    pub fn get_text(&mut self) -> String {
 +        if let Some(clipboard) = &mut self.clipboard {
 +            if let Ok(text) = clipboard.get_text() {

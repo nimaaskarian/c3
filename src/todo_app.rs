@@ -181,7 +181,8 @@ impl App {
                 if let Some(priority) = self.args.set_selected_priority {
                     todo.set_priority(priority as PriorityType);
                 }
-                if let Some(message) = self.args.set_selected_message.clone() {
+                if let Some(message) = &mut self.args.set_selected_message {
+                    let message = std::mem::take(message);
                     todo.set_message(message);
                 }
                 if self.args.done_selected {
@@ -283,17 +284,8 @@ impl App {
                 break;
             }
         }
-        let list = self.current_list().clone();
         let list_mut = self.current_list_mut();
-        list_mut.set_todos(
-            list
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !delete_indices.contains(i))
-                .map(|(_, todo)| todo)
-                .cloned()
-                .collect(),
-        );
+        list_mut.filter_indices(delete_indices);
         for line in indexed_lines {
             if line.index.is_none() {
                 list_mut
@@ -318,7 +310,7 @@ impl App {
         for position in self.tree_search_positions.iter() {
             self.tree_path.clone_from(&position.tree_path);
             let list = self.current_list();
-            for index in position.matching_indices.clone() {
+            for &index in &position.matching_indices {
                 println!(
                     "{}",
                     list.index(index, &self.restriction)
@@ -412,8 +404,8 @@ impl App {
 
     #[inline]
     fn set_tree_search_position(&mut self) {
-        let item = self.tree_search_positions[self.x_index].clone();
-        self.tree_path = item.tree_path;
+        let item = &self.tree_search_positions[self.x_index];
+        self.tree_path = item.tree_path.clone();
         self.index = item.matching_indices[self.y_index];
     }
 
@@ -453,7 +445,7 @@ impl App {
     pub fn parent(&mut self) -> Option<&Todo> {
         let mut list = &self.todo_list;
         let mut parent = None;
-        for index in self.tree_path.clone() {
+        for &index in &self.tree_path {
             parent = Some(&list.todos[index]);
             if let Some(todo_list) = list.todos[index].dependency.todo_list() {
                 list = todo_list
@@ -585,7 +577,7 @@ impl App {
         if is_root {
             return list;
         }
-        for index in self.tree_path.clone() {
+        for &index in &self.tree_path {
             list = &mut list.todos[index].dependency.todo_list
         }
         list
@@ -597,7 +589,7 @@ impl App {
         if self.is_root() {
             return list;
         }
-        for index in self.tree_path.clone() {
+        for &index in &self.tree_path {
             if let Some(todo_list) = &list.todos[index].dependency.todo_list() {
                 list = todo_list
             } else {

@@ -233,9 +233,10 @@ impl Todo {
     #[inline]
     pub fn remove_dependency(&mut self) {
         if self.dependency.is_written() {
-            self.removed_dependency = Some(self.dependency.clone());
+            self.removed_dependency = Some(std::mem::take(&mut self.dependency));
+        } else {
+            self.dependency = Dependency::default();
         }
-        self.dependency = Dependency::default();
     }
 
     #[inline]
@@ -432,7 +433,7 @@ mod tests {
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
-        let result = &todo.dependency.get_name();
+        let result = todo.dependency.get_name().to_string();
         assert_eq!(result, expected);
     }
 
@@ -450,7 +451,7 @@ mod tests {
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
-        let result = &todo.dependency.get_name();
+        let result = todo.dependency.get_name().to_string();
         assert_eq!(result, expected);
     }
 
