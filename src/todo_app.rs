@@ -810,7 +810,9 @@ impl App {
     pub fn paste_todo(&mut self) {
         if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
             let todo_parent = TodoList::dependency_parent(&self.args.todo_path);
-            let _ = todo.dependency.as_mut().unwrap().read(&todo_parent);
+            if let Some(dependency) = todo.dependency.as_mut() {
+                let _ = dependency.read(&todo_parent);
+            }
             let list = &mut self.current_list_mut();
             self.index = list.push(todo);
         }
