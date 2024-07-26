@@ -20,7 +20,7 @@ pub type PriorityType = u8;
 pub struct Todo {
     pub message: String,
     priority: PriorityType,
-    pub dependency: Dependency,
+    pub dependency: Option<Dependency>,
     removed_dependency: Option<Dependency>,
     done: bool,
     pub schedule: Schedule,
@@ -41,7 +41,7 @@ impl PartialOrd for Todo {
 impl From<&Todo> for String {
     fn from(todo: &Todo) -> String {
         let done_str = if todo.done() { "-" } else { "" };
-        let dep_str: String = (&todo.dependency).into();
+        let dep_str: String = todo.dependency.as_ref().map_or(String::new(),|dep| dep.into());
 
         let schedule_str: String = (&todo.schedule).into();
 
@@ -120,7 +120,7 @@ impl FromStr for Todo {
         }
         if state == State::Message && !message.is_empty() {
             let schedule = Schedule::from(schedule_string);
-            let dependency = Dependency::from(dependency_string.as_str());
+            let dependency = dependency_string.parse().ok();
 
             if schedule.should_undone() {
                 done = false;
@@ -162,13 +162,13 @@ impl Todo {
     }
 
     #[inline]
-    pub fn note_empty(&self) -> bool {
-        self.dependency.is_note()
+    pub fn is_note(&self) -> bool {
+        self.dependency.as_ref().map_or(false,|dep|dep.is_note())
     }
 
     #[inline]
     pub fn dependencies(&self) -> Option<&TodoList> {
-        self.dependency.todo_list()
+        self.dependency.as_ref()?.todo_list()
     }
 
     #[inline]
@@ -178,7 +178,7 @@ impl Todo {
 
     #[inline]
     pub fn remove_note(&mut self) {
-        if self.dependency.is_note() {
+        if self.is_note() {
             self.remove_dependency();
         }
     }
@@ -186,14 +186,16 @@ impl Todo {
     #[inline]
     pub fn add_todo_dependency(&mut self) {
         if self.dependency.is_none() {
-            self.dependency = Dependency::new_todo_list(self.hash());
+            self.dependency = Some(Dependency::new_todo_list(self.hash()));
         }
     }
 
     #[inline]
     pub fn delete_dependency_file(&mut self, path: &Path) -> io::Result<()> {
-        self.dependency.todo_list.remove_dependency_files(path)?;
-        let _ = remove_file(path.join(self.dependency.get_name()));
+        if let Some(dependency) = &mut self.dependency {
+            dependency.todo_list.remove_dependency_files(path)?;
+            let _ = remove_file(path.join(dependency.get_name()));
+        }
         Ok(())
     }
 
@@ -222,7 +224,7 @@ impl Todo {
         } else {
             ""
         };
-        let note_string = self.dependency.display();
+        let note_string = self.dependency.as_ref().map_or(".", |dep| dep.display());
         let daily_str = self.schedule.display();
         format!(
             "{done_string}{}{note_string} {}{daily_str}",
@@ -232,23 +234,24 @@ impl Todo {
 
     #[inline]
     pub fn remove_dependency(&mut self) {
-        if self.dependency.is_written() {
-            self.removed_dependency = Some(std::mem::take(&mut self.dependency));
-        } else {
-            self.dependency = Dependency::default();
+        if let Some(dependency) = self.dependency.as_mut() {
+            if dependency.is_written() {
+                self.removed_dependency = Some(std::mem::take(dependency));
+            } 
         }
+        self.dependency = None;
     }
 
     #[inline]
     pub fn set_note(&mut self, note: String) -> io::Result<()> {
-        self.dependency = Dependency::new_note(sha1(&note), note);
+        self.dependency = Some(Dependency::new_note(sha1(&note), note));
         Ok(())
     }
 
     #[inline]
     pub fn edit_note(&mut self) -> io::Result<()> {
-        if !self.dependency.is_list() {
-            let note = open_note_temp_editor(self.dependency.note())?;
+        if let Some(dependency) = self.dependency.as_ref() {
+            let note = open_note_temp_editor(dependency.note())?;
             if !note.is_empty() {
                 self.set_note(note)?;
             }
@@ -258,7 +261,7 @@ impl Todo {
 
     #[inline]
     pub fn dependency_path(&self, path: &Path) -> Option<PathBuf> {
-        self.dependency.path(path)
+        self.dependency.as_ref()?.path(path)
     }
 
     #[inline]
@@ -401,10 +404,10 @@ mod tests {
         let expected = Ok(Todo {
             removed_dependency: None,
             schedule: Schedule::new(),
-            dependency: Dependency::new_note(
+            dependency: Some(Dependency::new_note(
                 "2c924e3088204ee77ba681f72be3444357932fca".to_string(),
                 "".to_string(),
-            ),
+            )),
             message: "Test".to_string(),
             priority: 1,
             done: false,
@@ -433,7 +436,7 @@ mod tests {
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
-        let result = todo.dependency.get_name().to_string();
+        let result = todo.dependency.unwrap().get_name().to_string();
         assert_eq!(result, expected);
     }
 
@@ -442,7 +445,7 @@ mod tests {
         let mut todo = Todo::new("Test".to_string(), 1);
         todo.add_todo_dependency();
 
-        assert!(todo.dependency.is_list());
+        assert!(todo.dependency.unwrap().is_list());
     }
 
     #[test]
@@ -451,7 +454,7 @@ mod tests {
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
-        let result = todo.dependency.get_name().to_string();
+        let result = todo.dependency.unwrap().get_name().to_string();
         assert_eq!(result, expected);
     }
 
@@ -461,7 +464,7 @@ mod tests {
         todo.set_note("Note".to_string())
             .expect("Error setting note");
 
-        assert!(todo.dependency.is_note());
+        assert!(todo.dependency.unwrap().is_note());
     }
 
     #[test]
@@ -471,7 +474,7 @@ mod tests {
             .expect("Error setting note");
 
         assert_eq!(
-            todo.dependency.get_name(),
+            todo.dependency.unwrap().get_name(),
             "2c924e3088204ee77ba681f72be3444357932fca"
         );
     }
@@ -492,7 +495,7 @@ mod tests {
 
         todo.add_todo_dependency();
 
-        assert!(todo.dependency.is_list());
+        assert!(todo.dependency.unwrap().is_list());
     }
 
     #[test]
@@ -502,7 +505,7 @@ mod tests {
 
         todo.remove_dependency();
 
-        assert!(!todo.dependency.is_list());
+        assert!(todo.dependency.is_none());
     }
 
     #[test]
@@ -524,9 +527,9 @@ mod tests {
         let expected = Todo {
             removed_dependency: None,
             schedule: Schedule::new(),
-            dependency: Dependency::new_todo_list(
+            dependency: Some(Dependency::new_todo_list(
                 "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c".to_string(),
-            ),
+            )),
             message: "Read for exams".to_string(),
             priority: 1,
             done: false,
@@ -541,7 +544,7 @@ mod tests {
         let expected = Todo {
             removed_dependency: None,
             schedule: Schedule::from("D1(2023-09-05)"),
-            dependency: Dependency::default(),
+            dependency: None,
             message: "this one should be daily".to_string(),
             priority: 2,
             done: false,
@@ -556,7 +559,7 @@ mod tests {
     fn test_daily_display() {
         let test = Todo {
             removed_dependency: None,
-            dependency: Dependency::default(),
+            dependency: None,
             schedule: Schedule::from("D1()"),
             message: "this one should be daily".to_string(),
             priority: 2,
@@ -573,7 +576,7 @@ mod tests {
         let todo = Todo::from_str(input).unwrap();
         let expected = Todo {
             removed_dependency: None,
-            dependency: Dependency::default(),
+            dependency: None,
             schedule: Schedule::from("D7(2023-09-05)"),
             message: "this one should be daily".to_string(),
             priority: 2,

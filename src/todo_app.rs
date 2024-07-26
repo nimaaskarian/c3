@@ -450,7 +450,7 @@ impl App {
         let mut parent = None;
         for &index in &self.tree_path {
             parent = Some(&list.todos[index]);
-            if let Some(todo_list) = list.todos[index].dependency.todo_list() {
+            if let Some(todo_list) = list.todos[index].dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 list = todo_list
             } else {
                 break;
@@ -490,7 +490,7 @@ impl App {
     pub fn traverse_down(&mut self) {
         if self.is_tree() {
             match self.todo() {
-                Some(todo) if todo.dependency.is_list() => {
+                Some(todo) if todo.dependency.as_ref().map_or(false, |dep| dep.is_list()) => {
                     let index = self.index;
                     let restriction = self.restriction.clone();
                     let true_index = self
@@ -576,12 +576,13 @@ impl App {
     pub fn current_list_mut(&mut self) -> &mut TodoList {
         self.changed = true;
         let is_root = self.is_root();
-        let mut list = &mut self.todo_list;
         if is_root {
-            return list;
+            return &mut self.todo_list;
         }
+        let mut list = &mut self.todo_list;
+
         for &index in &self.tree_path {
-            list = &mut list.todos[index].dependency.todo_list
+            list = &mut list.todos[index].dependency.as_mut().unwrap().todo_list
         }
         list
     }
@@ -593,7 +594,7 @@ impl App {
             return list;
         }
         for &index in &self.tree_path {
-            if let Some(todo_list) = &list.todos[index].dependency.todo_list() {
+            if let Some(todo_list) = &list.todos[index].dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 list = todo_list
             } else {
                 break;
@@ -809,7 +810,7 @@ impl App {
     pub fn paste_todo(&mut self) {
         if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
             let todo_parent = TodoList::dependency_parent(&self.args.todo_path);
-            let _ = todo.dependency.read(&todo_parent);
+            let _ = todo.dependency.as_mut().unwrap().read(&todo_parent);
             let list = &mut self.current_list_mut();
             self.index = list.push(todo);
         }

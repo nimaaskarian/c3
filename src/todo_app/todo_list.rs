@@ -44,7 +44,9 @@ impl TodoList {
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
-            todo.dependency.todo_list.delete_removed_dependent_files(filename);
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.todo_list.delete_removed_dependent_files(filename);
+            }
             todo.delete_removed_dependent_files(filename)?;
         }
         Ok(())
@@ -72,7 +74,7 @@ impl TodoList {
         let prior_indices = prior_indices.unwrap_or_default();
         callback(app, self, prior_indices.as_slice());
         for (i, todo) in self.todos.iter().enumerate() {
-            if let Some(todo_list) = todo.dependency.todo_list() {
+            if let Some(todo_list) = todo.dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 let mut prior_indices = prior_indices.clone();
                 prior_indices.push(i);
                 todo_list.traverse_tree(callback, Some(prior_indices), app);
@@ -106,7 +108,9 @@ impl TodoList {
 
     pub fn read_recursive_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
-            todo.dependency.read(&folder_name)?;
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.read(&folder_name)?;
+            }
         }
         Ok(())
     }
@@ -115,7 +119,9 @@ impl TodoList {
         let dependency_path = Self::append_notes_to_parent(filename);
 
         for todo in &mut self.todos {
-            todo.dependency.read(&dependency_path)?;
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.read(&dependency_path)?;
+            }
         }
         Ok(())
     }
@@ -147,8 +153,10 @@ impl TodoList {
     #[inline]
     pub(super) fn write_dependencies(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
-            todo.dependency.todo_list.write_dependencies(filename)?;
-            todo.dependency.write(filename)?;
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.todo_list.write_dependencies(filename)?;
+                dependency.write(filename)?;
+            }
         }
         Ok(())
     }
@@ -156,8 +164,10 @@ impl TodoList {
     #[inline]
     pub(super) fn force_write_dependencies(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
-            todo.dependency.todo_list.force_write_dependencies(filename)?;
-            todo.dependency.force_write(filename)?;
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.todo_list.force_write_dependencies(filename)?;
+                dependency.force_write(filename)?;
+            }
         }
         Ok(())
     }
@@ -343,15 +353,10 @@ mod tests {
     #[test]
     fn test_todolist_read_undone() {
         let todo_list = get_todo_list();
-        let mut expected_undone = vec![
+        let expected_undone = vec![
             Todo::new("this todo has prio 1".to_string(), 1),
             Todo::new("this one has prio 2".to_string(), 2),
         ];
-        for i in 0..expected_undone.len() {
-            let _ = expected_undone[i]
-                .dependency
-                .write(&PathBuf::from("/dev/null"));
-        }
 
         assert_eq!(
             expected_undone,
@@ -373,9 +378,6 @@ mod tests {
         ];
         for i in 0..expected_done.len() {
             expected_done[i].toggle_done();
-            let _ = expected_done[i]
-                .dependency
-                .write(&PathBuf::from("/dev/null"));
         }
         assert_eq!(
             expected_done,
@@ -460,6 +462,8 @@ mod tests {
 
         todo_list.todos[0]
             .dependency
+            .as_mut()
+            .unwrap()
             .push(Todo::from_str("[0] Some dependency").unwrap());
         todo_list.write(&path)?;
         let dependency_path = TodoList::append_notes_to_parent(&path);

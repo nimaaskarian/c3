@@ -658,13 +658,13 @@ impl<'a> TuiApp<'a> {
         dependency_layout: Rect,
     ) {
         if let Some(todo) = todo {
-            if let Some(note) = todo.dependency.note() {
+            if let Some(note) = todo.dependency.as_ref().map_or(None, |dep| dep.note()) {
                 let note_widget = Paragraph::new(Text::styled(note, Style::default()))
                     .wrap(Wrap { trim: true })
                     .block(default_block("Todo note"));
                 frame.render_widget(note_widget, dependency_layout);
             }
-            if let Some(todo_list) = todo.dependency.todo_list() {
+            if let Some(todo_list) = todo.dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 Self::render_todos_widget(
                     self.highlight_string(),
                     frame,

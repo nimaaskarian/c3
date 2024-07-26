@@ -1,5 +1,6 @@
 use super::Todo;
 use super::TodoList;
+use std::str::FromStr;
 use std::{
     fs::File,
     io::{self, Write},
@@ -9,7 +10,6 @@ use std::{
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 enum DependencyMode {
     #[default]
-    None,
     TodoList,
     Note,
 }
@@ -159,11 +159,6 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn is_none(&self) -> bool {
-        self.mode == DependencyMode::None
-    }
-
-    #[inline]
     pub fn is_note(&self) -> bool {
         self.mode == DependencyMode::Note
     }
@@ -176,7 +171,6 @@ impl Dependency {
     #[inline]
     pub fn display<'a>(&self) -> &'a str {
         match self.mode {
-            DependencyMode::None => ".",
             DependencyMode::Note => ">",
             DependencyMode::TodoList => "-",
         }
@@ -191,33 +185,31 @@ impl Dependency {
 impl From<&Dependency> for String {
     #[inline]
     fn from(dependency: &Dependency) -> String {
-        match dependency.mode {
-            DependencyMode::None => String::new(),
-            _ => format!(">{}", dependency.name),
-        }
+        format!(">{}", dependency.name)
     }
 }
 
-impl From<&str> for Dependency {
+pub struct EmptyDependency;
+
+impl FromStr for Dependency {
+    type Err = EmptyDependency;
     #[inline]
-    fn from(input: &str) -> Dependency {
-        let mut name = String::new();
-        let mode: DependencyMode;
-        if input.is_empty() {
-            mode = DependencyMode::None;
-        } else {
-            name = String::from(input);
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        if !input.is_empty() {
+            let mode: DependencyMode;
+            let name = String::from(input);
             if input.ends_with(".todo") {
                 mode = DependencyMode::TodoList;
             } else {
                 mode = DependencyMode::Note;
             }
-        }
-
-        Self {
-            name,
-            mode,
-            ..Default::default()
+            Ok(Self {
+                name,
+                mode,
+                ..Default::default()
+            })
+        } else {
+            Err(EmptyDependency)
         }
     }
 }
