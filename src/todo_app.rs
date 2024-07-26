@@ -1022,14 +1022,38 @@ mod tests {
         app.remove_current_dependent();
         app.write()?;
 
-        let names: io::Result<Vec<PathBuf>> = match fs::read_dir(dir.join("notes")) {
-            Ok(value) => value.map(|res| res.map(|e| e.path())).collect(),
-            _ => Ok(vec![]),
-        };
+        let names: io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))
+            .unwrap()
+            .map(|dir|dir.map(|entry|entry.path()))
+            .collect();
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0] Hello there\n");
         remove_dir_all(dir)?;
         assert!(names?.is_empty());
+        assert_eq!(string, expected_string);
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_current_dependency_partial() -> io::Result<()> {
+        let dir = dir("test-remove-current-dependency-partial")?;
+        let mut app = write_test_todos(&dir)?;
+        assert_eq!(app.index, 2);
+        app.traverse_down();
+        assert_eq!(app.index, 0);
+        app.remove_current_dependent();
+        app.write()?;
+
+        let names: io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))
+            .unwrap()
+            .map(|dir|dir.map(|entry|entry.path()))
+            .collect();
+        let expected = vec![PathBuf::from("test-remove-current-dependency-partial/notes/63c5498f09d086fca6d870345350bfb210945790.todo")];
+        dbg!(&names);
+        assert_eq!(names.unwrap(), expected);
+        let string = fs::read_to_string(&dir.join("todo"))?;
+        let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0]>63c5498f09d086fca6d870345350bfb210945790.todo Hello there\n");
+        remove_dir_all(dir)?;
         assert_eq!(string, expected_string);
         Ok(())
     }

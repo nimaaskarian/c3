@@ -44,6 +44,7 @@ impl TodoList {
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
+            todo.dependency.todo_list.delete_removed_dependent_files(filename);
             todo.delete_removed_dependent_files(filename)?;
         }
         Ok(())
