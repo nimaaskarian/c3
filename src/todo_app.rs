@@ -281,6 +281,8 @@ impl App {
                     }
                 }
             } else {
+                changed = true;
+                delete_indices.push(i);
                 break;
             }
         }
@@ -293,7 +295,8 @@ impl App {
                 changed = true;
             }
         }
-        list_mut.changed = changed;
+        list_mut.changed = list_mut.changed || changed;
+        self.changed = changed;
     }
 
     #[inline(always)]
