@@ -136,7 +136,7 @@ impl App {
     }
 
     #[inline]
-    pub fn output_list_to_path(&mut self, path: PathBuf) -> io::Result<()> {
+    pub fn output_list_to_path(&mut self, path: &Path) -> io::Result<()> {
         let list = self.current_list_mut();
         let dependency_path = TodoList::append_notes_to_parent(&path);
         create_dir_all(&dependency_path)?;

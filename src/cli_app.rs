@@ -19,6 +19,11 @@ impl<'a> CliApp<'a> {
         for message in app.args.append_todo.clone() {
             app.append(message);
         }
+
+        if let Some(path) = app.args.output_file.clone() {
+            app.output_list_to_path(&path);
+        }
+
         for message in app.args.prepend_todo.clone() {
             app.prepend(message);
         }

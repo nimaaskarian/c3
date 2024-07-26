@@ -99,6 +99,10 @@ pub struct Args {
     #[arg(long)]
     append_file: Option<PathBuf>,
 
+    /// A todo file to output to
+    #[arg(short='o', long)]
+    output_file: Option<PathBuf>,
+
     /// Minimal tree with no tree graphics
     #[arg(short = 'M', long)]
     minimal_tree: bool,
@@ -139,10 +143,11 @@ impl Args {
         if self.stdout
             || self.minimal_tree
             || self.list
+            || self.append_file.is_some()
+            || self.output_file.is_some()
             || !self.search_and_select.is_empty()
             || !self.prepend_todo.is_empty()
             || !self.append_todo.is_empty()
-            || self.append_file.is_some()
         {
             AppMode::Cli
         } else {

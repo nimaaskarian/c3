@@ -1,5 +1,3 @@
-use crate::todo_app::todo_list;
-
 use super::Todo;
 use super::TodoList;
 use std::{

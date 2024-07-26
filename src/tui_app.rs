@@ -314,7 +314,7 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn nnn_output_todo(&mut self) {
         for path in Self::nnn_paths() {
-            let _ = self.todo_app.output_list_to_path(path);
+            let _ = self.todo_app.output_list_to_path(&path);
         }
     }
 
