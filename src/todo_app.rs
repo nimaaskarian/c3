@@ -138,10 +138,11 @@ impl App {
     #[inline]
     pub fn output_list_to_path(&mut self, path: PathBuf) -> io::Result<()> {
         let list = self.current_list_mut();
-        let dependency_path = TodoList::dependency_parent(&path);
-        list.write(&path)?;
+        let dependency_path = TodoList::append_notes_to_parent(&path);
+        create_dir_all(&dependency_path)?;
+        list.force_write(&path)?;
 
-        list.write_dependencies(&dependency_path)?;
+        list.force_write_dependencies(&dependency_path)?;
         Ok(())
     }
 
@@ -510,6 +511,12 @@ impl App {
     }
 
     #[inline]
+    pub fn go_root(&mut self) {
+        self.tree_path = vec![];
+        self.fix_index();
+    }
+
+    #[inline]
     pub fn traverse_up(&mut self) -> bool {
         self.update_show_done_restriction();
         if let Some(index) = self.tree_path.pop() {
@@ -610,7 +617,7 @@ impl App {
 
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
-        let note_dir = TodoList::append_notes_to_dir(&self.args.todo_path);
+        let note_dir = TodoList::append_notes_to_parent(&self.args.todo_path);
 
         create_dir_all(&note_dir)?;
         let todo_path = self.args.todo_path.clone();

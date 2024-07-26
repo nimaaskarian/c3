@@ -111,7 +111,7 @@ impl TodoList {
     }
 
     pub fn read_dependencies(&mut self, filename: &Path) -> io::Result<()> {
-        let dependency_path = Self::append_notes_to_dir(filename);
+        let dependency_path = Self::append_notes_to_parent(filename);
 
         for todo in &mut self.todos {
             todo.dependency.read(&dependency_path)?;
@@ -119,7 +119,7 @@ impl TodoList {
         Ok(())
     }
 
-    pub fn append_notes_to_dir(filename: &Path) -> PathBuf {
+    pub fn append_notes_to_parent(filename: &Path) -> PathBuf {
         filename.parent().unwrap().join("notes")
     }
 
@@ -151,13 +151,29 @@ impl TodoList {
         }
         Ok(())
     }
+
+    #[inline]
+    pub(super) fn force_write_dependencies(&mut self, filename: &Path) -> io::Result<()> {
+        for todo in &mut self.todos {
+            todo.dependency.todo_list.force_write_dependencies(filename)?;
+            todo.dependency.force_write(filename)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn force_write(&mut self, filename: &Path) -> io::Result<()> {
+        let file = File::create(filename)?;
+        let mut writer = BufWriter::new(file);
+        self.write_to_buf(&mut writer)?;
+        self.changed = false;
+        Ok(())
+    }
+
     #[inline]
     pub fn write(&mut self, filename: &Path) -> io::Result<()> {
         if self.changed {
-            let file = File::create(filename)?;
-            let mut writer = BufWriter::new(file);
-            self.write_to_buf(&mut writer)?;
-            self.changed = false;
+            self.force_write(filename)?;
         }
         Ok(())
     }
@@ -369,7 +385,7 @@ mod tests {
     fn test_write() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-write/tmplist");
-        let dependency_path = TodoList::append_notes_to_dir(&path);
+        let dependency_path = TodoList::append_notes_to_parent(&path);
         let _ = create_dir_all(&dependency_path);
         todo_list.changed = true;
 
@@ -426,14 +442,14 @@ mod tests {
         let _ = todo_list.todos[0].add_todo_dependency();
 
         let path = PathBuf::from("test-write-dependency/tmplist");
-        let dependency_path = TodoList::append_notes_to_dir(&path);
+        let dependency_path = TodoList::append_notes_to_parent(&path);
         let _ = create_dir_all(&dependency_path);
 
         todo_list.todos[0]
             .dependency
             .push(Todo::from_str("[0] Some dependency").unwrap());
         todo_list.write(&path)?;
-        let dependency_path = TodoList::append_notes_to_dir(&path);
+        let dependency_path = TodoList::append_notes_to_parent(&path);
         todo_list.write_dependencies(&dependency_path)?;
 
         let todo_dependency_path = PathBuf::from(format!(

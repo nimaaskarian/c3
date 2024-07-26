@@ -1,3 +1,5 @@
+use crate::todo_app::todo_list;
+
 use super::Todo;
 use super::TodoList;
 use std::{
@@ -116,25 +118,46 @@ impl Dependency {
 
     #[inline]
     pub fn write(&mut self, path: &Path) -> io::Result<()> {
-        let name = self.name.clone();
-            match self.mode.clone() {
-                DependencyMode::TodoList => {
-                    self.todo_list.write(&path.join(&self.name))?;
-                }
-                DependencyMode::Note if !self.written => {
-                    let mut file = File::create(path.join(name))?;
-                    write!(file, "{}", self.note)?;
-                }
-                _ => {}
-            };
-            self.written = true;
+        match self.mode {
+            DependencyMode::TodoList => {
+                self.todo_list.write(&path.join(&self.name))?;
+            }
+            DependencyMode::Note if !self.written => {
+                self.write_note(path)?;
+            }
+            _ => {}
+        };
+        self.written = true;
         Ok(())
     }
 
     #[inline]
+    fn write_note(&mut self, path: &Path) -> io::Result<()> {
+        let mut file = File::create(path.join(&self.name))?;
+        write!(file, "{}", self.note)?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn force_write(&mut self, path: &Path) -> io::Result<()> {
+        match self.mode {
+            DependencyMode::TodoList => {
+                self.todo_list.force_write(&path.join(&self.name))?;
+            }
+            DependencyMode::Note => {
+                self.write_note(path)?;
+            }
+            _ => {}
+        };
+        self.written = true;
+        Ok(())
+    }
+
+
+    #[inline]
     pub fn path(&self, path: &Path) -> Option<PathBuf> {
         path.parent()
-            .map(|path| TodoList::append_notes_to_dir(path))
+            .map(|path| TodoList::append_notes_to_parent(path))
     }
 
     #[inline]

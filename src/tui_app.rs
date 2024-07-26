@@ -589,6 +589,7 @@ impl<'a> TuiApp<'a> {
                     Char('A') => self.append_prompt(),
                     Char('e') | Char('E') => self.edit_prompt(key.code == Char('E')),
                     Char('r') if key.modifiers == KeyModifiers::CONTROL => self.edit_prompt(false),
+                    Char('~') => self.todo_app.go_root(),
                     Char('q') => self.quit_save_prompt(),
                     Char('r') => {
                         self.todo_app.batch_editor_messages();
