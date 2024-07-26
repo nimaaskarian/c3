@@ -10,8 +10,8 @@ impl Clipboard {
         }
     }
 
-    pub fn get_text(&self) -> String {
-        self.buffer.clone()
+    pub fn get_text(&self) -> &str {
+        &self.buffer
     }
 
     pub fn set_text(&mut self, text: String) {

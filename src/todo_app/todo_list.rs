@@ -1,4 +1,4 @@
-use std::fs::{create_dir_all, read, File};
+use std::fs::{read, File};
 use std::io;
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -9,12 +9,15 @@ use crate::DisplayArgs;
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TodoList {
     pub todos: Vec<Todo>,
+    pub(super) changed: bool,
 }
 
 type Output = Todo;
+
 impl TodoList {
     pub fn new() -> Self {
-        TodoList { todos: Vec::new() }
+        TodoList { ..Default::default() }
+        
     }
 
     pub fn index(&self, index: usize, restriction: &RestrictionFunction) -> &Output {
@@ -26,6 +29,7 @@ impl TodoList {
     }
 
     pub fn index_mut(&mut self, index: usize, restriction: &RestrictionFunction) -> &mut Output {
+        self.changed = true;
         self.todos
             .iter_mut()
             .filter(|todo| restriction(todo))
@@ -40,6 +44,9 @@ impl TodoList {
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.todo_list.delete_removed_dependent_files(filename);
+            }
             todo.delete_removed_dependent_files(filename)?;
         }
         Ok(())
@@ -47,6 +54,7 @@ impl TodoList {
 
     #[inline]
     pub fn prepend(&mut self, todo: Todo) {
+        self.changed = true;
         self.insert(0, todo);
     }
 
@@ -66,7 +74,7 @@ impl TodoList {
         let prior_indices = prior_indices.unwrap_or_default();
         callback(app, self, prior_indices.as_slice());
         for (i, todo) in self.todos.iter().enumerate() {
-            if let Some(todo_list) = todo.dependency.todo_list() {
+            if let Some(todo_list) = todo.dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 let mut prior_indices = prior_indices.clone();
                 prior_indices.push(i);
                 todo_list.traverse_tree(callback, Some(prior_indices), app);
@@ -81,44 +89,55 @@ impl TodoList {
         Ok(())
     }
 
-    pub fn read(filename: &Path, read_dependencies: bool, is_root: bool) -> Self {
-        let mut todolist = Self::new();
+    pub fn read(filename: &Path) -> Self {
         if !filename.is_file() {
-            return todolist;
+            return Self::new();
         }
         let file_data = read(filename).unwrap();
-
-        for line in file_data.lines() {
-            if let Ok(todo) = line.unwrap_or_default().parse::<Todo>() {
-                todolist.push(todo);
-            }
-        }
+        let mut todolist = Self {
+            todos: file_data.lines()
+                .map_while(Result::ok)
+                .flat_map(|line| line.parse())
+                .collect(),
+            ..Default::default()
+        };
         todolist.sort();
-        if read_dependencies {
-            let dependency_path = Self::dependency_parent(filename, is_root);
-            let _ = todolist.read_dependencies(&dependency_path);
-        }
+        todolist.changed = false;
         todolist
     }
 
-    fn read_dependencies(&mut self, path: &Path) -> io::Result<()> {
+    pub fn read_recursive_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
-            todo.dependency.read(path)?;
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.read(&folder_name)?;
+            }
         }
         Ok(())
     }
 
-    pub fn dependency_parent(filename: &Path, is_root: bool) -> PathBuf {
-        if is_root {
-            filename.parent().unwrap().join("notes")
-        } else {
-            filename.parent().unwrap().to_path_buf()
+    pub fn read_dependencies(&mut self, filename: &Path) -> io::Result<()> {
+        let dependency_path = Self::append_notes_to_parent(filename);
+
+        for todo in &mut self.todos {
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.read(&dependency_path)?;
+            }
         }
+        Ok(())
+    }
+
+    pub fn append_notes_to_parent(filename: &Path) -> PathBuf {
+        filename.parent().unwrap().join("notes")
+    }
+
+    pub fn dependency_parent(filename: &Path) -> PathBuf {
+        filename.parent().unwrap().to_path_buf()
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         TodoList {
             todos: Vec::with_capacity(capacity),
+            ..Default::default()
         }
     }
 
@@ -134,24 +153,58 @@ impl TodoList {
     #[inline]
     pub(super) fn write_dependencies(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
-            todo.dependency.todo_list.write_dependencies(filename)?;
-            todo.dependency.write(filename)?;
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.todo_list.write_dependencies(filename)?;
+                dependency.write(filename)?;
+            }
         }
         Ok(())
     }
+
     #[inline]
-    pub fn write(&mut self, filename: &Path, is_root: bool) -> io::Result<PathBuf> {
-        let dependency_path = Self::dependency_parent(filename, is_root);
-        create_dir_all(&dependency_path)?;
+    pub(super) fn force_write_dependencies(&mut self, filename: &Path) -> io::Result<()> {
+        for todo in &mut self.todos {
+            if let Some(dependency) = todo.dependency.as_mut() {
+                dependency.todo_list.force_write_dependencies(filename)?;
+                dependency.force_write(filename)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn force_write(&mut self, filename: &Path) -> io::Result<()> {
         let file = File::create(filename)?;
         let mut writer = BufWriter::new(file);
         self.write_to_buf(&mut writer)?;
-        Ok(dependency_path)
+        self.changed = false;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn write(&mut self, filename: &Path) -> io::Result<()> {
+        if self.changed {
+            self.force_write(filename)?;
+        }
+        Ok(())
     }
 
     #[inline(always)]
     pub(super) fn set_todos(&mut self, todos: Vec<Todo>) {
+        self.changed = true;
         self.todos = todos
+    }
+
+    #[inline(always)]
+    pub(super) fn filter_indices(&mut self, indices: Vec<usize>) {
+        self.todos = self.todos
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !indices.contains(i))
+                .map(|(_, todo)| todo)
+                .cloned()
+                .collect()
+
     }
 
     pub fn iter(&self) -> std::slice::Iter<Todo> {
@@ -159,13 +212,14 @@ impl TodoList {
     }
 
     pub fn iter_mut(&mut self) -> std::slice::IterMut<Todo> {
+        self.changed = true;
         self.todos.iter_mut()
     }
 
-    pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<String> {
+    pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<&str> {
         self.todos(restriction)
             .iter()
-            .map(|todo| todo.message.clone())
+            .map(|todo| todo.message.as_str())
             .collect()
     }
 
@@ -185,6 +239,7 @@ impl TodoList {
     }
 
     pub fn remove(&mut self, index: usize, restriction: &RestrictionFunction) {
+        self.changed = true;
         let mut binding = self.todos(restriction);
         let filtered: Vec<_> = binding.iter_mut().collect();
         self.todos = self
@@ -205,16 +260,19 @@ impl TodoList {
     }
 
     pub fn cut(&mut self, index: usize, restriction: &RestrictionFunction) -> Todo {
+        self.changed = true;
         let index_in_vec = self.true_position_in_list(index, restriction);
         self.todos.remove(index_in_vec)
     }
 
     pub fn push(&mut self, item: Todo) -> usize {
+        self.changed = true;
         self.todos.push(item);
         self.reorder_last()
     }
 
     fn insert(&mut self, index: usize, item: Todo) {
+        self.changed = true;
         self.todos.insert(index, item)
     }
 
@@ -229,10 +287,12 @@ impl TodoList {
 
     #[inline(always)]
     pub fn reorder_last(&mut self) -> usize {
+        self.changed = true;
         self.reorder(self.todos.len() - 1)
     }
 
     pub fn reorder(&mut self, index: usize) -> usize {
+        self.changed = true;
         if self.todos[index] < self.todos[0] {
             return self.move_index(index, 0, 1);
         }
@@ -264,40 +324,39 @@ impl TodoList {
     }
 
     pub fn append_list(&mut self, mut todo_list: TodoList) {
+        self.changed = true;
         self.todos.append(&mut todo_list.todos);
         self.sort();
     }
 
     #[inline(always)]
     pub fn sort(&mut self) {
+        self.changed = true;
         self.todos.sort()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{self, remove_dir_all, remove_file};
+    use std::fs::{self, create_dir_all, remove_dir_all, remove_file};
     use std::str::FromStr;
 
     use super::*;
 
     fn get_todo_list() -> TodoList {
         let path = PathBuf::from("tests/TODO_LIST");
-        TodoList::read(&path, true, true)
+        let mut todolist = TodoList::read(&path);
+        todolist.read_dependencies(&path);
+        todolist
     }
 
     #[test]
     fn test_todolist_read_undone() {
         let todo_list = get_todo_list();
-        let mut expected_undone = vec![
+        let expected_undone = vec![
             Todo::new("this todo has prio 1".to_string(), 1),
             Todo::new("this one has prio 2".to_string(), 2),
         ];
-        for i in 0..expected_undone.len() {
-            let _ = expected_undone[i]
-                .dependency
-                .write(&PathBuf::from("/dev/null"));
-        }
 
         assert_eq!(
             expected_undone,
@@ -319,9 +378,6 @@ mod tests {
         ];
         for i in 0..expected_done.len() {
             expected_done[i].toggle_done();
-            let _ = expected_done[i]
-                .dependency
-                .write(&PathBuf::from("/dev/null"));
         }
         assert_eq!(
             expected_done,
@@ -344,7 +400,11 @@ mod tests {
     fn test_write() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-write/tmplist");
-        let _ = todo_list.write(&path, true);
+        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let _ = create_dir_all(&dependency_path);
+        todo_list.changed = true;
+
+        let _ = todo_list.write(&path);
 
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
         let expected = "[1] this todo has prio 1
@@ -362,9 +422,11 @@ mod tests {
     fn test_push() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-push/tmplist");
+        let dependency_path = TodoList::dependency_parent(&path);
+        let _ = create_dir_all(&dependency_path);
         todo_list.push(Todo::new("Show me your warface".to_string(), 0));
         todo_list.reorder_last();
-        let _ = todo_list.write(&path, true);
+        let _ = todo_list.write(&path);
 
         let contents = fs::read_to_string(&path).expect("Reading file failed :(");
         let expected = "[1] this todo has prio 1
@@ -384,6 +446,7 @@ mod tests {
         let todo_list = get_todo_list();
         let mut sorted_list = todo_list.clone();
         sorted_list.sort();
+        sorted_list.changed = false;
 
         assert_eq!(todo_list, sorted_list)
     }
@@ -392,11 +455,18 @@ mod tests {
     fn test_write_dependencies() -> io::Result<()> {
         let mut todo_list = get_todo_list();
         let _ = todo_list.todos[0].add_todo_dependency();
+
         let path = PathBuf::from("test-write-dependency/tmplist");
+        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let _ = create_dir_all(&dependency_path);
+
         todo_list.todos[0]
             .dependency
+            .as_mut()
+            .unwrap()
             .push(Todo::from_str("[0] Some dependency").unwrap());
-        let dependency_path = todo_list.write(&path, true)?;
+        todo_list.write(&path)?;
+        let dependency_path = TodoList::append_notes_to_parent(&path);
         todo_list.write_dependencies(&dependency_path)?;
 
         let todo_dependency_path = PathBuf::from(format!(
@@ -408,7 +478,7 @@ mod tests {
         assert_eq!(contents, expected);
 
         todo_list.todos[0].remove_dependency();
-        todo_list.write(&path, true)?;
+        todo_list.write(&path)?;
         remove_dir_all(&path.parent().unwrap())?;
         Ok(())
     }

@@ -1,3 +1,4 @@
+use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
@@ -25,8 +26,8 @@ pub struct App {
     clipboard: Clipboard,
     pub(super) todo_list: TodoList,
     index: usize,
-    tree_path: Vec<usize>,
     changed: bool,
+    tree_path: Vec<usize>,
     pub(super) args: Args,
     removed_todos: Vec<Todo>,
     tree_search_positions: Vec<SearchPosition>,
@@ -49,8 +50,12 @@ struct LineMalformed;
 impl FromStr for IndexedLine {
     type Err = LineMalformed;
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let (priority, message) = nth_word_parse(input, 0);
-        let (index, message) = nth_word_parse(message.as_str(), 0);
+        let (mut index, message) = nth_word_parse(input, 0);
+        let (mut priority, message) = nth_word_parse(message.as_str(), 0);
+        if priority.is_none() {
+            priority = index.and_then(|val| Some(val as u8));
+            index = None;
+        }
 
         Ok(Self {
             index,
@@ -78,7 +83,10 @@ fn nth_word_parse<T: FromStr>(input: &str, n: usize) -> (Option<T>, String) {
 impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
-        let todo_list = TodoList::read(&args.todo_path, !args.no_tree, true);
+        let mut todo_list = TodoList::read(&args.todo_path);
+        if !args.no_tree {
+            todo_list.read_dependencies(&args.todo_path);
+        }
         let mut app = App {
             x_index: 0,
             y_index: 0,
@@ -106,7 +114,10 @@ impl App {
 
     #[inline]
     pub fn append_list_from_path(&mut self, path: PathBuf) {
-        let todo_list = TodoList::read(&path, !self.args.no_tree, true);
+        let todo_list = TodoList::read(&path);
+        if !self.args.no_tree {
+            self.todo_list.read_dependencies(&path);
+        }
         self.append_list(todo_list)
     }
 
@@ -117,17 +128,21 @@ impl App {
 
     #[inline]
     pub fn open_path(&mut self, path: PathBuf) {
-        self.todo_list = TodoList::read(&path, !self.args.no_tree, true);
+        self.todo_list = TodoList::read(&path);
+        if !self.args.no_tree {
+            self.todo_list.read_dependencies(&path);
+        }
         self.args.todo_path = path;
     }
 
     #[inline]
-    pub fn output_list_to_path(&mut self, path: PathBuf) -> io::Result<()> {
-        let changed = self.changed;
+    pub fn output_list_to_path(&mut self, path: &Path) -> io::Result<()> {
         let list = self.current_list_mut();
-        let dependency_path = list.write(&path, true)?;
-        list.write_dependencies(&dependency_path)?;
-        self.changed = changed;
+        let dependency_path = TodoList::append_notes_to_parent(&path);
+        create_dir_all(&dependency_path)?;
+        list.force_write(&path)?;
+
+        list.force_write_dependencies(&dependency_path)?;
         Ok(())
     }
 
@@ -148,9 +163,10 @@ impl App {
     }
 
     pub fn do_commands_on_selected(&mut self) {
+        let mut changed = false;
         for query in self.args.search_and_select.iter() {
             if self.args.delete_selected {
-                self.changed = true;
+                changed = true;
                 self.todo_list.set_todos(
                     self.todo_list
                         .iter()
@@ -161,11 +177,12 @@ impl App {
                 continue;
             }
             for todo in self.todo_list.iter_mut().filter(|todo| todo.matches(query)) {
-                self.changed = true;
+                changed = true;
                 if let Some(priority) = self.args.set_selected_priority {
                     todo.set_priority(priority as PriorityType);
                 }
-                if let Some(message) = self.args.set_selected_message.clone() {
+                if let Some(message) = &mut self.args.set_selected_message {
+                    let message = std::mem::take(message);
                     todo.set_message(message);
                 }
                 if self.args.done_selected {
@@ -173,6 +190,7 @@ impl App {
                 }
             }
         }
+        self.todo_list.changed = changed;
         self.args.search_and_select = vec![];
     }
 
@@ -216,14 +234,14 @@ impl App {
 
     pub fn batch_editor_messages(&mut self) {
         let restriction = &self.restriction;
-        let content = self
+        let content = String::from("# index priority message\n") + self
             .current_list()
             .todos(restriction)
             .iter()
             .enumerate()
-            .map(|(i, x)| format!("{} {i} {}", x.priority(), x.message))
+            .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
             .collect::<Vec<String>>()
-            .join("\n");
+            .join("\n").as_str();
         let new_messages = open_temp_editor(Some(&content), temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
@@ -234,6 +252,7 @@ impl App {
         let mut changed = false;
         let mut indexed_lines: Vec<IndexedLine> = messages
             .into_iter()
+            .filter(|message| !message.starts_with('#'))
             .flat_map(|message| message.parse())
             .collect();
 
@@ -262,25 +281,21 @@ impl App {
                     }
                 }
             } else {
+                changed = true;
+                delete_indices.push(i);
                 break;
             }
         }
-        self.todo_list.set_todos(
-            self.todo_list
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !delete_indices.contains(i))
-                .map(|(_, todo)| todo)
-                .cloned()
-                .collect(),
-        );
+        let list_mut = self.current_list_mut();
+        list_mut.filter_indices(delete_indices);
         for line in indexed_lines {
             if line.index.is_none() {
-                self.current_list_mut()
+                list_mut
                     .push(Todo::new(line.message, line.priority));
                 changed = true;
             }
         }
+        list_mut.changed = list_mut.changed || changed;
         self.changed = changed;
     }
 
@@ -298,7 +313,7 @@ impl App {
         for position in self.tree_search_positions.iter() {
             self.tree_path.clone_from(&position.tree_path);
             let list = self.current_list();
-            for index in position.matching_indices.clone() {
+            for &index in &position.matching_indices {
                 println!(
                     "{}",
                     list.index(index, &self.restriction)
@@ -311,6 +326,11 @@ impl App {
     #[inline]
     pub fn is_tree(&self) -> bool {
         !self.args.no_tree
+    }
+
+    #[inline]
+    pub fn is_current_changed(&self) -> bool {
+        self.current_list().changed
     }
 
     #[inline]
@@ -387,8 +407,8 @@ impl App {
 
     #[inline]
     fn set_tree_search_position(&mut self) {
-        let item = self.tree_search_positions[self.x_index].clone();
-        self.tree_path = item.tree_path;
+        let item = &self.tree_search_positions[self.x_index];
+        self.tree_path = item.tree_path.clone();
         self.index = item.matching_indices[self.y_index];
     }
 
@@ -411,7 +431,8 @@ impl App {
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = TodoList::read(&self.args.todo_path, true, true);
+        self.todo_list = TodoList::read(&self.args.todo_path);
+        self.todo_list.read_dependencies(&self.args.todo_path);
     }
 
     #[inline]
@@ -427,9 +448,9 @@ impl App {
     pub fn parent(&mut self) -> Option<&Todo> {
         let mut list = &self.todo_list;
         let mut parent = None;
-        for index in self.tree_path.clone() {
+        for &index in &self.tree_path {
             parent = Some(&list.todos[index]);
-            if let Some(todo_list) = list.todos[index].dependency.todo_list() {
+            if let Some(todo_list) = list.todos[index].dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 list = todo_list
             } else {
                 break;
@@ -469,7 +490,7 @@ impl App {
     pub fn traverse_down(&mut self) {
         if self.is_tree() {
             match self.todo() {
-                Some(todo) if todo.dependency.is_list() => {
+                Some(todo) if todo.dependency.as_ref().map_or(false, |dep| dep.is_list()) => {
                     let index = self.index;
                     let restriction = self.restriction.clone();
                     let true_index = self
@@ -482,6 +503,12 @@ impl App {
                 _ => {}
             }
         }
+    }
+
+    #[inline]
+    pub fn go_root(&mut self) {
+        self.tree_path = vec![];
+        self.fix_index();
     }
 
     #[inline]
@@ -549,12 +576,13 @@ impl App {
     pub fn current_list_mut(&mut self) -> &mut TodoList {
         self.changed = true;
         let is_root = self.is_root();
-        let mut list = &mut self.todo_list;
         if is_root {
-            return list;
+            return &mut self.todo_list;
         }
-        for index in self.tree_path.clone() {
-            list = &mut list.todos[index].dependency.todo_list
+        let mut list = &mut self.todo_list;
+
+        for &index in &self.tree_path {
+            list = &mut list.todos[index].dependency.as_mut().unwrap().todo_list
         }
         list
     }
@@ -565,8 +593,8 @@ impl App {
         if self.is_root() {
             return list;
         }
-        for index in self.tree_path.clone() {
-            if let Some(todo_list) = &list.todos[index].dependency.todo_list() {
+        for &index in &self.tree_path {
+            if let Some(todo_list) = &list.todos[index].dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 list = todo_list
             } else {
                 break;
@@ -584,20 +612,20 @@ impl App {
     }
 
     #[inline]
-    pub fn write(&mut self) -> io::Result<bool> {
-        if self.changed {
-            self.changed = false;
-            let dependency_path = self.todo_list.write(&self.args.todo_path, true)?;
-            self.handle_removed_todo_dependency_files(&dependency_path);
-            self.todo_list
-                .delete_removed_dependent_files(&dependency_path)?;
-            if self.is_tree() {
-                self.todo_list.write_dependencies(&dependency_path)?;
-            }
-            Ok(true)
-        } else {
-            Ok(false)
+    pub fn write(&mut self) -> io::Result<()> {
+        let note_dir = TodoList::append_notes_to_parent(&self.args.todo_path);
+
+        create_dir_all(&note_dir)?;
+        let todo_path = self.args.todo_path.clone();
+        self.handle_removed_todo_dependency_files(&note_dir);
+        self.todo_list.write(&todo_path)?;
+        self.todo_list
+            .delete_removed_dependent_files(&note_dir)?;
+        if self.is_tree() {
+            self.todo_list.write_dependencies(&note_dir)?;
         }
+        self.changed = false;
+        Ok(())
     }
 
     #[inline]
@@ -781,8 +809,8 @@ impl App {
     #[inline]
     pub fn paste_todo(&mut self) {
         if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
-            let todo_parent = TodoList::dependency_parent(&self.args.todo_path, true);
-            let _ = todo.dependency.read(&todo_parent);
+            let todo_parent = TodoList::dependency_parent(&self.args.todo_path);
+            let _ = todo.dependency.as_mut().unwrap().read(&todo_parent);
             let list = &mut self.current_list_mut();
             self.index = list.push(todo);
         }
@@ -855,6 +883,7 @@ mod tests {
             app.add_dependency_traverse_down();
             app.append(String::from(dependency));
         }
+        app.todo_mut().unwrap().set_note("Heaven from hell".to_string()).unwrap();
         for _ in 0..3 {
             app.traverse_up();
         }
@@ -952,6 +981,7 @@ mod tests {
             .collect::<Result<Vec<_>, io::Error>>()?;
 
         let expected_names = vec![
+            "33a25a20dcf8d607bcac45120f26ab158d5dbdd2",
             "560b05afe5e03eae9f8ad475b0b8b73ea6911272.todo",
             "63c5498f09d086fca6d870345350bfb210945790.todo",
             "b3942ad1c555625b7f60649fe50853830b6cdb04.todo",
@@ -990,14 +1020,38 @@ mod tests {
         app.remove_current_dependent();
         app.write()?;
 
-        let names: io::Result<Vec<PathBuf>> = match fs::read_dir(dir.join("notes")) {
-            Ok(value) => value.map(|res| res.map(|e| e.path())).collect(),
-            _ => Ok(vec![]),
-        };
+        let names: io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))
+            .unwrap()
+            .map(|dir|dir.map(|entry|entry.path()))
+            .collect();
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0] Hello there\n");
         remove_dir_all(dir)?;
         assert!(names?.is_empty());
+        assert_eq!(string, expected_string);
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_current_dependency_partial() -> io::Result<()> {
+        let dir = dir("test-remove-current-dependency-partial")?;
+        let mut app = write_test_todos(&dir)?;
+        assert_eq!(app.index, 2);
+        app.traverse_down();
+        assert_eq!(app.index, 0);
+        app.remove_current_dependent();
+        app.write()?;
+
+        let names: io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))
+            .unwrap()
+            .map(|dir|dir.map(|entry|entry.path()))
+            .collect();
+        let expected = vec![PathBuf::from("test-remove-current-dependency-partial/notes/63c5498f09d086fca6d870345350bfb210945790.todo")];
+        dbg!(&names);
+        assert_eq!(names.unwrap(), expected);
+        let string = fs::read_to_string(&dir.join("todo"))?;
+        let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0]>63c5498f09d086fca6d870345350bfb210945790.todo Hello there\n");
+        remove_dir_all(dir)?;
         assert_eq!(string, expected_string);
         Ok(())
     }

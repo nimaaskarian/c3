@@ -58,7 +58,12 @@ pub fn temp_path(name: &str) -> PathBuf {
         Ok(some) => some.as_secs(),
     };
     let filename = format!("c3-{name}.{time}");
-    let path = home_dir().unwrap().join(filename);
+    let tmpdir = PathBuf::from("/tmp");
+    let path = if tmpdir.is_dir() {
+        tmpdir.join(filename)
+    } else {
+        home_dir().unwrap().join(filename)
+    };
     path.to_path_buf()
 }
 

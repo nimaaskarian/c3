@@ -153,7 +153,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn title(&mut self) -> String {
-        let changed_str = if self.todo_app.is_changed() { "*" } else { "" };
+        let changed_str = if self.todo_app.is_current_changed() { "*" } else { "" };
         let size = self.todo_app.len();
         let todo_string = format!("Todos ({size}){changed_str}");
 
@@ -233,7 +233,12 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_priority_delete(&mut self, new: String, old: String) {
-        if new.is_empty() || old.is_empty() {
+        if new.is_empty() {
+            if let Some(restriction) = self.last_restriction.clone() {
+                self.todo_app.set_restriction(restriction)
+            }
+        }
+        if old.is_empty() {
             self.todo_app.update_show_done_restriction()
         }
     }
@@ -309,7 +314,7 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn nnn_output_todo(&mut self) {
         for path in Self::nnn_paths() {
-            let _ = self.todo_app.output_list_to_path(path);
+            let _ = self.todo_app.output_list_to_path(&path);
         }
     }
 
@@ -359,7 +364,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn quit_save_prompt(&mut self) {
-        if self.todo_app.is_changed() {
+        if self.todo_app.is_changed() || self.todo_app.is_current_changed() {
             self.set_text_mode(
                 Self::on_save_prompt,
                 "You have done changes. You wanna save? [n: no, y: yes, c: cancel] (default: n)",
@@ -520,10 +525,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn write(&mut self) -> io::Result<()> {
-        if !self.todo_app.write()? {
-            self.todo_app.read();
-        }
-        Ok(())
+        self.todo_app.write()
     }
 
     #[inline]
@@ -585,9 +587,11 @@ impl<'a> TuiApp<'a> {
                     Char('/') => self.search_prompt(),
                     Char('?') => self.tree_search_prompt(),
                     Char('A') => self.append_prompt(),
-                    Char('E') | Char('e') => self.edit_prompt(key.code == Char('E')),
+                    Char('e') | Char('E') => self.edit_prompt(key.code == Char('E')),
+                    Char('r') if key.modifiers == KeyModifiers::CONTROL => self.edit_prompt(false),
+                    Char('~') => self.todo_app.go_root(),
                     Char('q') => self.quit_save_prompt(),
-                    Char('b') => {
+                    Char('r') => {
                         self.todo_app.batch_editor_messages();
                         return Ok(Operation::Restart);
                     }
@@ -601,7 +605,7 @@ impl<'a> TuiApp<'a> {
                     Char('c') => self.module.on_c(),
                     Char('C') => self.module.on_capital_c(),
                     Char('L') => self.module.on_capital_l(),
-                    Char('r') => self.module.on_r(),
+                    Char('f') => self.module.on_f(),
                     Char('+') | Char('=') => self.module.on_plus(),
                     Char('-') => self.module.on_minus(),
                     Char('.') => self.module.on_dot(),
@@ -654,13 +658,13 @@ impl<'a> TuiApp<'a> {
         dependency_layout: Rect,
     ) {
         if let Some(todo) = todo {
-            if let Some(note) = todo.dependency.note() {
+            if let Some(note) = todo.dependency.as_ref().map_or(None, |dep| dep.note()) {
                 let note_widget = Paragraph::new(Text::styled(note, Style::default()))
                     .wrap(Wrap { trim: true })
                     .block(default_block("Todo note"));
                 frame.render_widget(note_widget, dependency_layout);
             }
-            if let Some(todo_list) = todo.dependency.todo_list() {
+            if let Some(todo_list) = todo.dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 Self::render_todos_widget(
                     self.highlight_string(),
                     frame,

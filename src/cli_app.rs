@@ -19,6 +19,11 @@ impl<'a> CliApp<'a> {
         for message in app.args.append_todo.clone() {
             app.append(message);
         }
+
+        if let Some(path) = app.args.output_file.clone() {
+            app.output_list_to_path(&path);
+        }
+
         for message in app.args.prepend_todo.clone() {
             app.prepend(message);
         }
@@ -109,12 +114,12 @@ impl PrintTodoTree {
             }
             self.print_todo(todo, display_args);
 
-            if let Some(todo_list) = todo.dependency.todo_list() {
+            if let Some(todo_list) = todo.dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
                 let mut tree_child = self.tree_child();
                 tree_child.print_list(todo_list, display_args, restriction);
             }
 
-            if let Some(note) = todo.dependency.note() {
+            if let Some(note) = todo.dependency.as_ref().map_or(None, |dep| dep.note()) {
                 self.print_note(note)
             }
         }
@@ -138,7 +143,7 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_prenote(&self, last_stack: Vec<bool>) {
-        self.print_preindention(last_stack);
+        self.print_preindention(&last_stack);
         print!("    ")
     }
 
@@ -147,7 +152,7 @@ impl PrintTodoTree {
         if self.should_print_indention {
             return;
         }
-        self.print_preindention(self.last_stack.clone());
+        self.print_preindention(&self.last_stack);
         if self.is_last {
             print!("└── ");
         } else {
@@ -156,10 +161,10 @@ impl PrintTodoTree {
     }
 
     #[inline(always)]
-    fn print_preindention(&self, last_stack: Vec<bool>) {
-        let mut stack_iter = last_stack.into_iter();
+    fn print_preindention(&self, last_stack: &Vec<bool>) {
+        let mut stack_iter = last_stack.iter();
         stack_iter.next();
-        for x in stack_iter {
+        for &x in stack_iter {
             if x {
                 print!("│   ")
             } else {

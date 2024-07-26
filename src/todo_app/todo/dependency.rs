@@ -1,5 +1,6 @@
 use super::Todo;
 use super::TodoList;
+use std::str::FromStr;
 use std::{
     fs::File,
     io::{self, Write},
@@ -9,7 +10,6 @@ use std::{
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 enum DependencyMode {
     #[default]
-    None,
     TodoList,
     Note,
 }
@@ -39,8 +39,8 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn get_name(&self) -> String {
-        self.name.clone()
+    pub fn get_name(&self) -> &str {
+        &self.name
     }
 
     #[inline]
@@ -86,7 +86,8 @@ impl Dependency {
                         self.name = name_todo;
                         self.mode = DependencyMode::TodoList;
                     }
-                    self.todo_list = TodoList::read(&path.join(&self.name), true, false);
+                    self.todo_list = TodoList::read(&path.join(&self.name));
+                    self.todo_list.read_recursive_dependencies(&path);
             }
             _ => {}
         };
@@ -115,14 +116,12 @@ impl Dependency {
 
     #[inline]
     pub fn write(&mut self, path: &Path) -> io::Result<()> {
-        let name = self.name.clone();
-        match self.mode.clone() {
+        match self.mode {
             DependencyMode::TodoList => {
-                self.todo_list.write(&path.join(&self.name), false)?;
+                self.todo_list.write(&path.join(&self.name))?;
             }
-            DependencyMode::Note => {
-                let mut file = File::create(path.join(name))?;
-                write!(file, "{}", self.note)?;
+            DependencyMode::Note if !self.written => {
+                self.write_note(path)?;
             }
             _ => {}
         };
@@ -131,14 +130,32 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn path(&self, path: &Path) -> Option<PathBuf> {
-        path.parent()
-            .map(|path| TodoList::dependency_parent(path, false))
+    fn write_note(&mut self, path: &Path) -> io::Result<()> {
+        let mut file = File::create(path.join(&self.name))?;
+        write!(file, "{}", self.note)?;
+        Ok(())
     }
 
     #[inline]
-    pub fn is_none(&self) -> bool {
-        self.mode == DependencyMode::None
+    pub fn force_write(&mut self, path: &Path) -> io::Result<()> {
+        match self.mode {
+            DependencyMode::TodoList => {
+                self.todo_list.force_write(&path.join(&self.name))?;
+            }
+            DependencyMode::Note => {
+                self.write_note(path)?;
+            }
+            _ => {}
+        };
+        self.written = true;
+        Ok(())
+    }
+
+
+    #[inline]
+    pub fn path(&self, path: &Path) -> Option<PathBuf> {
+        path.parent()
+            .map(|path| TodoList::append_notes_to_parent(path))
     }
 
     #[inline]
@@ -154,7 +171,6 @@ impl Dependency {
     #[inline]
     pub fn display<'a>(&self) -> &'a str {
         match self.mode {
-            DependencyMode::None => ".",
             DependencyMode::Note => ">",
             DependencyMode::TodoList => "-",
         }
@@ -169,33 +185,31 @@ impl Dependency {
 impl From<&Dependency> for String {
     #[inline]
     fn from(dependency: &Dependency) -> String {
-        match dependency.mode {
-            DependencyMode::None => String::new(),
-            _ => format!(">{}", dependency.name),
-        }
+        format!(">{}", dependency.name)
     }
 }
 
-impl From<&str> for Dependency {
+pub struct EmptyDependency;
+
+impl FromStr for Dependency {
+    type Err = EmptyDependency;
     #[inline]
-    fn from(input: &str) -> Dependency {
-        let mut name = String::new();
-        let mode: DependencyMode;
-        if input.is_empty() {
-            mode = DependencyMode::None;
-        } else {
-            name = String::from(input);
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        if !input.is_empty() {
+            let mode: DependencyMode;
+            let name = String::from(input);
             if input.ends_with(".todo") {
                 mode = DependencyMode::TodoList;
             } else {
                 mode = DependencyMode::Note;
             }
-        }
-
-        Self {
-            name,
-            mode,
-            ..Default::default()
+            Ok(Self {
+                name,
+                mode,
+                ..Default::default()
+            })
+        } else {
+            Err(EmptyDependency)
         }
     }
 }

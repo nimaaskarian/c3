@@ -8,7 +8,7 @@ pub trait Module<'a> {
     fn on_s(&mut self);
     fn on_capital_h(&mut self);
     fn on_capital_l(&mut self);
-    fn on_r(&mut self);
+    fn on_f(&mut self);
     fn on_minus(&mut self);
     fn on_plus(&mut self);
     fn on_dot(&mut self);

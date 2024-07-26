@@ -53,7 +53,7 @@ impl<'a> Module<'a> for Potato<'a> {
     }
 
     #[inline]
-    fn on_r(&mut self) {
+    fn on_f(&mut self) {
         self.restart()
     }
 
