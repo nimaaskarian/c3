@@ -379,6 +379,20 @@ impl App {
         self.index = item.matching_indices[self.y_index];
     }
 
+    fn max_tree_length(&self) -> usize {
+        let mut current_list = &self.todo_list;
+        let mut max_i = 0;
+        for &index in self.tree_path.iter() {
+            if let Some(dependency) = current_list.todos.get(index).and_then(|todo| todo.dependency.as_ref()) {
+                current_list = &dependency.todo_list;
+                max_i+=1;
+            } else {
+                break;
+            }
+        };
+        max_i
+    }
+
     #[inline]
     pub fn toggle_current_done(&mut self) {
         let index = self.index;
@@ -400,6 +414,8 @@ impl App {
         self.changed = false;
         self.todo_list = TodoList::read(&self.args.todo_path);
         self.todo_list.read_dependencies(&self.args.todo_path);
+        let len = self.max_tree_length();
+        self.tree_path.truncate(len);
     }
 
     #[inline]
