@@ -450,7 +450,7 @@ impl App {
         let mut parent = None;
         for &index in &self.tree_path {
             parent = Some(&list.todos[index]);
-            if let Some(todo_list) = list.todos[index].dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
+            if let Some(todo_list) = list.todos[index].dependency.as_ref().and_then(|dep| dep.todo_list()) {
                 list = todo_list
             } else {
                 break;
@@ -594,7 +594,7 @@ impl App {
             return list;
         }
         for &index in &self.tree_path {
-            if let Some(todo_list) = &list.todos[index].dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
+            if let Some(todo_list) = &list.todos[index].dependency.as_ref().and_then(|dep| dep.todo_list()) {
                 list = todo_list
             } else {
                 break;

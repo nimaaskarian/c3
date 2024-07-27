@@ -114,12 +114,10 @@ impl PrintTodoTree {
             }
             self.print_todo(todo, display_args);
 
-            if let Some(todo_list) = todo.dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
+            if let Some(todo_list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
                 let mut tree_child = self.tree_child();
                 tree_child.print_list(todo_list, display_args, restriction);
-            }
-
-            if let Some(note) = todo.dependency.as_ref().map_or(None, |dep| dep.note()) {
+            } else if let Some(note) = todo.dependency.as_ref().and_then(|dep| dep.note()) {
                 self.print_note(note)
             }
         }

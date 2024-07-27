@@ -74,7 +74,7 @@ impl TodoList {
         let prior_indices = prior_indices.unwrap_or_default();
         callback(app, self, prior_indices.as_slice());
         for (i, todo) in self.todos.iter().enumerate() {
-            if let Some(todo_list) = todo.dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
+            if let Some(todo_list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
                 let mut prior_indices = prior_indices.clone();
                 prior_indices.push(i);
                 todo_list.traverse_tree(callback, Some(prior_indices), app);
