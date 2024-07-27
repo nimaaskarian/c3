@@ -1,10 +1,10 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std {{{
-use std::process::Command;
 use std::{
+    iter,
     io::{self, stdout, BufRead, BufReader},
     path::PathBuf,
-    process::Stdio,
+    process::{Command, self, Stdio},
     rc::Rc,
 };
 // }}}
@@ -278,7 +278,7 @@ impl<'a> TuiApp<'a> {
         self.set_text_mode(Self::on_reminder, "Date reminder", "");
     }
 
-    fn nnn_paths() -> Vec<PathBuf> {
+    fn nnn_paths() -> Option<iter::Map<io::Lines<BufReader<process::ChildStdout>>, impl FnMut(Result<String, io::Error>) -> PathBuf>> {
         let mut output = Command::new("nnn")
             .args(["-p", "-"])
             .stdin(Stdio::inherit())
@@ -290,31 +290,36 @@ impl<'a> TuiApp<'a> {
         let exit_status = output.wait().expect("Failed to wait on nnn.");
         if exit_status.success() {
             let reader = BufReader::new(output.stdout.unwrap());
-            return reader
+            return Some(reader
                 .lines()
-                .map(|x| PathBuf::from(x.unwrap_or_default()))
-                .collect();
+                .map(|x| PathBuf::from(x.unwrap_or_default())))
         }
-        vec![]
+        None
     }
 
     #[inline]
     pub fn nnn_append_todo(&mut self) {
-        for path in Self::nnn_paths() {
-            self.todo_app.append_list_from_path(path);
+        if let Some(paths) = Self::nnn_paths() {
+            for path in paths {
+                self.todo_app.append_list_from_path(&path);
+            }
         }
     }
 
     pub fn nnn_open(&mut self) {
-        for path in Self::nnn_paths() {
-            self.todo_app.open_path(path);
+        if let Some(paths) = Self::nnn_paths() {
+            for path in paths {
+                self.todo_app.open_path(path);
+            }
         }
     }
 
     #[inline]
     pub fn nnn_output_todo(&mut self) {
-        for path in Self::nnn_paths() {
-            let _ = self.todo_app.output_list_to_path(&path);
+        if let Some(paths) = Self::nnn_paths() {
+            for path in paths {
+                let _ = self.todo_app.output_list_to_path(&path);
+            }
         }
     }
 

@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
@@ -53,7 +54,7 @@ impl FromStr for IndexedLine {
         let (mut index, message) = nth_word_parse(input, 0);
         let (mut priority, message) = nth_word_parse(message.as_str(), 0);
         if priority.is_none() {
-            priority = index.and_then(|val| Some(val as u8));
+            priority = index.map(|val| val as u8);
             index = None;
         }
 
@@ -113,10 +114,10 @@ impl App {
     }
 
     #[inline]
-    pub fn append_list_from_path(&mut self, path: PathBuf) {
-        let todo_list = TodoList::read(&path);
+    pub fn append_list_from_path(&mut self, path: &Path) {
+        let todo_list = TodoList::read(path);
         if !self.args.no_tree {
-            self.todo_list.read_dependencies(&path);
+            self.todo_list.read_dependencies(path);
         }
         self.append_list(todo_list)
     }
@@ -138,9 +139,9 @@ impl App {
     #[inline]
     pub fn output_list_to_path(&mut self, path: &Path) -> io::Result<()> {
         let list = self.current_list_mut();
-        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let dependency_path = TodoList::append_notes_to_parent(path);
         create_dir_all(&dependency_path)?;
-        list.force_write(&path)?;
+        list.force_write(path)?;
 
         list.force_write_dependencies(&dependency_path)?;
         Ok(())
@@ -167,13 +168,7 @@ impl App {
         for query in self.args.search_and_select.iter() {
             if self.args.delete_selected {
                 changed = true;
-                self.todo_list.set_todos(
-                    self.todo_list
-                        .iter()
-                        .filter(|todo| !todo.matches(query))
-                        .cloned()
-                        .collect(),
-                );
+                self.todo_list.todos.retain(|todo| !todo.matches(query));
                 continue;
             }
             for todo in self.todo_list.iter_mut().filter(|todo| todo.matches(query)) {
@@ -234,14 +229,10 @@ impl App {
 
     pub fn batch_editor_messages(&mut self) {
         let restriction = &self.restriction;
-        let content = String::from("# index priority message\n") + self
-            .current_list()
-            .todos(restriction)
-            .iter()
-            .enumerate()
-            .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
-            .collect::<Vec<String>>()
-            .join("\n").as_str();
+        let mut content = String::from("# index priority message\n");
+        for (i, line) in self.current_list().todos(restriction).iter().enumerate() {
+            writeln!(content, "{i: <7} {: <8} {}", line.priority(), line.message);
+        }
         let new_messages = open_temp_editor(Some(&content), temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
@@ -283,7 +274,6 @@ impl App {
             } else {
                 changed = true;
                 delete_indices.push(i);
-                break;
             }
         }
         let list_mut = self.current_list_mut();
@@ -408,7 +398,7 @@ impl App {
     #[inline]
     fn set_tree_search_position(&mut self) {
         let item = &self.tree_search_positions[self.x_index];
-        self.tree_path = item.tree_path.clone();
+        self.tree_path.clone_from(&item.tree_path);
         self.index = item.matching_indices[self.y_index];
     }
 
@@ -561,7 +551,7 @@ impl App {
         if !self.is_todos_empty() {
             let restriction = self.restriction.clone();
             let index = self.index;
-            let todo = self.current_list_mut().cut(index, &restriction);
+            let todo = self.current_list_mut().remove(index, &restriction);
             let todo_string: String = (&todo).into();
             self.clipboard.set_text(todo_string);
         }
@@ -744,7 +734,7 @@ impl App {
         let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
-            let todo = self.current_list_mut().cut(index, &restriction);
+            let todo = self.current_list_mut().remove(index, &restriction);
             self.removed_todos.push(todo);
         }
     }

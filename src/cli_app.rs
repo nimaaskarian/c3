@@ -28,7 +28,7 @@ impl<'a> CliApp<'a> {
             app.prepend(message);
         }
         if let Some(path) = app.args.append_file.clone() {
-            app.append_list_from_path(path)
+            app.append_list_from_path(&path)
         }
         app.do_commands_on_selected();
         let _ = app.write();
@@ -159,7 +159,7 @@ impl PrintTodoTree {
     }
 
     #[inline(always)]
-    fn print_preindention(&self, last_stack: &Vec<bool>) {
+    fn print_preindention(&self, last_stack: &[bool]) {
         let mut stack_iter = last_stack.iter();
         stack_iter.next();
         for &x in stack_iter {

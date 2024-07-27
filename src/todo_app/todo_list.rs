@@ -109,7 +109,7 @@ impl TodoList {
     pub fn read_recursive_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
             if let Some(dependency) = todo.dependency.as_mut() {
-                dependency.read(&folder_name)?;
+                dependency.read(folder_name)?;
             }
         }
         Ok(())
@@ -190,21 +190,12 @@ impl TodoList {
     }
 
     #[inline(always)]
-    pub(super) fn set_todos(&mut self, todos: Vec<Todo>) {
-        self.changed = true;
-        self.todos = todos
-    }
-
-    #[inline(always)]
     pub(super) fn filter_indices(&mut self, indices: Vec<usize>) {
         self.todos = self.todos
                 .iter()
                 .enumerate()
-                .filter(|(i, _)| !indices.contains(i))
-                .map(|(_, todo)| todo)
-                .cloned()
+                .filter_map(|(i, todo)| if indices.binary_search(&i).is_ok() {None} else {Some(todo.clone())})
                 .collect()
-
     }
 
     pub fn iter(&self) -> std::slice::Iter<Todo> {
@@ -238,28 +229,15 @@ impl TodoList {
         self.todos(restriction).is_empty()
     }
 
-    pub fn remove(&mut self, index: usize, restriction: &RestrictionFunction) {
-        self.changed = true;
-        let mut binding = self.todos(restriction);
-        let filtered: Vec<_> = binding.iter_mut().collect();
-        self.todos = self
-            .todos
-            .iter()
-            .filter(|x| x != filtered[index])
-            .cloned()
-            .collect();
-    }
-
     pub fn true_position_in_list(&self, index: usize, restriction: &RestrictionFunction) -> usize {
-        let mut binding = self.todos(restriction);
-        let filtered: Vec<_> = binding.iter_mut().collect();
+        let binding = self.todos(restriction);
         self.todos
             .iter()
-            .position(|x| &x == filtered[index])
+            .position(|x| x == binding[index])
             .unwrap_or_default()
     }
 
-    pub fn cut(&mut self, index: usize, restriction: &RestrictionFunction) -> Todo {
+    pub fn remove(&mut self, index: usize, restriction: &RestrictionFunction) -> Todo {
         self.changed = true;
         let index_in_vec = self.true_position_in_list(index, restriction);
         self.todos.remove(index_in_vec)
