@@ -87,7 +87,7 @@ impl Dependency {
                         self.mode = DependencyMode::TodoList;
                     }
                     self.todo_list = TodoList::read(&path.join(&self.name));
-                    self.todo_list.read_recursive_dependencies(&path);
+                    self.todo_list.read_recursive_dependencies(path);
             }
             _ => {}
         };
@@ -145,7 +145,6 @@ impl Dependency {
             DependencyMode::Note => {
                 self.write_note(path)?;
             }
-            _ => {}
         };
         self.written = true;
         Ok(())
@@ -155,7 +154,7 @@ impl Dependency {
     #[inline]
     pub fn path(&self, path: &Path) -> Option<PathBuf> {
         path.parent()
-            .map(|path| TodoList::append_notes_to_parent(path))
+            .map(TodoList::append_notes_to_parent)
     }
 
     #[inline]
@@ -196,13 +195,12 @@ impl FromStr for Dependency {
     #[inline]
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         if !input.is_empty() {
-            let mode: DependencyMode;
             let name = String::from(input);
-            if input.ends_with(".todo") {
-                mode = DependencyMode::TodoList;
+            let mode = if input.ends_with(".todo") {
+                DependencyMode::TodoList
             } else {
-                mode = DependencyMode::Note;
-            }
+                DependencyMode::Note
+            };
             Ok(Self {
                 name,
                 mode,

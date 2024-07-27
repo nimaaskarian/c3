@@ -28,7 +28,7 @@ impl<'a> CliApp<'a> {
             app.prepend(message);
         }
         if let Some(path) = app.args.append_file.clone() {
-            app.append_list_from_path(path)
+            app.append_list_from_path(&path)
         }
         app.do_commands_on_selected();
         let _ = app.write();
@@ -114,12 +114,10 @@ impl PrintTodoTree {
             }
             self.print_todo(todo, display_args);
 
-            if let Some(todo_list) = todo.dependency.as_ref().map_or(None, |dep| dep.todo_list()) {
+            if let Some(todo_list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
                 let mut tree_child = self.tree_child();
                 tree_child.print_list(todo_list, display_args, restriction);
-            }
-
-            if let Some(note) = todo.dependency.as_ref().map_or(None, |dep| dep.note()) {
+            } else if let Some(note) = todo.dependency.as_ref().and_then(|dep| dep.note()) {
                 self.print_note(note)
             }
         }
@@ -161,7 +159,7 @@ impl PrintTodoTree {
     }
 
     #[inline(always)]
-    fn print_preindention(&self, last_stack: &Vec<bool>) {
+    fn print_preindention(&self, last_stack: &[bool]) {
         let mut stack_iter = last_stack.iter();
         stack_iter.next();
         for &x in stack_iter {

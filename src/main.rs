@@ -17,6 +17,14 @@ fn main() -> io::Result<()> {
     let mut app = App::new(args);
 
     match mode {
+        AppMode::PrintFiles => {
+            println!("{}", app.args.todo_path.to_str().unwrap_or(""));
+            let notes = app.args.todo_path.parent().unwrap().join("notes");
+            if notes.is_dir() {
+                println!("{}", notes.to_str().unwrap_or(""));
+            }
+            Ok(())
+        }
         AppMode::Completion(generator) => {
             print_completions(generator, &mut Args::command());
             Ok(())
@@ -103,6 +111,9 @@ pub struct Args {
     #[arg(short='o', long)]
     output_file: Option<PathBuf>,
 
+    #[arg(short='p', long, default_value_t=false)]
+    print_path: bool,
+
     /// Minimal tree with no tree graphics
     #[arg(short = 'M', long)]
     minimal_tree: bool,
@@ -132,10 +143,14 @@ pub enum AppMode {
     Cli,
     Tui,
     Completion(Shell),
+    PrintFiles,
 }
 
 impl Args {
     pub fn mode(&self) -> AppMode {
+        if self.print_path {
+            return AppMode::PrintFiles;
+        }
         if let Some(generator) = self.completion {
             return AppMode::Completion(generator);
         }
