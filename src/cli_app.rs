@@ -130,19 +130,21 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_note(&mut self, note: &str) {
-        let mut last_stack = self.last_stack.clone();
-        last_stack.push(self.what_to_push());
-
         for line in note.lines() {
-            self.print_prenote(last_stack.clone());
+            let last = if self.last_stack.is_empty() {
+                None
+            } else {
+                Some(self.what_to_push())
+            };
+            self.print_prenote(&self.last_stack, last);
             println!("{}", line);
         }
     }
 
     #[inline]
-    fn print_prenote(&self, last_stack: Vec<bool>) {
-        self.print_preindention(&last_stack);
-        print!("    ")
+    fn print_prenote(&self, last_stack: &[bool], last_item: Option<bool>) {
+        self.print_preindention(&last_stack, last_item);
+        print!("   ")
     }
 
     #[inline]
@@ -150,7 +152,7 @@ impl PrintTodoTree {
         if self.should_print_indention {
             return;
         }
-        self.print_preindention(&self.last_stack);
+        self.print_preindention(&self.last_stack, None);
         if self.is_last {
             print!("└── ");
         } else {
@@ -159,10 +161,10 @@ impl PrintTodoTree {
     }
 
     #[inline(always)]
-    fn print_preindention(&self, last_stack: &[bool]) {
+    fn print_preindention(&self, last_stack: &[bool], last_item: Option<bool>) {
         let mut stack_iter = last_stack.iter();
         stack_iter.next();
-        for &x in stack_iter {
+        for &x in stack_iter.chain(last_item.as_ref()) {
             if x {
                 print!("│   ")
             } else {
