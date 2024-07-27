@@ -199,12 +199,9 @@ impl Schedule {
     }
 
     pub fn toggle(&mut self) {
-        match self.mode.clone() {
-            ScheduleMode::None => self.mode = self.last_mode.clone(),
-            any => {
-                self.last_mode = any;
-                self.mode = ScheduleMode::None;
-            }
+        match self.mode {
+            ScheduleMode::None => self.mode = std::mem::take(&mut self.last_mode),
+            _ => self.last_mode = std::mem::take(&mut self.mode),
         };
     }
 

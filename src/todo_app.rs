@@ -240,63 +240,37 @@ impl App {
 
     #[inline(always)]
     fn batch_edit_current_list(&mut self, messages: Lines<'_>) {
-        let mut changed = false;
-        let mut indexed_lines: Vec<IndexedLine> = messages
+        let restriction = self.restriction.clone();
+        let mut lines: Vec<IndexedLine> = messages
             .into_iter()
             .filter(|message| !message.starts_with('#'))
             .flat_map(|message| message.parse())
             .collect();
 
-        indexed_lines.sort_by_key(|a| a.index);
-        let mut indexed_lines_iter = indexed_lines.iter();
-        let mut current_line = indexed_lines_iter.next();
-        let mut delete_indices: Vec<usize> = vec![];
-        let restriction = self.restriction.clone();
-        for (i, todo) in self
-            .current_list_mut()
-            .todos
-            .iter_mut()
-            .filter(|todo| restriction(todo))
-            .enumerate()
-        {
-            if let Some(indexed_line) = current_line {
-                if let Some(line_index) = indexed_line.index {
-                    if line_index == i {
-                        if Self::batch_edit_helper(todo, indexed_line) {
-                            changed = true;
-                        }
-                        current_line = indexed_lines_iter.next();
-                    } else {
-                        changed = true;
-                        delete_indices.push(i);
-                    }
+        lines.sort_by_key(|a| a.index);
+        let todolist = self.current_list_mut();
+        let size = todolist.len(&restriction);
+        let indices: Vec<usize> = lines.iter().filter_map(|x| x.index).collect();
+        let delete_indices: Vec<usize> = (0..size).filter(|i| indices.binary_search(i).is_err()).collect();
+        let mut changed = !delete_indices.is_empty();
+
+        for mut line in lines {
+            if let Some(index) = line.index {
+                let index = todolist.true_position_in_list(index, &restriction);
+                let todo = &todolist.todos[index];
+                if todo.priority() != line.priority || todo.message != line.message {
+                    let todo = &mut todolist.todos[index];
+                    changed = true;
+                    todo.set_message(std::mem::take(&mut line.message));
+                    todo.set_priority(line.priority);
                 }
             } else {
-                changed = true;
-                delete_indices.push(i);
+                todolist.push(Todo::new(line.message, line.priority));
             }
         }
-        let list_mut = self.current_list_mut();
-        list_mut.filter_indices(delete_indices);
-        for line in indexed_lines {
-            if line.index.is_none() {
-                list_mut
-                    .push(Todo::new(line.message, line.priority));
-                changed = true;
-            }
-        }
-        list_mut.changed = list_mut.changed || changed;
+        todolist.filter_indices(delete_indices);
+        todolist.changed = todolist.changed || changed;
         self.changed = changed;
-    }
-
-    #[inline(always)]
-    fn batch_edit_helper(todo: &mut Todo, line: &IndexedLine) -> bool {
-        if todo.message == line.message && todo.priority() == line.priority {
-            return false;
-        }
-        todo.set_message(line.message.clone());
-        todo.set_priority(line.priority);
-        true
     }
 
     pub fn print_searched(&mut self) {

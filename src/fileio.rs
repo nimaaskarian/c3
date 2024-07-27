@@ -16,10 +16,7 @@ pub fn open_temp_editor(content: Option<&str>, path: PathBuf) -> io::Result<Stri
     let editor = if cfg!(windows) {
         String::from("notepad")
     } else {
-        match env::var("EDITOR") {
-            Ok(editor) => editor,
-            Err(_) => String::from("vim"),
-        }
+        env::var("EDITOR").unwrap_or(String::from("vim"))
     };
     Command::new(editor)
         .arg(&path)
