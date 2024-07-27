@@ -106,21 +106,10 @@ impl TodoList {
         todolist
     }
 
-    pub fn read_recursive_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
+    pub fn read_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
             if let Some(dependency) = todo.dependency.as_mut() {
                 dependency.read(folder_name)?;
-            }
-        }
-        Ok(())
-    }
-
-    pub fn read_dependencies(&mut self, filename: &Path) -> io::Result<()> {
-        let dependency_path = Self::append_notes_to_parent(filename);
-
-        for todo in &mut self.todos {
-            if let Some(dependency) = todo.dependency.as_mut() {
-                dependency.read(&dependency_path)?;
             }
         }
         Ok(())

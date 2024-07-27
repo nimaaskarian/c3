@@ -87,7 +87,7 @@ impl Dependency {
                         self.mode = DependencyMode::TodoList;
                     }
                     self.todo_list = TodoList::read(&path.join(&self.name));
-                    self.todo_list.read_recursive_dependencies(path);
+                    self.todo_list.read_dependencies(path);
             }
             _ => {}
         };

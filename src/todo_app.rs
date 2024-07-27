@@ -23,6 +23,7 @@ struct SearchPosition {
 
 pub type RestrictionFunction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
+    notes_dir: PathBuf,
     selected: Vec<usize>,
     clipboard: Clipboard,
     pub(super) todo_list: TodoList,
@@ -81,11 +82,13 @@ fn first_word_parse<T: FromStr>(input: &str) -> (Option<T>, String) {
 impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
+        let notes_dir = TodoList::append_notes_to_parent(&args.todo_path);
         let mut todo_list = TodoList::read(&args.todo_path);
         if !args.no_tree {
-            todo_list.read_dependencies(&args.todo_path);
+            todo_list.read_dependencies(&notes_dir);
         }
         let mut app = App {
+            notes_dir,
             x_index: 0,
             y_index: 0,
             last_query: String::new(),
@@ -110,12 +113,18 @@ impl App {
         }
     }
 
+    #[inline(always)]
+    fn read_a_todo_list(&self, path: &Path) -> TodoList {
+        let mut todo_list = TodoList::read(path);
+        if !self.args.no_tree {
+            todo_list.read_dependencies(&self.notes_dir);
+        }
+        todo_list
+    }
+
     #[inline]
     pub fn append_list_from_path(&mut self, path: &Path) {
-        let todo_list = TodoList::read(path);
-        if !self.args.no_tree {
-            self.todo_list.read_dependencies(path);
-        }
+        let todo_list = self.read_a_todo_list(path);
         self.append_list(todo_list)
     }
 
@@ -126,10 +135,8 @@ impl App {
 
     #[inline]
     pub fn open_path(&mut self, path: PathBuf) {
-        self.todo_list = TodoList::read(&path);
-        if !self.args.no_tree {
-            self.todo_list.read_dependencies(&path);
-        }
+        self.todo_list = self.read_a_todo_list(&path);
+        self.tree_path = vec![];
         self.args.todo_path = path;
     }
 
@@ -412,8 +419,7 @@ impl App {
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = TodoList::read(&self.args.todo_path);
-        self.todo_list.read_dependencies(&self.args.todo_path);
+        self.todo_list = self.read_a_todo_list(&self.args.todo_path);
         let len = self.max_tree_length();
         self.tree_path.truncate(len);
     }
@@ -792,9 +798,10 @@ impl App {
     #[inline]
     pub fn paste_todo(&mut self) {
         if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
-            let todo_parent = TodoList::dependency_parent(&self.args.todo_path);
             if let Some(dependency) = todo.dependency.as_mut() {
-                let _ = dependency.read(&todo_parent);
+                if dependency.is_written() {
+                    let _ = dependency.read(&self.notes_dir);
+                }
             }
             let list = &mut self.current_list_mut();
             self.index = list.push(todo);
