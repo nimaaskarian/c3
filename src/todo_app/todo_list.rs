@@ -115,14 +115,6 @@ impl TodoList {
         Ok(())
     }
 
-    pub fn append_notes_to_parent(filename: &Path) -> PathBuf {
-        filename.parent().unwrap().join("notes")
-    }
-
-    pub fn dependency_parent(filename: &Path) -> PathBuf {
-        filename.parent().unwrap().to_path_buf()
-    }
-
     pub fn with_capacity(capacity: usize) -> Self {
         TodoList {
             todos: Vec::with_capacity(capacity),
@@ -367,7 +359,7 @@ mod tests {
     fn test_write() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-write/tmplist");
-        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let dependency_path = App::append_notes_to_path_parent(&path);
         let _ = create_dir_all(&dependency_path);
         todo_list.changed = true;
 
@@ -389,8 +381,7 @@ mod tests {
     fn test_push() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-push/tmplist");
-        let dependency_path = TodoList::dependency_parent(&path);
-        let _ = create_dir_all(&dependency_path);
+        let _ = create_dir_all(&path.parent().unwrap());
         todo_list.push(Todo::new("Show me your warface".to_string(), 0));
         todo_list.reorder_last();
         let _ = todo_list.write(&path);
@@ -424,7 +415,7 @@ mod tests {
         let _ = todo_list.todos[0].add_todo_dependency();
 
         let path = PathBuf::from("test-write-dependency/tmplist");
-        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let dependency_path = App::append_notes_to_path_parent(&path);
         let _ = create_dir_all(&dependency_path);
 
         todo_list.todos[0]
@@ -433,7 +424,7 @@ mod tests {
             .unwrap()
             .push(Todo::from_str("[0] Some dependency").unwrap());
         todo_list.write(&path)?;
-        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let dependency_path = App::append_notes_to_path_parent(&path);
         todo_list.write_dependencies(&dependency_path)?;
 
         let todo_dependency_path = PathBuf::from(format!(

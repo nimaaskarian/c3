@@ -143,7 +143,7 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_prenote(&self, last_stack: &[bool], last_item: Option<bool>) {
-        self.print_preindention(&last_stack, last_item);
+        self.print_preindention(last_stack, last_item);
         print!("   ")
     }
 

@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::{
     fs::File,
     io::{self, Write},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -148,13 +148,6 @@ impl Dependency {
         };
         self.written = true;
         Ok(())
-    }
-
-
-    #[inline]
-    pub fn path(&self, path: &Path) -> Option<PathBuf> {
-        path.parent()
-            .map(TodoList::append_notes_to_parent)
     }
 
     #[inline]

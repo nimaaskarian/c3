@@ -82,7 +82,7 @@ fn first_word_parse<T: FromStr>(input: &str) -> (Option<T>, String) {
 impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
-        let notes_dir = TodoList::append_notes_to_parent(&args.todo_path);
+        let notes_dir = Self::append_notes_to_path_parent(&args.todo_path);
         let mut todo_list = TodoList::read(&args.todo_path);
         if !args.no_tree {
             todo_list.read_dependencies(&notes_dir);
@@ -143,7 +143,7 @@ impl App {
     #[inline]
     pub fn output_list_to_path(&mut self, path: &Path) -> io::Result<()> {
         let list = self.current_list_mut();
-        let dependency_path = TodoList::append_notes_to_parent(path);
+        let dependency_path = Self::append_notes_to_path_parent(path);
         create_dir_all(&dependency_path)?;
         list.force_write(path)?;
 
@@ -602,7 +602,7 @@ impl App {
 
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
-        let note_dir = TodoList::append_notes_to_parent(&self.args.todo_path);
+        let note_dir = Self::append_notes_to_path_parent(&self.args.todo_path);
 
         create_dir_all(&note_dir)?;
         let todo_path = self.args.todo_path.clone();
@@ -806,6 +806,10 @@ impl App {
             let list = &mut self.current_list_mut();
             self.index = list.push(todo);
         }
+    }
+
+    pub fn append_notes_to_path_parent(filename: &Path) -> PathBuf {
+        filename.parent().unwrap().join("notes")
     }
 
     #[inline]
