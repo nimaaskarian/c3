@@ -51,8 +51,8 @@ struct LineMalformed;
 impl FromStr for IndexedLine {
     type Err = LineMalformed;
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let (mut index, message) = nth_word_parse(input, 0);
-        let (mut priority, message) = nth_word_parse(message.as_str(), 0);
+        let (mut index, message) = first_word_parse(input);
+        let (mut priority, message) = first_word_parse(message.as_str());
         if priority.is_none() {
             priority = index.map(|val| val as u8);
             index = None;
@@ -66,15 +66,12 @@ impl FromStr for IndexedLine {
     }
 }
 
-fn nth_word_parse<T: FromStr>(input: &str, n: usize) -> (Option<T>, String) {
-    let word = input.split_whitespace().nth(n).unwrap_or_default();
-    match word.parse::<T>() {
+fn first_word_parse<T: FromStr>(input: &str) -> (Option<T>, String) {
+    let input = input.trim_start();
+    let position = input.chars().position(|x|x.is_whitespace()).unwrap_or(input.len());
+    match input[..position].parse::<T>() {
         Ok(num) => {
-            let rest: String = input
-                .split_whitespace()
-                .skip(n + 1)
-                .collect::<Vec<&str>>()
-                .join(" ");
+            let rest = input[position..].trim_start().to_string();
             (Some(num), rest)
         }
         Err(_) => (None, input.to_string()),
@@ -229,8 +226,14 @@ impl App {
 
     pub fn batch_editor_messages(&mut self) {
         let restriction = &self.restriction;
-        let mut content = String::from("# index priority message\n");
-        for (i, line) in self.current_list().todos(restriction).iter().enumerate() {
+        
+        let todos = self.current_list().todos(restriction);
+        let mut content = if todos.is_empty() {
+            String::new()
+        } else {
+            String::from("# INDEX PRIORITY MESSAGE\n")
+        };
+        for (i, line) in todos.iter().enumerate() {
             writeln!(content, "{i: <7} {: <8} {}", line.priority(), line.message);
         }
         let new_messages = open_temp_editor(Some(&content), temp_path("messages")).unwrap();
