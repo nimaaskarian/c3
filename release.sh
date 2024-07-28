@@ -25,7 +25,8 @@ zip_source() {
 release_package() {
   cp target/release/c3 c3.x86.linux || echo_exit copy linux binary failed
   cp target/x86_64-pc-windows-gnu/release/c3.exe c3.x86_64.windows.exe || echo_exit copy windows binary failed
-  FILES="c3.x86.linux c3.x86_64.windows.exe $SOURCE"
+  cp target/aarch64-linux-android/release/c3 c3.termux || echo_exit copy termux binary failed
+  FILES="c3.x86.linux c3.x86_64.windows.exe c3.termux $SOURCE"
   gh release create "$TAG" $FILES --title "$TAG" --notes "**Full Changelog**: https://github.com/$USERNAME/$PACKAGE_NAME/compare/$LAST_TAG...$TAG" --repo $USERNAME/$PACKAGE_NAME
   rm $FILES
 }

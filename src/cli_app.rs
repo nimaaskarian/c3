@@ -21,6 +21,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
         return Ok(())
     }
     if args.stdout {
+        app.write_to_stdout();
         return Ok(())
     }
     if args.minimal_tree || args.list {
