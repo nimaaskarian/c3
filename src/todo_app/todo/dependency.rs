@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::{
     fs::File,
     io::{self, Write},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -47,6 +47,7 @@ impl Dependency {
     pub fn push(&mut self, todo: Todo) {
         if self.is_list() {
             self.todo_list.push(todo);
+            self.todo_list.reorder_last();
         }
     }
 
@@ -87,7 +88,7 @@ impl Dependency {
                         self.mode = DependencyMode::TodoList;
                     }
                     self.todo_list = TodoList::read(&path.join(&self.name));
-                    self.todo_list.read_recursive_dependencies(path);
+                    self.todo_list.read_dependencies(path);
             }
             _ => {}
         };
@@ -148,13 +149,6 @@ impl Dependency {
         };
         self.written = true;
         Ok(())
-    }
-
-
-    #[inline]
-    pub fn path(&self, path: &Path) -> Option<PathBuf> {
-        path.parent()
-            .map(TodoList::append_notes_to_parent)
     }
 
     #[inline]

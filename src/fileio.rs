@@ -8,6 +8,11 @@ use std::env;
 use std::process::Command;
 
 #[inline(always)]
+pub fn append_notes_to_path_parent(filename: &Path) -> PathBuf {
+    filename.parent().unwrap().join("notes")
+}
+
+#[inline(always)]
 pub fn open_temp_editor(content: Option<&str>, path: PathBuf) -> io::Result<String> {
     let mut file = File::create(&path)?;
     if let Some(content) = content {
@@ -16,10 +21,7 @@ pub fn open_temp_editor(content: Option<&str>, path: PathBuf) -> io::Result<Stri
     let editor = if cfg!(windows) {
         String::from("notepad")
     } else {
-        match env::var("EDITOR") {
-            Ok(editor) => editor,
-            Err(_) => String::from("vim"),
-        }
+        env::var("EDITOR").unwrap_or(String::from("vim"))
     };
     Command::new(editor)
         .arg(&path)

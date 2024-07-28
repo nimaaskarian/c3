@@ -1,7 +1,7 @@
 use std::fs::{read, File};
 use std::io;
 use std::io::{stdout, BufRead, BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::{App, RestrictionFunction, Todo};
 use crate::DisplayArgs;
@@ -13,6 +13,12 @@ pub struct TodoList {
 }
 
 type Output = Todo;
+
+fn with_index<T, F>(mut f: F) -> impl FnMut(&T) -> bool
+where F: FnMut(usize, &T) -> bool {
+    let mut i = 0;
+    move |item| (f(i, item), i+=1).0
+}
 
 impl TodoList {
     pub fn new() -> Self {
@@ -41,6 +47,10 @@ impl TodoList {
         self.todos.iter().filter(|todo| restriction(todo)).collect()
     }
 
+    pub fn todos_mut(&mut self, restriction: &RestrictionFunction) -> Vec<&mut Todo> {
+        self.todos.iter_mut().filter(|todo| restriction(todo)).collect()
+    }
+
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
@@ -59,7 +69,7 @@ impl TodoList {
     }
 
     #[inline]
-    pub fn print(&self) -> io::Result<()> {
+    pub fn write_to_stdout(&self) -> io::Result<()> {
         let mut stdout_writer = BufWriter::new(stdout());
         self.write_to_buf(&mut stdout_writer)?;
         Ok(())
@@ -106,32 +116,13 @@ impl TodoList {
         todolist
     }
 
-    pub fn read_recursive_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
+    pub fn read_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
             if let Some(dependency) = todo.dependency.as_mut() {
                 dependency.read(folder_name)?;
             }
         }
         Ok(())
-    }
-
-    pub fn read_dependencies(&mut self, filename: &Path) -> io::Result<()> {
-        let dependency_path = Self::append_notes_to_parent(filename);
-
-        for todo in &mut self.todos {
-            if let Some(dependency) = todo.dependency.as_mut() {
-                dependency.read(&dependency_path)?;
-            }
-        }
-        Ok(())
-    }
-
-    pub fn append_notes_to_parent(filename: &Path) -> PathBuf {
-        filename.parent().unwrap().join("notes")
-    }
-
-    pub fn dependency_parent(filename: &Path) -> PathBuf {
-        filename.parent().unwrap().to_path_buf()
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
@@ -190,12 +181,8 @@ impl TodoList {
     }
 
     #[inline(always)]
-    pub(super) fn filter_indices(&mut self, indices: Vec<usize>) {
-        self.todos = self.todos
-                .iter()
-                .enumerate()
-                .filter_map(|(i, todo)| if indices.binary_search(&i).is_ok() {None} else {Some(todo.clone())})
-                .collect()
+    pub(super) fn filter_indices(&mut self, sorted_indices: Vec<usize>) {
+        self.todos.retain(with_index(|i, _| sorted_indices.binary_search(&i).is_err() ))
     }
 
     pub fn iter(&self) -> std::slice::Iter<Todo> {
@@ -243,10 +230,9 @@ impl TodoList {
         self.todos.remove(index_in_vec)
     }
 
-    pub fn push(&mut self, item: Todo) -> usize {
+    pub fn push(&mut self, item: Todo) {
         self.changed = true;
         self.todos.push(item);
-        self.reorder_last()
     }
 
     fn insert(&mut self, index: usize, item: Todo) {
@@ -316,6 +302,8 @@ impl TodoList {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+    use crate::fileio;
     use std::fs::{self, create_dir_all, remove_dir_all, remove_file};
     use std::str::FromStr;
 
@@ -378,7 +366,7 @@ mod tests {
     fn test_write() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-write/tmplist");
-        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let dependency_path = fileio::append_notes_to_path_parent(&path);
         let _ = create_dir_all(&dependency_path);
         todo_list.changed = true;
 
@@ -400,8 +388,7 @@ mod tests {
     fn test_push() {
         let mut todo_list = get_todo_list();
         let path = PathBuf::from("todo-list-test-push/tmplist");
-        let dependency_path = TodoList::dependency_parent(&path);
-        let _ = create_dir_all(&dependency_path);
+        let _ = create_dir_all(&path.parent().unwrap());
         todo_list.push(Todo::new("Show me your warface".to_string(), 0));
         todo_list.reorder_last();
         let _ = todo_list.write(&path);
@@ -435,7 +422,7 @@ mod tests {
         let _ = todo_list.todos[0].add_todo_dependency();
 
         let path = PathBuf::from("test-write-dependency/tmplist");
-        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let dependency_path = fileio::append_notes_to_path_parent(&path);
         let _ = create_dir_all(&dependency_path);
 
         todo_list.todos[0]
@@ -444,7 +431,7 @@ mod tests {
             .unwrap()
             .push(Todo::from_str("[0] Some dependency").unwrap());
         todo_list.write(&path)?;
-        let dependency_path = TodoList::append_notes_to_parent(&path);
+        let dependency_path = fileio::append_notes_to_path_parent(&path);
         todo_list.write_dependencies(&dependency_path)?;
 
         let todo_dependency_path = PathBuf::from(format!(

@@ -2,7 +2,7 @@ use std::path::Path;
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
 use std::str::{self, FromStr};
-use std::{fs::remove_file, io, path::PathBuf};
+use std::{fs::remove_file, io};
 //}}}
 // mod{{{
 mod dependency;
@@ -256,11 +256,6 @@ impl Todo {
             self.set_note(note)?;
         }
         Ok(())
-    }
-
-    #[inline]
-    pub fn dependency_path(&self, path: &Path) -> Option<PathBuf> {
-        self.dependency.as_ref()?.path(path)
     }
 
     #[inline]
