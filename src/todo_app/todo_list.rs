@@ -14,6 +14,12 @@ pub struct TodoList {
 
 type Output = Todo;
 
+fn with_index<T, F>(mut f: F) -> impl FnMut(&T) -> bool
+where F: FnMut(usize, &T) -> bool {
+    let mut i = 0;
+    move |item| (f(i, item), i+=1).0
+}
+
 impl TodoList {
     pub fn new() -> Self {
         TodoList { ..Default::default() }
@@ -172,11 +178,7 @@ impl TodoList {
 
     #[inline(always)]
     pub(super) fn filter_indices(&mut self, indices: Vec<usize>) {
-        self.todos = self.todos
-                .iter()
-                .enumerate()
-                .filter_map(|(i, todo)| if indices.binary_search(&i).is_ok() {None} else {Some(todo.clone())})
-                .collect()
+        self.todos.retain(with_index(|i, _| indices.binary_search(&i).is_err() ))
     }
 
     pub fn iter(&self) -> std::slice::Iter<Todo> {
