@@ -23,7 +23,6 @@ struct SearchPosition {
 pub type RestrictionFunction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
-    selected: Vec<usize>,
     clipboard: Clipboard,
     pub(super) todo_list: TodoList,
     index: usize,
@@ -93,7 +92,6 @@ impl App {
             last_query: String::new(),
             tree_search_positions: vec![],
             removed_todos: vec![],
-            selected: vec![],
             todo_list,
             clipboard: Clipboard::new(),
             index: 0,
@@ -257,20 +255,6 @@ impl App {
             todolist.sort();
         }
         self.changed = changed;
-    }
-
-    pub fn print_searched(&mut self) {
-        for position in self.tree_search_positions.iter() {
-            self.tree_path.clone_from(&position.tree_path);
-            let list = self.current_list();
-            for &index in &position.matching_indices {
-                println!(
-                    "{}",
-                    list.index(index, &self.restriction)
-                        .display(&self.args.display_args)
-                );
-            }
-        }
     }
 
     #[inline]
@@ -804,18 +788,6 @@ impl App {
     #[inline]
     pub fn write_to_stdout(&self) -> io::Result<()> {
         self.todo_list.write_to_stdout()
-    }
-
-    #[inline]
-    pub fn print_selected(&self) {
-        for index in self.selected.clone() {
-            println!(
-                "{}",
-                self.todo_list
-                    .index(index, &self.restriction)
-                    .display(&self.args.display_args)
-            );
-        }
     }
 }
 

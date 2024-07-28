@@ -1,5 +1,5 @@
 // vim:fileencoding=utf-8:foldmethod=marker
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use clap_complete::Shell;
 use std::io;
 pub(crate) mod cli_app;
@@ -37,6 +37,12 @@ pub struct Args {
     cli_args: CliArgs,
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+pub enum DoOnSelected {
+    Delete,
+    Done,
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct CliArgs {
@@ -44,21 +50,11 @@ struct CliArgs {
     #[arg(short = 'S', long)]
     search_and_select: Vec<String>,
 
-    /// Set selected todo priority
     #[arg(long)]
-    set_selected_priority: Option<u8>,
+    do_on_selected: Option<DoOnSelected>,
 
-    /// Set selected todo message
-    #[arg(long)]
-    set_selected_message: Option<String>,
-
-    /// Delete selected todos
-    #[arg(long)]
-    delete_selected: bool,
-
-    /// Done selected todos
-    #[arg(long)]
-    done_selected: bool,
+    #[arg(short='b',long, default_value_t=false)]
+    batch_edit: bool,
 
     /// A todo message to append
     #[arg(short = 'a', long)]

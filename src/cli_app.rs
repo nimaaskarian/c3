@@ -1,13 +1,44 @@
 use clap::{Command, CommandFactory};
 use super::todo_app::{App, RestrictionFunction, Todo, TodoList};
-use crate::{CliArgs, DisplayArgs};
+use crate::{CliArgs, DisplayArgs, DoOnSelected};
 use crate::Args;
 use clap_complete::{generate, Generator};
 use std::io;
+use std::process;
 
 pub struct NotCli;
 #[inline]
 pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
+    if !args.search_and_select.is_empty() {
+        for query in args.search_and_select {
+            app.set_query_restriction(query, None)
+        }
+        if app.is_todos_empty() {
+            process::exit(1);
+        }
+        let restriction = app.restriction().clone();
+        if let Some(do_on_selected) = args.do_on_selected {
+            match do_on_selected {
+                DoOnSelected::Delete => {
+                    app.current_list_mut().todos.retain(|todo| !restriction(todo))
+                }
+                DoOnSelected::Done => {
+                    for todo in app.current_list_mut().todos_mut(&restriction) {
+                        todo.set_done(true);
+                    }
+                }
+            }
+        } else {
+            print_todos(app);
+            return Ok(())
+        }
+    }
+    if args.batch_edit {
+        app.batch_editor_messages();
+    }
+    if app.is_changed() {
+        app.write();
+    }
     if args.print_path {
         println!("{}", app.args.todo_path.to_str().unwrap_or(""));
         let notes = app.args.todo_path.parent().unwrap().join("notes");
@@ -20,6 +51,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
         print_completions(generator, &mut Args::command());
         return Ok(())
     }
+
     if args.stdout {
         app.write_to_stdout();
         return Ok(())
@@ -40,7 +72,6 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
     if let Some(path) = args.output_file.as_ref() {
         app.output_list_to_path(path);
         return Ok(())
-
     }
     Err(NotCli)
 }

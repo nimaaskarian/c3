@@ -47,6 +47,10 @@ impl TodoList {
         self.todos.iter().filter(|todo| restriction(todo)).collect()
     }
 
+    pub fn todos_mut(&mut self, restriction: &RestrictionFunction) -> Vec<&mut Todo> {
+        self.todos.iter_mut().filter(|todo| restriction(todo)).collect()
+    }
+
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
