@@ -264,14 +264,14 @@ impl App {
         let delete_indices: Vec<usize> = (0..size).filter(|i| indices.binary_search(i).is_err()).collect();
         let mut changed = !delete_indices.is_empty();
 
-        for mut line in lines {
+        for line in lines {
             if let Some(index) = line.index {
                 let index = todolist.true_position_in_list(index, &restriction);
                 let todo = &todolist.todos[index];
                 if todo.priority() != line.priority || todo.message != line.message {
                     let todo = &mut todolist.todos[index];
                     changed = true;
-                    todo.set_message(std::mem::take(&mut line.message));
+                    todo.set_message(line.message);
                     todo.set_priority(line.priority);
                 }
             } else {
@@ -280,6 +280,9 @@ impl App {
         }
         todolist.filter_indices(delete_indices);
         todolist.changed = todolist.changed || changed;
+        if todolist.changed {
+            todolist.sort();
+        }
         self.changed = changed;
     }
 
@@ -334,7 +337,9 @@ impl App {
 
     #[inline]
     pub fn append(&mut self, message: String) {
-        self.index = self.current_list_mut().push(Todo::new(message, 0));
+        let todo_list = self.current_list_mut();
+        todo_list.push(Todo::new(message, 0));
+        self.index = todo_list.reorder_last();
     }
 
     pub fn index(&self) -> usize {
@@ -804,7 +809,8 @@ impl App {
                 }
             }
             let list = &mut self.current_list_mut();
-            self.index = list.push(todo);
+            list.push(todo);
+            self.index = list.reorder_last();
         }
     }
 

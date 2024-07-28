@@ -47,6 +47,7 @@ impl Dependency {
     pub fn push(&mut self, todo: Todo) {
         if self.is_list() {
             self.todo_list.push(todo);
+            self.todo_list.reorder_last();
         }
     }
 

@@ -226,10 +226,9 @@ impl TodoList {
         self.todos.remove(index_in_vec)
     }
 
-    pub fn push(&mut self, item: Todo) -> usize {
+    pub fn push(&mut self, item: Todo) {
         self.changed = true;
         self.todos.push(item);
-        self.reorder_last()
     }
 
     fn insert(&mut self, index: usize, item: Todo) {
