@@ -164,10 +164,6 @@ impl App {
         }))
     }
 
-    fn traverse_parents_from_root(&mut self, callback: fn(&mut App, &TodoList, &[usize])) {
-        self.todo_list.clone().traverse_tree(callback, None, self)
-    }
-
     fn add_to_tree_positions(&mut self, list: &TodoList, prior_indices: &[usize]) {
         let mut matching_indices: Vec<usize> = vec![];
         for (i, todo) in list.todos(&self.restriction).iter().enumerate() {
@@ -198,7 +194,8 @@ impl App {
             matching_indices: vec![self.index],
         };
         self.tree_search_positions.push(before_position);
-        self.traverse_parents_from_root(Self::add_to_tree_positions);
+        self.todo_list.clone().traverse_tree(Self::add_to_tree_positions, vec![], self);
+
         self.search_next();
     }
 

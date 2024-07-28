@@ -78,16 +78,15 @@ impl TodoList {
     pub fn traverse_tree(
         &self,
         callback: fn(&mut App, &TodoList, &[usize]),
-        prior_indices: Option<Vec<usize>>,
+        prior_indices: Vec<usize>,
         app: &mut App,
     ) {
-        let prior_indices = prior_indices.unwrap_or_default();
-        callback(app, self, prior_indices.as_slice());
+        callback(app, self, &prior_indices);
         for (i, todo) in self.todos.iter().enumerate() {
             if let Some(todo_list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
                 let mut prior_indices = prior_indices.clone();
                 prior_indices.push(i);
-                todo_list.traverse_tree(callback, Some(prior_indices), app);
+                todo_list.traverse_tree(callback, prior_indices, app);
             }
         }
     }
