@@ -7,8 +7,7 @@ mod clipboard;
 use clipboard::Clipboard;
 mod todo;
 mod todo_list;
-use crate::fileio;
-use crate::Args;
+use crate::{fileio, AppArgs};
 use std::rc::Rc;
 pub use todo::Todo;
 
@@ -30,7 +29,7 @@ pub struct App {
     index: usize,
     changed: bool,
     tree_path: Vec<usize>,
-    pub(super) args: Args,
+    pub(super) args: AppArgs,
     removed_todos: Vec<Todo>,
     tree_search_positions: Vec<SearchPosition>,
     last_query: String,
@@ -81,7 +80,7 @@ fn first_word_parse<T: FromStr>(input: &str) -> (Option<T>, String) {
 
 impl App {
     #[inline]
-    pub fn new(args: Args) -> Self {
+    pub(crate) fn new(args: AppArgs) -> Self {
         let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
         let mut todo_list = TodoList::read(&args.todo_path);
         if !args.no_tree {
@@ -165,32 +164,6 @@ impl App {
         self.set_restriction(Rc::new(move |todo| {
             todo.matches(query.as_str()) && last_restriction(todo)
         }))
-    }
-
-    pub fn do_commands_on_selected(&mut self) {
-        let mut changed = false;
-        for query in self.args.search_and_select.iter() {
-            if self.args.delete_selected {
-                changed = true;
-                self.todo_list.todos.retain(|todo| !todo.matches(query));
-                continue;
-            }
-            for todo in self.todo_list.iter_mut().filter(|todo| todo.matches(query)) {
-                changed = true;
-                if let Some(priority) = self.args.set_selected_priority {
-                    todo.set_priority(priority as PriorityType);
-                }
-                if let Some(message) = &mut self.args.set_selected_message {
-                    let message = std::mem::take(message);
-                    todo.set_message(message);
-                }
-                if self.args.done_selected {
-                    todo.set_done(true);
-                }
-            }
-        }
-        self.todo_list.changed = changed;
-        self.args.search_and_select = vec![];
     }
 
     fn traverse_parents_from_root(&mut self, callback: fn(&mut App, &TodoList, &[usize])) {
@@ -853,7 +826,6 @@ mod tests {
         path::Path,
     };
 
-    use crate::Args;
     use clap::Parser;
 
     use super::*;
@@ -865,7 +837,7 @@ mod tests {
     }
 
     fn write_test_todos(dir: &Path) -> io::Result<App> {
-        let mut args = Args::parse();
+        let mut args = AppArgs::parse();
         fs::create_dir_all(dir.join("notes"))?;
         args.todo_path = dir.join("todo");
         let mut app = App::new(args);

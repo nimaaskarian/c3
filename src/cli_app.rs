@@ -1,30 +1,47 @@
 use clap::{Command, CommandFactory};
 use super::todo_app::{App, RestrictionFunction, Todo, TodoList};
-use crate::{CliMode, DisplayArgs};
+use crate::{CliArgs, DisplayArgs};
 use crate::Args;
 use clap_complete::{generate, Generator};
 use std::io;
 
+pub struct NotCli;
 #[inline]
-pub fn run(app: &mut App, mode: CliMode) -> io::Result<()> {
-    match mode {
-        CliMode::Stdout => {
-            app.write_to_stdout()?;
+pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
+    if args.print_path {
+        println!("{}", app.args.todo_path.to_str().unwrap_or(""));
+        let notes = app.args.todo_path.parent().unwrap().join("notes");
+        if notes.is_dir() {
+            println!("{}", notes.to_str().unwrap_or(""));
         }
-        CliMode::Completion(generator) => {
-            print_completions(generator, &mut Args::command());
-        }
-        CliMode::PrintTree(is_minimal) => {
-            let mut print_todo = PrintTodoTree::new(is_minimal);
+        return Ok(())
+    }
+    if let Some(generator) = args.completion {
+        print_completions(generator, &mut Args::command());
+        return Ok(())
+    }
+    if args.stdout {
+        return Ok(())
+    }
+    if args.minimal_tree || args.list {
+        if app.args.no_tree {
+            print_todos(app);
+        } else {
+            let mut print_todo = PrintTodoTree::new(args.minimal_tree);
             print_todo.print_list(
                 &app.todo_list,
                 &app.args.display_args,
                 app.restriction(),
             )
         }
-        CliMode::Print => print_todos(app),
+        return Ok(())
     }
-    Ok(())
+    if let Some(path) = args.output_file.as_ref() {
+        app.output_list_to_path(path);
+        return Ok(())
+
+    }
+    Err(NotCli)
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {

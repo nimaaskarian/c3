@@ -13,60 +13,36 @@ use todo_app::App;
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
-    let mode = args.mode();
-    let mut app = App::new(args);
+    let mut app = App::new(args.app_args);
 
-    match mode {
-        AppMode::PrintFiles => {
-            println!("{}", app.args.todo_path.to_str().unwrap_or(""));
-            let notes = app.args.todo_path.parent().unwrap().join("notes");
-            if notes.is_dir() {
-                println!("{}", notes.to_str().unwrap_or(""));
-            }
-            Ok(())
+    if cli_app::run(&mut app, args.cli_args).is_err() {
+        let output = tui_app::run(&mut app);
+        {
+            tui_app::shutdown()?;
+            output
         }
-        AppMode::Cli(cli_mode) => cli_app::run(&mut app, cli_mode),
-        AppMode::Tui => match tui_app::run(&mut app) {
-            Ok(_) => Ok(()),
-            err => {
-                tui_app::shutdown()?;
-                err
-            }
-        },
+    } else {
+        Ok(())
     }
-}
-
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-pub struct DisplayArgs {
-    /// Show done todos too
-    #[arg(short = 'd', long, default_value_t = false)]
-    show_done: bool,
-
-    /// String before done todos
-    #[arg(long, default_value_t=String::from("[x] "))]
-    done_string: String,
-
-    /// String before undone todos
-    #[arg(long, default_value_t=String::from("[ ] "))]
-    undone_string: String,
 }
 
 /// A tree-like todo application that makes you smile
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Performance mode, don't read dependencies
-    #[arg(short = 'n', long)]
-    no_tree: bool,
+    #[command(flatten)]
+    app_args: AppArgs,
 
+    #[command(flatten)]
+    cli_args: CliArgs,
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct CliArgs {
     /// Search and select todo. Used for batch change operations
     #[arg(short = 'S', long)]
     search_and_select: Vec<String>,
-
-    /// String behind highlighted todo in TUI mode
-    #[arg(short='H', long, default_value_t=String::from(">>"))]
-    highlight_string: String,
 
     /// Set selected todo priority
     #[arg(long)]
@@ -83,9 +59,6 @@ pub struct Args {
     /// Done selected todos
     #[arg(long)]
     done_selected: bool,
-
-    #[command(flatten)]
-    display_args: DisplayArgs,
 
     /// A todo message to append
     #[arg(short = 'a', long)]
@@ -114,56 +87,50 @@ pub struct Args {
     #[arg(short = 'l', long)]
     list: bool,
 
-    /// Enable TUI module at startup
-    #[arg(short = 'm', long)]
-    enable_module: bool,
-
     /// Write contents of todo file in the stdout (non interactive)
     #[arg(short = 's', long)]
     stdout: bool,
-
-    /// Path to todo file (and notes sibling directory)
-    #[arg(default_value=get_todo_path().unwrap().into_os_string())]
-    todo_path: PathBuf,
 
     /// Generate completion for a certain shell
     #[arg(short = 'c', long)]
     completion: Option<Shell>,
 }
 
-pub enum AppMode {
-    Cli(CliMode),
-    Tui,
-    PrintFiles,
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct AppArgs {
+    /// Performance mode, don't read dependencies
+    #[arg(short = 'n', long)]
+    no_tree: bool,
+
+    /// String behind highlighted todo in TUI mode
+    #[arg(short='H', long, default_value_t=String::from(">>"))]
+    highlight_string: String,
+
+    #[command(flatten)]
+    display_args: DisplayArgs,
+
+    /// Enable TUI module at startup
+    #[arg(short = 'm', long)]
+    enable_module: bool,
+
+    /// Path to todo file (and notes sibling directory)
+    #[arg(default_value=get_todo_path().unwrap().into_os_string())]
+    todo_path: PathBuf,
 }
 
-pub enum CliMode {
-    Stdout,
-    Completion(Shell),
-    PrintTree(bool),
-    Print,
-}
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct DisplayArgs {
+    /// Show done todos too
+    #[arg(short = 'd', long, default_value_t = false)]
+    show_done: bool,
 
-impl Args {
-    pub fn mode(&self) -> AppMode {
-        if self.print_path {
-            return AppMode::PrintFiles;
-        }
-        if let Some(generator) = self.completion {
-            return AppMode::Cli(CliMode::Completion(generator))
-        }
+    /// String before done todos
+    #[arg(long, default_value_t=String::from("[x] "))]
+    done_string: String,
 
-        if self.stdout {
-            return AppMode::Cli(CliMode::Stdout)
-        }
-
-        if self.minimal_tree || self.list {
-            return if self.no_tree {
-                AppMode::Cli(CliMode::Print)
-            } else {
-                AppMode::Cli(CliMode::PrintTree(self.minimal_tree))
-            }
-        }
-        AppMode::Tui
-    }
+    /// String before undone todos
+    #[arg(long, default_value_t=String::from("[ ] "))]
+    undone_string: String,
 }
