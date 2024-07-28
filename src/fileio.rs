@@ -8,6 +8,11 @@ use std::env;
 use std::process::Command;
 
 #[inline(always)]
+pub fn append_notes_to_path_parent(filename: &Path) -> PathBuf {
+    filename.parent().unwrap().join("notes")
+}
+
+#[inline(always)]
 pub fn open_temp_editor(content: Option<&str>, path: PathBuf) -> io::Result<String> {
     let mut file = File::create(&path)?;
     if let Some(content) = content {

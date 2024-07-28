@@ -7,7 +7,7 @@ mod clipboard;
 use clipboard::Clipboard;
 mod todo;
 mod todo_list;
-use crate::fileio::{open_temp_editor, temp_path};
+use crate::fileio;
 use crate::Args;
 use std::rc::Rc;
 pub use todo::Todo;
@@ -82,10 +82,10 @@ fn first_word_parse<T: FromStr>(input: &str) -> (Option<T>, String) {
 impl App {
     #[inline]
     pub fn new(args: Args) -> Self {
-        let notes_dir = Self::append_notes_to_path_parent(&args.todo_path);
+        let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
         let mut todo_list = TodoList::read(&args.todo_path);
         if !args.no_tree {
-            todo_list.read_dependencies(&notes_dir);
+            todo_list.read_dependencies(&notes_dir).expect("Failed to read dependencies");
         }
         let mut app = App {
             notes_dir,
@@ -143,7 +143,7 @@ impl App {
     #[inline]
     pub fn output_list_to_path(&mut self, path: &Path) -> io::Result<()> {
         let list = self.current_list_mut();
-        let dependency_path = Self::append_notes_to_path_parent(path);
+        let dependency_path = fileio::append_notes_to_path_parent(path);
         create_dir_all(&dependency_path)?;
         list.force_write(path)?;
 
@@ -243,7 +243,7 @@ impl App {
         for (i, line) in todos.iter().enumerate() {
             writeln!(content, "{i: <7} {: <8} {}", line.priority(), line.message);
         }
-        let new_messages = open_temp_editor(Some(&content), temp_path("messages")).unwrap();
+        let new_messages = fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
     }
@@ -607,7 +607,7 @@ impl App {
 
     #[inline]
     pub fn write(&mut self) -> io::Result<()> {
-        let note_dir = Self::append_notes_to_path_parent(&self.args.todo_path);
+        let note_dir = fileio::append_notes_to_path_parent(&self.args.todo_path);
 
         create_dir_all(&note_dir)?;
         let todo_path = self.args.todo_path.clone();
@@ -812,10 +812,6 @@ impl App {
             list.push(todo);
             self.index = list.reorder_last();
         }
-    }
-
-    pub fn append_notes_to_path_parent(filename: &Path) -> PathBuf {
-        filename.parent().unwrap().join("notes")
     }
 
     #[inline]
