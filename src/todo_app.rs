@@ -829,8 +829,8 @@ impl App {
     }
 
     #[inline]
-    pub fn print(&self) -> io::Result<()> {
-        self.todo_list.print()
+    pub fn write_to_stdout(&self) -> io::Result<()> {
+        self.todo_list.write_to_stdout()
     }
 
     #[inline]

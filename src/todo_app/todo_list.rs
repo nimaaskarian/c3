@@ -65,7 +65,7 @@ impl TodoList {
     }
 
     #[inline]
-    pub fn print(&self) -> io::Result<()> {
+    pub fn write_to_stdout(&self) -> io::Result<()> {
         let mut stdout_writer = BufWriter::new(stdout());
         self.write_to_buf(&mut stdout_writer)?;
         Ok(())

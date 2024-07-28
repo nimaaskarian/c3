@@ -1,5 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
-use clap::{Command, CommandFactory, Parser};
+use clap::Parser;
+use clap_complete::Shell;
 use std::io;
 pub(crate) mod cli_app;
 pub(crate) mod date;
@@ -7,7 +8,6 @@ pub(crate) mod fileio;
 pub(crate) mod todo_app;
 pub(crate) mod tui_app;
 use crate::fileio::get_todo_path;
-use clap_complete::{generate, Generator, Shell};
 use std::path::PathBuf;
 use todo_app::App;
 
@@ -25,11 +25,7 @@ fn main() -> io::Result<()> {
             }
             Ok(())
         }
-        AppMode::Completion(generator) => {
-            print_completions(generator, &mut Args::command());
-            Ok(())
-        }
-        AppMode::Cli => cli_app::run(&mut app),
+        AppMode::Cli(cli_mode) => cli_app::run(&mut app, cli_mode),
         AppMode::Tui => match tui_app::run(&mut app) {
             Ok(_) => Ok(()),
             err => {
@@ -38,10 +34,6 @@ fn main() -> io::Result<()> {
             }
         },
     }
-}
-
-fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
-    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
 #[derive(Parser, Debug)]
@@ -140,10 +132,16 @@ pub struct Args {
 }
 
 pub enum AppMode {
-    Cli,
+    Cli(CliMode),
     Tui,
-    Completion(Shell),
     PrintFiles,
+}
+
+pub enum CliMode {
+    Stdout,
+    Completion(Shell),
+    PrintTree(bool),
+    Print,
 }
 
 impl Args {
@@ -152,21 +150,20 @@ impl Args {
             return AppMode::PrintFiles;
         }
         if let Some(generator) = self.completion {
-            return AppMode::Completion(generator);
+            return AppMode::Cli(CliMode::Completion(generator))
         }
 
-        if self.stdout
-            || self.minimal_tree
-            || self.list
-            || self.append_file.is_some()
-            || self.output_file.is_some()
-            || !self.search_and_select.is_empty()
-            || !self.prepend_todo.is_empty()
-            || !self.append_todo.is_empty()
-        {
-            AppMode::Cli
-        } else {
-            AppMode::Tui
+        if self.stdout {
+            return AppMode::Cli(CliMode::Stdout)
         }
+
+        if self.minimal_tree || self.list {
+            return if self.no_tree {
+                AppMode::Cli(CliMode::Print)
+            } else {
+                AppMode::Cli(CliMode::PrintTree(self.minimal_tree))
+            }
+        }
+        AppMode::Tui
     }
 }

@@ -1,68 +1,39 @@
+use clap::{Command, CommandFactory};
 use super::todo_app::{App, RestrictionFunction, Todo, TodoList};
-use crate::DisplayArgs;
+use crate::{CliMode, DisplayArgs};
+use crate::Args;
+use clap_complete::{generate, Generator};
 use std::io;
 
 #[inline]
-pub fn run(app: &mut App) -> io::Result<()> {
-    let app = CliApp::new(app);
-    app.print()?;
+pub fn run(app: &mut App, mode: CliMode) -> io::Result<()> {
+    match mode {
+        CliMode::Stdout => {
+            app.write_to_stdout()?;
+        }
+        CliMode::Completion(generator) => {
+            print_completions(generator, &mut Args::command());
+        }
+        CliMode::PrintTree(is_minimal) => {
+            let mut print_todo = PrintTodoTree::new(is_minimal);
+            print_todo.print_list(
+                &app.todo_list,
+                &app.args.display_args,
+                app.restriction(),
+            )
+        }
+        CliMode::Print => print_todos(app),
+    }
     Ok(())
 }
 
-pub struct CliApp<'a> {
-    todo_app: &'a App,
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
-impl<'a> CliApp<'a> {
-    #[inline]
-    pub fn new(app: &'a mut App) -> Self {
-        for message in app.args.append_todo.clone() {
-            app.append(message);
-        }
-
-        if let Some(path) = app.args.output_file.clone() {
-            app.output_list_to_path(&path);
-        }
-
-        for message in app.args.prepend_todo.clone() {
-            app.prepend(message);
-        }
-        if let Some(path) = app.args.append_file.clone() {
-            app.append_list_from_path(&path)
-        }
-        app.do_commands_on_selected();
-        let _ = app.write();
-        CliApp { todo_app: app }
-    }
-
-    #[inline]
-    fn print_list(&self) {
-        for display in self.todo_app.display_current() {
-            println!("{}", display);
-        }
-    }
-
-    #[inline]
-    pub fn print(&self) -> io::Result<()> {
-        if !self.todo_app.args.search_and_select.is_empty() {
-            self.todo_app.print_selected();
-            return Ok(());
-        }
-        if self.todo_app.args.stdout {
-            self.todo_app.print()?;
-            return Ok(());
-        }
-        if self.todo_app.is_tree() {
-            let mut print_todo = PrintTodoTree::new(self.todo_app.args.minimal_tree);
-            print_todo.print_list(
-                &self.todo_app.todo_list,
-                &self.todo_app.args.display_args,
-                self.todo_app.restriction(),
-            );
-        } else {
-            self.print_list()
-        }
-        Ok(())
+fn print_todos(app: &App) {
+    for display in app.display_current() {
+        println!("{}", display);
     }
 }
 
@@ -70,17 +41,17 @@ impl<'a> CliApp<'a> {
 #[derive(Clone)]
 struct PrintTodoTree {
     last_stack: Vec<bool>,
-    should_print_indention: bool,
+    should_skip_indention: bool,
     is_last: bool,
 }
 
 impl PrintTodoTree {
     #[inline]
-    pub fn new(should_print_indention: bool) -> Self {
+    pub fn new(should_skip_indention: bool) -> Self {
         PrintTodoTree {
             last_stack: vec![],
             is_last: false,
-            should_print_indention,
+            should_skip_indention,
         }
     }
 
@@ -143,13 +114,15 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_prenote(&self, last_stack: &[bool], last_item: Option<bool>) {
-        self.print_preindention(last_stack, last_item);
+        if !self.should_skip_indention {
+            self.print_preindention(last_stack, last_item);
+        }
         print!("   ")
     }
 
     #[inline]
     fn print_indention(&self) {
-        if self.should_print_indention {
+        if self.should_skip_indention {
             return;
         }
         self.print_preindention(&self.last_stack, None);
