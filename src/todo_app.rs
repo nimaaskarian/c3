@@ -254,7 +254,7 @@ impl App {
         if todolist.changed {
             todolist.sort();
         }
-        self.changed = changed;
+        self.changed = todolist.changed;
     }
 
     #[inline]

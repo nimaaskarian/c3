@@ -40,7 +40,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
         app.write();
     }
     if args.print_path {
-        println!("{}", app.args.todo_path.to_str().unwrap_or(""));
+        println!("{}", app.args.todo_path.to_str().unwrap());
         let notes = app.args.todo_path.parent().unwrap().join("notes");
         if notes.is_dir() {
             println!("{}", notes.to_str().unwrap_or(""));
