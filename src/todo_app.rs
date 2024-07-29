@@ -81,10 +81,7 @@ impl App {
     #[inline]
     pub(crate) fn new(args: AppArgs) -> Self {
         let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
-        let mut todo_list = TodoList::read(&args.todo_path);
-        if !args.no_tree {
-            todo_list.read_dependencies(&notes_dir).expect("Failed to read dependencies");
-        }
+        let todo_list = Self::read_a_todo_list(&args.todo_path, &notes_dir, &args);
         let mut app = App {
             notes_dir,
             x_index: 0,
@@ -111,17 +108,18 @@ impl App {
     }
 
     #[inline(always)]
-    fn read_a_todo_list(&self, path: &Path) -> TodoList {
+    fn read_a_todo_list(path: &Path, notes_dir: &Path, args: &AppArgs) -> TodoList {
         let mut todo_list = TodoList::read(path);
-        if !self.args.no_tree {
-            todo_list.read_dependencies(&self.notes_dir);
+        if !args.no_tree {
+            todo_list.read_dependencies(&notes_dir);
         }
         todo_list
     }
 
     #[inline]
     pub fn append_list_from_path(&mut self, path: &Path) {
-        let todo_list = self.read_a_todo_list(path);
+        let notes_dir = fileio::append_notes_to_path_parent(path);
+        let todo_list = Self::read_a_todo_list(path, &notes_dir, &self.args);
         self.append_list(todo_list)
     }
 
@@ -132,7 +130,8 @@ impl App {
 
     #[inline]
     pub fn open_path(&mut self, path: PathBuf) {
-        self.todo_list = self.read_a_todo_list(&path);
+        self.notes_dir = fileio::append_notes_to_path_parent(&path);
+        self.todo_list = Self::read_a_todo_list(&path, &self.notes_dir, &self.args);
         self.tree_path = vec![];
         self.args.todo_path = path;
     }
@@ -378,7 +377,7 @@ impl App {
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = self.read_a_todo_list(&self.args.todo_path);
+        self.todo_list = Self::read_a_todo_list(&self.args.todo_path, &self.notes_dir, &self.args);
         let len = self.max_tree_length();
         self.tree_path.truncate(len);
     }
