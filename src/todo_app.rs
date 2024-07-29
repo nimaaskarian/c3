@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::fmt::Write;
 use std::fs::create_dir_all;
 use std::path::Path;
@@ -31,7 +32,6 @@ pub struct App {
     pub(super) args: AppArgs,
     removed_todos: Vec<Todo>,
     tree_search_positions: Vec<SearchPosition>,
-    last_query: String,
     x_index: usize,
     y_index: usize,
     restriction: RestrictionFunction,
@@ -86,7 +86,6 @@ impl App {
             notes_dir,
             x_index: 0,
             y_index: 0,
-            last_query: String::new(),
             tree_search_positions: vec![],
             removed_todos: vec![],
             todo_list,
@@ -163,29 +162,11 @@ impl App {
         }))
     }
 
-    fn add_to_tree_positions(&mut self, list: &TodoList, prior_indices: &[usize]) {
-        let mut matching_indices: Vec<usize> = vec![];
-        for (i, todo) in list.todos(&self.restriction).iter().enumerate() {
-            if todo.matches(self.last_query.as_str()) {
-                matching_indices.push(i)
-            }
-        }
-        if !matching_indices.is_empty() {
-            self.tree_search_positions.push(SearchPosition {
-                tree_path: prior_indices.to_vec(),
-                matching_indices,
-            })
-        }
-    }
-
-    pub fn tree_search(&mut self, query: Option<String>) {
-        if let Some(query) = query {
-            self.last_query = query;
-        }
+    pub fn tree_search(&mut self, query: String) {
         self.tree_search_positions = vec![];
         self.y_index = 0;
         self.x_index = 0;
-        if self.last_query.is_empty() {
+        if query.is_empty() {
             return;
         }
         let before_position = SearchPosition {
@@ -193,9 +174,35 @@ impl App {
             matching_indices: vec![self.index],
         };
         self.tree_search_positions.push(before_position);
-        self.todo_list.clone().traverse_tree(Self::add_to_tree_positions, vec![], self);
+        self.search_tree(query);
 
         self.search_next();
+    }
+
+    pub fn search_tree(&mut self, query: String) {
+        let mut lists: VecDeque<(Vec<usize>, &TodoList)> = VecDeque::from([(vec![],&self.todo_list)]);
+        while !lists.is_empty() {
+            let (indices, current_list) = lists.pop_back().unwrap();
+            let mut matching_indices: Vec<usize> = vec![];
+            for (i,todo) in current_list.todos(&self.restriction).iter().enumerate() {
+                let mut todo_indices = indices.clone();
+                let true_index = current_list.true_position_in_list(i, &self.restriction);
+                todo_indices.push(true_index);
+                if todo.matches(&query) {
+                    matching_indices.push(i)
+                }
+                if let Some(list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
+                    
+                    lists.push_front((todo_indices,list))
+                }
+            }
+            if !matching_indices.is_empty() {
+                self.tree_search_positions.push(SearchPosition {
+                    tree_path: indices.to_vec(),
+                    matching_indices,
+                })
+            }
+        }
     }
 
     pub fn batch_editor_messages(&mut self) {
@@ -903,7 +910,7 @@ mod tests {
         let mut app = write_test_todos(&dir)?;
         remove_dir_all(dir)?;
         let query = String::from("nod");
-        app.tree_search(Some(query));
+        app.tree_search(query);
         let position = &app.tree_search_positions[1];
         assert_eq!(position.tree_path, vec![2, 0]);
         assert_eq!(position.matching_indices, vec![0]);

@@ -254,7 +254,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_tree_search(&mut self, str: String) {
-        self.todo_app.tree_search(Some(str));
+        self.todo_app.tree_search(str);
     }
 
     #[inline]
@@ -587,8 +587,8 @@ impl<'a> TuiApp<'a> {
                     Char('R') => self.todo_app.read(),
                     Char('T') => self.todo_app.remove_current_dependent(),
                     Char(' ') => self.todo_app.toggle_current_done(),
-                    KeyCode::Tab => self.todo_app.search_next(),
-                    Char('n') | Char('a') => self.prepend_prompt(),
+                    Char('n') => self.todo_app.search_next(),
+                    Char('a') => self.prepend_prompt(),
                     Char('/') => self.search_prompt(),
                     Char('?') => self.tree_search_prompt(),
                     Char('A') => self.append_prompt(),
