@@ -186,13 +186,11 @@ impl App {
             let mut matching_indices: Vec<usize> = vec![];
             for (i,todo) in current_list.todos(&self.restriction).iter().enumerate() {
                 let mut todo_indices = indices.clone();
-                let true_index = current_list.true_position_in_list(i, &self.restriction);
-                todo_indices.push(true_index);
+                todo_indices.push(i);
                 if todo.matches(&query) {
                     matching_indices.push(i)
                 }
                 if let Some(list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
-                    
                     lists.push_front((todo_indices,list))
                 }
             }
