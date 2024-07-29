@@ -169,20 +169,17 @@ impl App {
         if query.is_empty() {
             return;
         }
-        let before_position = SearchPosition {
-            tree_path: self.tree_path.clone(),
-            matching_indices: vec![self.index],
-        };
-        self.tree_search_positions.push(before_position);
+        let current_not_matches = self.todo().map_or(true, |todo| !todo.matches(&query));
         self.search_tree(query);
 
-        self.search_next();
+        if current_not_matches {
+            self.search_next();
+        }
     }
 
     pub fn search_tree(&mut self, query: String) {
         let mut lists: VecDeque<(Vec<usize>, &TodoList)> = VecDeque::from([(vec![],&self.todo_list)]);
-        while !lists.is_empty() {
-            let (indices, current_list) = lists.pop_back().unwrap();
+        while let Some((indices, current_list)) = lists.pop_back() {
             let mut matching_indices: Vec<usize> = vec![];
             for (i,todo) in current_list.todos(&self.restriction).iter().enumerate() {
                 let mut todo_indices = indices.clone();
@@ -372,10 +369,8 @@ impl App {
         } else {
             self.current_list_mut().sort();
         }
-        if self.is_undone_empty() {
-            while self.traverse_up() && !self.is_undone_empty() {
-                self.toggle_current_done()
-            }
+        while self.is_undone_empty() && self.traverse_up() {
+            self.toggle_current_done()
         }
     }
 
