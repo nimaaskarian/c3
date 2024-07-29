@@ -188,7 +188,7 @@ impl App {
                     matching_indices.push(i)
                 }
                 if let Some(list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
-                    lists.push_front((todo_indices,list))
+                    lists.push_back((todo_indices,list))
                 }
             }
             if !matching_indices.is_empty() {
