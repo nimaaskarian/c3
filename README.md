@@ -87,3 +87,7 @@ Keybinds that modules can use are **C, c, H, L, comma, period, +, -, s, r**
 
 ### Non interactive mode
 For command line arguments and such, run `c3 -h` to see full usage.
+
+## Performance
+If you're experiencing performance issues on very large todo lists (I begin to experience it with 500k todos, which can seem like a lot),
+you can use `--minimal-render` and `--no-tree` cli options. Also use `?` (tree) search instead of the normal search.

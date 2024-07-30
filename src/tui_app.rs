@@ -90,7 +90,7 @@ pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut potato_module = Potato::new(None);
-    let mut list_state = ListState::default();
+    let mut list_state = ListState::default().with_selected(Some(0));
     let mut app = TuiApp::new(app, &mut potato_module, args);
 
     loop {
@@ -677,7 +677,6 @@ impl<'a> TuiApp<'a> {
                     dependency_layout,
                     self.todo_app.display_list(todo_list),
                     String::from("Todo dependencies"),
-                    self.todo_app.index(),
                 )
             }
         }
@@ -705,7 +704,6 @@ impl<'a> TuiApp<'a> {
             todo_layout,
             display,
             title,
-            self.todo_app.index(),
         )
     }
 
@@ -717,16 +715,12 @@ impl<'a> TuiApp<'a> {
         todo_layout: Rect,
         display_list: Vec<String>,
         title: String,
-        index: usize,
     ) {
         match create_todo_widget(display_list, title, highlight_symbol) {
             TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout),
             TodoWidget::List(widget) => {
                 if let Some(list_state) = list_state {
-                    let widget = frame.render_stateful_widget(widget, todo_layout, list_state);
-                    list_state.select(Some(index-list_state.offset()));
-                    widget
-
+                    frame.render_stateful_widget(widget, todo_layout, list_state)
                 } else {
                     frame.render_widget(widget, todo_layout)
                 }
@@ -737,9 +731,7 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn ui(&mut self, frame: &mut Frame, list_state: &mut ListState) {
         let todo = self.todo_app.todo();
-        if self.args.minimal_render {
-            list_state.select(Some(0));
-        } else {
+        if !self.args.minimal_render {
             list_state.select(Some(self.todo_app.index()));
         }
 
