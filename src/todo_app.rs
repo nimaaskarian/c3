@@ -657,11 +657,10 @@ impl App {
     }
 
     #[inline]
+    /// Clone current todo message and return
     pub fn get_message(&mut self) -> Option<String> {
-        if let Some(todo) = self.todo() {
-            return Some(todo.message.clone());
-        };
-        None
+        self.todo()
+            .and_then(|todo| Some(todo.message.clone()))
     }
 
     #[inline]

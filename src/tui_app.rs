@@ -334,12 +334,12 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn edit_prompt(&mut self, start: bool) {
-        let todo_message = self.todo_app.get_message().unwrap_or_default();
-
-        self.set_text_mode(Self::on_edit_todo, "Edit todo", todo_message.as_str());
-        self.textarea.insert_str(todo_message);
-        if start {
-            self.textarea.move_cursor(CursorMove::Head);
+        if let Some(message) = &self.todo_app.get_message() {
+            self.set_text_mode(Self::on_edit_todo, "Edit todo", message);
+            self.textarea.insert_str(message);
+            if start {
+                self.textarea.move_cursor(CursorMove::Head);
+            }
         }
     }
 
