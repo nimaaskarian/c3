@@ -702,6 +702,12 @@ impl App {
     }
 
     #[inline]
+    pub fn display_current_slice(&self, min: usize, max: usize) -> Vec<String> {
+        self.current_list().display_slice(&self.args.display_args, &self.restriction, min, max)
+    }
+
+
+    #[inline]
     pub fn display_list(&self, todo_list: &TodoList) -> Vec<String> {
         todo_list.display(&self.args.display_args, &self.restriction)
     }

@@ -207,6 +207,15 @@ impl TodoList {
             .collect()
     }
 
+    pub fn display_slice(&self, args: &DisplayArgs, restriction: &RestrictionFunction, min: usize, max: usize) -> Vec<String> {
+        self.todos(restriction)
+            .iter()
+            .skip(min)
+            .take(max)
+            .map(|todo| todo.display(args))
+            .collect()
+    }
+
     pub fn len(&self, restriction: &RestrictionFunction) -> usize {
         self.todos(restriction).len()
     }
