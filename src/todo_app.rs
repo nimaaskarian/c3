@@ -181,7 +181,7 @@ impl App {
         let mut lists: VecDeque<(Vec<usize>, &TodoList)> = VecDeque::from([(vec![],&self.todo_list)]);
         while let Some((indices, current_list)) = lists.pop_back() {
             let mut matching_indices: Vec<usize> = vec![];
-            for (i,todo) in current_list.todos(&self.restriction).iter().enumerate() {
+            for (i,todo) in current_list.filter(&self.restriction).enumerate() {
                 let mut todo_indices = indices.clone();
                 todo_indices.push(i);
                 if todo.matches(&query) {
@@ -203,14 +203,15 @@ impl App {
     pub fn batch_editor_messages(&mut self) {
         let restriction = &self.restriction;
         
-        let todos = self.current_list().todos(restriction);
-        let mut content = if todos.is_empty() {
-            String::new()
+        let mut todos_iter = self.current_list().filter(restriction);
+        let first_item = todos_iter.next();
+        let mut content = if let Some(item) = first_item {
+            format!("# INDEX PRIORITY MESSAGE\n{: <7} {: <8} {}\n",0, item.priority(), item.message)
         } else {
-            String::from("# INDEX PRIORITY MESSAGE\n")
+            String::new()
         };
-        for (i, line) in todos.iter().enumerate() {
-            writeln!(content, "{i: <7} {: <8} {}", line.priority(), line.message);
+        for (i, line) in todos_iter.enumerate() {
+            writeln!(content, "{: <7} {: <8} {}",i+1, line.priority(), line.message);
         }
         let new_messages = fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();

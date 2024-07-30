@@ -194,22 +194,26 @@ impl TodoList {
     }
 
     pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<&str> {
-        self.todos(restriction)
-            .iter()
+        self.todos.iter()
+            .filter(|todo| restriction(todo))
             .map(|todo| todo.message.as_str())
             .collect()
     }
 
+    pub fn filter<'a>(&'a self, restriction: &'a RestrictionFunction) -> std::iter::Filter<std::slice::Iter<Todo>, impl FnMut(&&'a Todo) -> bool> {
+        self.todos.iter().filter(|todo| restriction(todo))
+    }
+
     pub fn display(&self, args: &DisplayArgs, restriction: &RestrictionFunction) -> Vec<String> {
-        self.todos(restriction)
-            .iter()
+        self.todos.iter()
+            .filter(|todo| restriction(todo))
             .map(|todo| todo.display(args))
             .collect()
     }
 
     pub fn display_slice(&self, args: &DisplayArgs, restriction: &RestrictionFunction, min: usize, max: usize) -> Vec<String> {
-        self.todos(restriction)
-            .iter()
+        self.todos.iter()
+            .filter(|todo| restriction(todo))
             .skip(min)
             .take(max)
             .map(|todo| todo.display(args))
@@ -217,11 +221,13 @@ impl TodoList {
     }
 
     pub fn len(&self, restriction: &RestrictionFunction) -> usize {
-        self.todos(restriction).len()
+        self.todos.iter()
+            .filter(|todo| restriction(todo))
+            .count()
     }
 
     pub fn is_empty(&self, restriction: &RestrictionFunction) -> bool {
-        self.todos(restriction).is_empty()
+        self.len(restriction) == 0
     }
 
     pub fn true_position_in_list(&self, index: usize, restriction: &RestrictionFunction) -> usize {
