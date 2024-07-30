@@ -911,7 +911,7 @@ mod tests {
         remove_dir_all(dir)?;
         let query = String::from("nod");
         app.tree_search(query);
-        let position = &app.tree_search_positions[1];
+        let position = &app.tree_search_positions[0];
         assert_eq!(position.tree_path, vec![2, 0]);
         assert_eq!(position.matching_indices, vec![0]);
         Ok(())

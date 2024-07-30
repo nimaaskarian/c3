@@ -693,7 +693,7 @@ impl<'a> TuiApp<'a> {
         let title = self.title();
         let display = if self.args.minimal_render {
             let first = self.todo_app.index();
-            let last = self.todo_app.len().min(todo_layout.height as usize+first);
+            let last = self.todo_app.len().min(todo_layout.height as usize+first-2);
             self.todo_app.display_current_slice(first, last)
         } else {
             self.todo_app.display_current()
