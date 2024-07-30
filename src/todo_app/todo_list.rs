@@ -15,15 +15,18 @@ pub struct TodoList {
 type Output = Todo;
 
 fn with_index<T, F>(mut f: F) -> impl FnMut(&T) -> bool
-where F: FnMut(usize, &T) -> bool {
+where
+    F: FnMut(usize, &T) -> bool,
+{
     let mut i = 0;
-    move |item| (f(i, item), i+=1).0
+    move |item| (f(i, item), i += 1).0
 }
 
 impl TodoList {
     pub fn new() -> Self {
-        TodoList { ..Default::default() }
-        
+        TodoList {
+            ..Default::default()
+        }
     }
 
     pub fn index(&self, index: usize, restriction: &RestrictionFunction) -> &Output {
@@ -48,14 +51,19 @@ impl TodoList {
     }
 
     pub fn todos_mut(&mut self, restriction: &RestrictionFunction) -> Vec<&mut Todo> {
-        self.todos.iter_mut().filter(|todo| restriction(todo)).collect()
+        self.todos
+            .iter_mut()
+            .filter(|todo| restriction(todo))
+            .collect()
     }
 
     #[inline]
     pub(super) fn delete_removed_dependent_files(&mut self, filename: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
             if let Some(dependency) = todo.dependency.as_mut() {
-                dependency.todo_list.delete_removed_dependent_files(filename);
+                dependency
+                    .todo_list
+                    .delete_removed_dependent_files(filename);
             }
             todo.delete_removed_dependent_files(filename)?;
         }
@@ -104,7 +112,8 @@ impl TodoList {
         }
         let file_data = read(filename).unwrap();
         let mut todolist = Self {
-            todos: file_data.lines()
+            todos: file_data
+                .lines()
                 .map_while(Result::ok)
                 .flat_map(|line| line.parse())
                 .collect(),
@@ -181,7 +190,8 @@ impl TodoList {
 
     #[inline(always)]
     pub(super) fn filter_indices(&mut self, sorted_indices: Vec<usize>) {
-        self.todos.retain(with_index(|i, _| sorted_indices.binary_search(&i).is_err() ))
+        self.todos
+            .retain(with_index(|i, _| sorted_indices.binary_search(&i).is_err()))
     }
 
     pub fn iter(&self) -> std::slice::Iter<Todo> {
@@ -194,25 +204,37 @@ impl TodoList {
     }
 
     pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<&str> {
-        self.todos.iter()
+        self.todos
+            .iter()
             .filter(|todo| restriction(todo))
             .map(|todo| todo.message.as_str())
             .collect()
     }
 
-    pub fn filter<'a>(&'a self, restriction: &'a RestrictionFunction) -> std::iter::Filter<std::slice::Iter<Todo>, impl FnMut(&&'a Todo) -> bool> {
+    pub fn filter<'a>(
+        &'a self,
+        restriction: &'a RestrictionFunction,
+    ) -> std::iter::Filter<std::slice::Iter<Todo>, impl FnMut(&&'a Todo) -> bool> {
         self.todos.iter().filter(|todo| restriction(todo))
     }
 
     pub fn display(&self, args: &DisplayArgs, restriction: &RestrictionFunction) -> Vec<String> {
-        self.todos.iter()
+        self.todos
+            .iter()
             .filter(|todo| restriction(todo))
             .map(|todo| todo.display(args))
             .collect()
     }
 
-    pub fn display_slice(&self, args: &DisplayArgs, restriction: &RestrictionFunction, min: usize, max: usize) -> Vec<String> {
-        self.todos.iter()
+    pub fn display_slice(
+        &self,
+        args: &DisplayArgs,
+        restriction: &RestrictionFunction,
+        min: usize,
+        max: usize,
+    ) -> Vec<String> {
+        self.todos
+            .iter()
             .filter(|todo| restriction(todo))
             .skip(min)
             .take(max)
@@ -221,9 +243,7 @@ impl TodoList {
     }
 
     pub fn len(&self, restriction: &RestrictionFunction) -> usize {
-        self.todos.iter()
-            .filter(|todo| restriction(todo))
-            .count()
+        self.todos.iter().filter(|todo| restriction(todo)).count()
     }
 
     pub fn is_empty(&self, restriction: &RestrictionFunction) -> bool {
@@ -316,9 +336,9 @@ impl TodoList {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use crate::fileio;
     use std::fs::{self, create_dir_all, remove_dir_all, remove_file};
+    use std::path::PathBuf;
     use std::str::FromStr;
 
     use super::*;

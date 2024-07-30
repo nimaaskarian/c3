@@ -56,7 +56,7 @@ struct CliArgs {
     #[arg(long)]
     do_on_selected: Option<DoOnSelected>,
 
-    #[arg(short='b',long, default_value_t=false)]
+    #[arg(short = 'b', long, default_value_t = false)]
     batch_edit: bool,
 
     /// A todo message to append
@@ -72,10 +72,10 @@ struct CliArgs {
     append_file: Option<PathBuf>,
 
     /// A todo file to output to
-    #[arg(short='o', long)]
+    #[arg(short = 'o', long)]
     output_file: Option<PathBuf>,
 
-    #[arg(short='p', long, default_value_t=false)]
+    #[arg(short = 'p', long, default_value_t = false)]
     print_path: bool,
 
     /// Minimal tree with no tree graphics

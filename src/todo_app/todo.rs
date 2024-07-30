@@ -41,7 +41,10 @@ impl PartialOrd for Todo {
 impl From<&Todo> for String {
     fn from(todo: &Todo) -> String {
         let done_str = if todo.done() { "-" } else { "" };
-        let dep_str: String = todo.dependency.as_ref().map_or(String::new(),|dep| dep.into());
+        let dep_str: String = todo
+            .dependency
+            .as_ref()
+            .map_or(String::new(), |dep| dep.into());
 
         let schedule_str: String = (&todo.schedule).into();
 
@@ -163,7 +166,7 @@ impl Todo {
 
     #[inline]
     pub fn is_note(&self) -> bool {
-        self.dependency.as_ref().map_or(false,|dep|dep.is_note())
+        self.dependency.as_ref().map_or(false, |dep| dep.is_note())
     }
 
     #[inline]
@@ -237,7 +240,7 @@ impl Todo {
         if let Some(dependency) = self.dependency.as_mut() {
             if dependency.is_written() {
                 self.removed_dependency = Some(std::mem::take(dependency));
-            } 
+            }
         }
         self.dependency = None;
     }

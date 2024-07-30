@@ -1,14 +1,14 @@
-use clap::{Command, CommandFactory};
 use super::todo_app::{App, RestrictionFunction, Todo, TodoList};
-use crate::{CliArgs, DisplayArgs, DoOnSelected};
 use crate::Args;
+use crate::{CliArgs, DisplayArgs, DoOnSelected};
+use clap::{Command, CommandFactory};
 use clap_complete::{generate, Generator};
 use std::io;
 use std::process;
 
 pub struct NotCli;
 #[inline]
-pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
+pub fn run(app: &mut App, args: CliArgs) -> Result<(), NotCli> {
     if !args.search_and_select.is_empty() {
         for query in args.search_and_select {
             app.set_query_restriction(query, None)
@@ -19,9 +19,10 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
         let restriction = app.restriction().clone();
         if let Some(do_on_selected) = args.do_on_selected {
             match do_on_selected {
-                DoOnSelected::Delete => {
-                    app.current_list_mut().todos.retain(|todo| !restriction(todo))
-                }
+                DoOnSelected::Delete => app
+                    .current_list_mut()
+                    .todos
+                    .retain(|todo| !restriction(todo)),
                 DoOnSelected::Done => {
                     for todo in app.current_list_mut().todos_mut(&restriction) {
                         todo.set_done(true);
@@ -30,7 +31,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
             }
         } else {
             print_todos(app);
-            return Ok(())
+            return Ok(());
         }
     }
     if args.batch_edit {
@@ -45,33 +46,29 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(),NotCli> {
         if notes.is_dir() {
             println!("{}", notes.to_str().unwrap_or(""));
         }
-        return Ok(())
+        return Ok(());
     }
     if let Some(generator) = args.completion {
         print_completions(generator, &mut Args::command());
-        return Ok(())
+        return Ok(());
     }
 
     if args.stdout {
         app.write_to_stdout();
-        return Ok(())
+        return Ok(());
     }
     if args.minimal_tree || args.list {
         if app.args.no_tree {
             print_todos(app);
         } else {
             let mut print_todo = PrintTodoTree::new(args.minimal_tree);
-            print_todo.print_list(
-                &app.todo_list,
-                &app.args.display_args,
-                app.restriction(),
-            )
+            print_todo.print_list(&app.todo_list, &app.args.display_args, app.restriction())
         }
-        return Ok(())
+        return Ok(());
     }
     if let Some(path) = args.output_file.as_ref() {
         app.output_list_to_path(path);
-        return Ok(())
+        return Ok(());
     }
     Err(NotCli)
 }

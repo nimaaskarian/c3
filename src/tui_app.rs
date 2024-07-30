@@ -1,10 +1,10 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std {{{
 use std::{
-    iter,
     io::{self, stdout, BufRead, BufReader},
+    iter,
     path::PathBuf,
-    process::{Command, self, Stdio},
+    process::{self, Command, Stdio},
     rc::Rc,
 };
 // }}}
@@ -26,8 +26,8 @@ use tui_textarea::{CursorMove, Input, TextArea};
 
 mod modules;
 use super::todo_app::{App, Todo};
-use crate::{todo_app::RestrictionFunction, TuiArgs};
 use crate::{date, todo_app::PriorityType};
+use crate::{todo_app::RestrictionFunction, TuiArgs};
 use modules::{potato::Potato, Module};
 // }}}
 
@@ -153,7 +153,11 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn title(&mut self) -> String {
-        let changed_str = if self.todo_app.is_current_changed() { "*" } else { "" };
+        let changed_str = if self.todo_app.is_current_changed() {
+            "*"
+        } else {
+            ""
+        };
         let size = self.todo_app.len();
         let todo_string = format!("Todos ({size}){changed_str}");
 
@@ -278,7 +282,12 @@ impl<'a> TuiApp<'a> {
         self.set_text_mode(Self::on_reminder, "Date reminder", "");
     }
 
-    fn nnn_paths() -> Option<iter::Map<io::Lines<BufReader<process::ChildStdout>>, impl FnMut(Result<String, io::Error>) -> PathBuf>> {
+    fn nnn_paths() -> Option<
+        iter::Map<
+            io::Lines<BufReader<process::ChildStdout>>,
+            impl FnMut(Result<String, io::Error>) -> PathBuf,
+        >,
+    > {
         let mut output = Command::new("nnn")
             .args(["-p", "-"])
             .stdin(Stdio::inherit())
@@ -290,9 +299,7 @@ impl<'a> TuiApp<'a> {
         let exit_status = output.wait().expect("Failed to wait on nnn.");
         if exit_status.success() {
             let reader = BufReader::new(output.stdout.unwrap());
-            return Some(reader
-                .lines()
-                .map(|x| PathBuf::from(x.unwrap_or_default())))
+            return Some(reader.lines().map(|x| PathBuf::from(x.unwrap_or_default())));
         }
         None
     }
@@ -692,7 +699,10 @@ impl<'a> TuiApp<'a> {
         let title = self.title();
         let display = if self.args.minimal_render {
             let first = self.todo_app.index();
-            let last = self.todo_app.len().min(todo_layout.height as usize+first-2);
+            let last = self
+                .todo_app
+                .len()
+                .min(todo_layout.height as usize + first - 2);
             self.todo_app.display_current_slice(first, last)
         } else {
             self.todo_app.display_current()
