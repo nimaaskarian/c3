@@ -16,7 +16,7 @@ fn main() -> io::Result<()> {
     let mut app = App::new(args.app_args);
 
     if cli_app::run(&mut app, args.cli_args).is_err() {
-        let output = tui_app::run(&mut app);
+        let output = tui_app::run(&mut app, args.tui_args);
         {
             tui_app::shutdown()?;
             output
@@ -35,6 +35,9 @@ pub struct Args {
 
     #[command(flatten)]
     cli_args: CliArgs,
+
+    #[command(flatten)]
+    tui_args: TuiArgs,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -94,21 +97,29 @@ struct CliArgs {
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct AppArgs {
-    /// Performance mode, don't read dependencies
-    #[arg(short = 'n', long)]
-    no_tree: bool,
+struct TuiArgs {
+    /// Alternative way of rendering, render minimum amount of todos
+    #[arg(long)]
+    minimal_render: bool,
 
     /// String behind highlighted todo in TUI mode
     #[arg(short='H', long, default_value_t=String::from(">>"))]
     highlight_string: String,
 
-    #[command(flatten)]
-    display_args: DisplayArgs,
-
     /// Enable TUI module at startup
     #[arg(short = 'm', long)]
     enable_module: bool,
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct AppArgs {
+    /// Performance mode, don't read dependencies
+    #[arg(short = 'n', long)]
+    no_tree: bool,
+
+    #[command(flatten)]
+    display_args: DisplayArgs,
 
     /// Path to todo file (and notes sibling directory)
     #[arg(default_value=get_todo_path().unwrap().into_os_string())]

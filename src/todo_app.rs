@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::fmt::Write;
 use std::fs::create_dir_all;
 use std::path::Path;
@@ -31,7 +32,6 @@ pub struct App {
     pub(super) args: AppArgs,
     removed_todos: Vec<Todo>,
     tree_search_positions: Vec<SearchPosition>,
-    last_query: String,
     x_index: usize,
     y_index: usize,
     restriction: RestrictionFunction,
@@ -81,15 +81,11 @@ impl App {
     #[inline]
     pub(crate) fn new(args: AppArgs) -> Self {
         let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
-        let mut todo_list = TodoList::read(&args.todo_path);
-        if !args.no_tree {
-            todo_list.read_dependencies(&notes_dir).expect("Failed to read dependencies");
-        }
+        let todo_list = Self::read_a_todo_list(&args.todo_path, &notes_dir, &args);
         let mut app = App {
             notes_dir,
             x_index: 0,
             y_index: 0,
-            last_query: String::new(),
             tree_search_positions: vec![],
             removed_todos: vec![],
             todo_list,
@@ -111,17 +107,18 @@ impl App {
     }
 
     #[inline(always)]
-    fn read_a_todo_list(&self, path: &Path) -> TodoList {
+    fn read_a_todo_list(path: &Path, notes_dir: &Path, args: &AppArgs) -> TodoList {
         let mut todo_list = TodoList::read(path);
-        if !self.args.no_tree {
-            todo_list.read_dependencies(&self.notes_dir);
+        if !args.no_tree {
+            todo_list.read_dependencies(&notes_dir);
         }
         todo_list
     }
 
     #[inline]
     pub fn append_list_from_path(&mut self, path: &Path) {
-        let todo_list = self.read_a_todo_list(path);
+        let notes_dir = fileio::append_notes_to_path_parent(path);
+        let todo_list = Self::read_a_todo_list(path, &notes_dir, &self.args);
         self.append_list(todo_list)
     }
 
@@ -132,7 +129,8 @@ impl App {
 
     #[inline]
     pub fn open_path(&mut self, path: PathBuf) {
-        self.todo_list = self.read_a_todo_list(&path);
+        self.notes_dir = fileio::append_notes_to_path_parent(&path);
+        self.todo_list = Self::read_a_todo_list(&path, &self.notes_dir, &self.args);
         self.tree_path = vec![];
         self.args.todo_path = path;
     }
@@ -164,55 +162,56 @@ impl App {
         }))
     }
 
-    fn traverse_parents_from_root(&mut self, callback: fn(&mut App, &TodoList, &[usize])) {
-        self.todo_list.clone().traverse_tree(callback, None, self)
-    }
-
-    fn add_to_tree_positions(&mut self, list: &TodoList, prior_indices: &[usize]) {
-        let mut matching_indices: Vec<usize> = vec![];
-        for (i, todo) in list.todos(&self.restriction).iter().enumerate() {
-            if todo.matches(self.last_query.as_str()) {
-                matching_indices.push(i)
-            }
-        }
-        if !matching_indices.is_empty() {
-            self.tree_search_positions.push(SearchPosition {
-                tree_path: prior_indices.to_vec(),
-                matching_indices,
-            })
-        }
-    }
-
-    pub fn tree_search(&mut self, query: Option<String>) {
-        if let Some(query) = query {
-            self.last_query = query;
-        }
+    pub fn tree_search(&mut self, query: String) {
         self.tree_search_positions = vec![];
         self.y_index = 0;
         self.x_index = 0;
-        if self.last_query.is_empty() {
+        if query.is_empty() {
             return;
         }
-        let before_position = SearchPosition {
-            tree_path: self.tree_path.clone(),
-            matching_indices: vec![self.index],
-        };
-        self.tree_search_positions.push(before_position);
-        self.traverse_parents_from_root(Self::add_to_tree_positions);
-        self.search_next();
+        let current_not_matches = self.todo().map_or(true, |todo| !todo.matches(&query));
+        self.search_tree(query);
+
+        if current_not_matches {
+            self.search_next();
+        }
+    }
+
+    pub fn search_tree(&mut self, query: String) {
+        let mut lists: VecDeque<(Vec<usize>, &TodoList)> = VecDeque::from([(vec![],&self.todo_list)]);
+        while let Some((indices, current_list)) = lists.pop_back() {
+            let mut matching_indices: Vec<usize> = vec![];
+            for (i,todo) in current_list.filter(&self.restriction).enumerate() {
+                let mut todo_indices = indices.clone();
+                todo_indices.push(i);
+                if todo.matches(&query) {
+                    matching_indices.push(i)
+                }
+                if let Some(list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
+                    lists.push_back((todo_indices,list))
+                }
+            }
+            if !matching_indices.is_empty() {
+                self.tree_search_positions.push(SearchPosition {
+                    tree_path: indices.to_vec(),
+                    matching_indices,
+                })
+            }
+        }
     }
 
     pub fn batch_editor_messages(&mut self) {
         let restriction = &self.restriction;
         
-        let todos = self.current_list().todos(restriction);
-        let mut content = if todos.is_empty() {
-            String::new()
+        let mut todos_iter = self.current_list().filter(restriction);
+        let first_item = todos_iter.next();
+        let mut content = if let Some(item) = first_item {
+            format!("# INDEX PRIORITY MESSAGE\n{: <7} {: <8} {}\n",0, item.priority(), item.message)
         } else {
-            String::from("# INDEX PRIORITY MESSAGE\n")
+            String::new()
         };
-        for (i, line) in todos.iter().enumerate() {
-            writeln!(content, "{i: <7} {: <8} {}", line.priority(), line.message);
+        for (i, line) in todos_iter.enumerate() {
+            writeln!(content, "{: <7} {: <8} {}",i+1, line.priority(), line.message);
         }
         let new_messages = fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
@@ -371,17 +370,15 @@ impl App {
         } else {
             self.current_list_mut().sort();
         }
-        if self.is_undone_empty() {
-            while self.traverse_up() && !self.is_undone_empty() {
-                self.toggle_current_done()
-            }
+        while self.is_undone_empty() && self.traverse_up() {
+            self.toggle_current_done()
         }
     }
 
     #[inline]
     pub fn read(&mut self) {
         self.changed = false;
-        self.todo_list = self.read_a_todo_list(&self.args.todo_path);
+        self.todo_list = Self::read_a_todo_list(&self.args.todo_path, &self.notes_dir, &self.args);
         let len = self.max_tree_length();
         self.tree_path.truncate(len);
     }
@@ -706,6 +703,12 @@ impl App {
     }
 
     #[inline]
+    pub fn display_current_slice(&self, min: usize, max: usize) -> Vec<String> {
+        self.current_list().display_slice(&self.args.display_args, &self.restriction, min, max)
+    }
+
+
+    #[inline]
     pub fn display_list(&self, todo_list: &TodoList) -> Vec<String> {
         todo_list.display(&self.args.display_args, &self.restriction)
     }
@@ -907,8 +910,8 @@ mod tests {
         let mut app = write_test_todos(&dir)?;
         remove_dir_all(dir)?;
         let query = String::from("nod");
-        app.tree_search(Some(query));
-        let position = &app.tree_search_positions[1];
+        app.tree_search(query);
+        let position = &app.tree_search_positions[0];
         assert_eq!(position.tree_path, vec![2, 0]);
         assert_eq!(position.matching_indices, vec![0]);
         Ok(())

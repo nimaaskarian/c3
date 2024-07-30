@@ -26,7 +26,7 @@ use tui_textarea::{CursorMove, Input, TextArea};
 
 mod modules;
 use super::todo_app::{App, Todo};
-use crate::todo_app::RestrictionFunction;
+use crate::{todo_app::RestrictionFunction, TuiArgs};
 use crate::{date, todo_app::PriorityType};
 use modules::{potato::Potato, Module};
 // }}}
@@ -85,13 +85,13 @@ pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Res
 }
 
 #[inline]
-pub fn run(app: &mut App) -> io::Result<()> {
+pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
     startup()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut potato_module = Potato::new(None);
     let mut list_state = ListState::default();
-    let mut app = TuiApp::new(app, &mut potato_module, app.args.enable_module);
+    let mut app = TuiApp::new(app, &mut potato_module, args);
 
     loop {
         terminal.draw(|frame| app.ui(frame, &mut list_state))?;
@@ -126,7 +126,7 @@ pub struct TuiApp<'a> {
     on_submit: Option<fn(&mut Self, HandlerParameter) -> ()>,
     on_delete: Option<fn(&mut Self, HandlerParameter, String) -> ()>,
     on_input: Option<fn(&mut Self, HandlerParameter) -> ()>,
-    module_enabled: bool,
+    args: TuiArgs,
     module: &'a mut dyn Module<'a>,
     textarea: TextArea<'a>,
     todo_app: &'a mut App,
@@ -134,7 +134,7 @@ pub struct TuiApp<'a> {
 
 impl<'a> TuiApp<'a> {
     #[inline]
-    pub fn new(app: &'a mut App, module: &'a mut dyn Module<'a>, module_enabled: bool) -> Self {
+    pub fn new(app: &'a mut App, module: &'a mut dyn Module<'a>, args: TuiArgs) -> Self {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         TuiApp {
@@ -146,7 +146,7 @@ impl<'a> TuiApp<'a> {
             on_delete: None,
             show_right: true,
             text_mode: false,
-            module_enabled,
+            args,
             last_restriction: None,
         }
     }
@@ -254,7 +254,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_tree_search(&mut self, str: String) {
-        self.todo_app.tree_search(Some(str));
+        self.todo_app.tree_search(str);
     }
 
     #[inline]
@@ -457,7 +457,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn update_editor(&mut self) -> io::Result<Operation> {
-        if self.module_enabled {
+        if self.args.enable_module {
             if event::poll(std::time::Duration::from_millis(
                 self.module.update_time_ms(),
             ))? {
@@ -516,7 +516,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn update_no_editor(&mut self) -> io::Result<Operation> {
-        if self.module_enabled {
+        if self.args.enable_module {
             if event::poll(std::time::Duration::from_millis(
                 self.module.update_time_ms(),
             ))? {
@@ -575,7 +575,7 @@ impl<'a> TuiApp<'a> {
                     Char('J') => self.todo_app.decrease_current_priority(),
                     Char('K') => self.todo_app.increase_current_priority(),
                     Char(']') => self.show_right = !self.show_right,
-                    Char('P') => self.module_enabled = !self.module_enabled,
+                    Char('P') => self.args.enable_module = !self.args.enable_module,
                     Char('>') => {
                         self.todo_app.edit_or_add_note();
                         return Ok(Operation::Restart);
@@ -587,8 +587,8 @@ impl<'a> TuiApp<'a> {
                     Char('R') => self.todo_app.read(),
                     Char('T') => self.todo_app.remove_current_dependent(),
                     Char(' ') => self.todo_app.toggle_current_done(),
-                    KeyCode::Tab => self.todo_app.search_next(),
-                    Char('n') | Char('a') => self.prepend_prompt(),
+                    Char('n') => self.todo_app.search_next(),
+                    Char('a') => self.prepend_prompt(),
                     Char('/') => self.search_prompt(),
                     Char('?') => self.tree_search_prompt(),
                     Char('A') => self.append_prompt(),
@@ -652,7 +652,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn highlight_string(&self) -> &str {
-        self.todo_app.args.highlight_string.as_str()
+        self.args.highlight_string.as_str()
     }
 
     #[inline]
@@ -677,6 +677,7 @@ impl<'a> TuiApp<'a> {
                     dependency_layout,
                     self.todo_app.display_list(todo_list),
                     String::from("Todo dependencies"),
+                    self.todo_app.index(),
                 )
             }
         }
@@ -690,13 +691,21 @@ impl<'a> TuiApp<'a> {
         todo_layout: Rect,
     ) {
         let title = self.title();
+        let display = if self.args.minimal_render {
+            let first = self.todo_app.index();
+            let last = self.todo_app.len().min(todo_layout.height as usize+first-2);
+            self.todo_app.display_current_slice(first, last)
+        } else {
+            self.todo_app.display_current()
+        };
         Self::render_todos_widget(
             self.highlight_string(),
             frame,
             Some(list_state),
             todo_layout,
-            self.todo_app.display_current(),
+            display,
             title,
+            self.todo_app.index(),
         )
     }
 
@@ -708,12 +717,16 @@ impl<'a> TuiApp<'a> {
         todo_layout: Rect,
         display_list: Vec<String>,
         title: String,
+        index: usize,
     ) {
         match create_todo_widget(display_list, title, highlight_symbol) {
             TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout),
             TodoWidget::List(widget) => {
                 if let Some(list_state) = list_state {
-                    frame.render_stateful_widget(widget, todo_layout, list_state)
+                    let widget = frame.render_stateful_widget(widget, todo_layout, list_state);
+                    list_state.select(Some(index-list_state.offset()));
+                    widget
+
                 } else {
                     frame.render_widget(widget, todo_layout)
                 }
@@ -724,11 +737,15 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn ui(&mut self, frame: &mut Frame, list_state: &mut ListState) {
         let todo = self.todo_app.todo();
+        if self.args.minimal_render {
+            list_state.select(Some(0));
+        } else {
+            list_state.select(Some(self.todo_app.index()));
+        }
 
-        list_state.select(Some(self.todo_app.index()));
         let dependency_width = self.get_dependency_width(todo);
 
-        let main_layout = if self.module_enabled {
+        let main_layout = if self.args.enable_module {
             self.render_module_widget(
                 frame,
                 Direction::Vertical,
@@ -748,7 +765,7 @@ impl<'a> TuiApp<'a> {
                 Constraint::Percentage(100 - dependency_width),
                 Constraint::Percentage(dependency_width),
             ])
-            .split(main_layout[self.module_enabled as usize]);
+            .split(main_layout[self.args.enable_module as usize]);
 
         let todo_and_textarea_layout = Layout::default()
             .direction(Direction::Vertical)
