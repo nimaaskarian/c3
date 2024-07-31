@@ -252,13 +252,15 @@ impl Todo {
     }
 
     #[inline]
-    pub fn edit_note(&mut self) -> io::Result<()> {
+    pub fn edit_note(&mut self) -> io::Result<bool> {
         let note = self.dependency.as_ref().and_then(|dep| dep.note());
-        let note = open_note_temp_editor(note)?;
-        if !note.is_empty() {
-            self.set_note(note)?;
+        let new_note = open_note_temp_editor(note)?;
+        if !new_note.is_empty() && note.map_or(true, |note| note != new_note) {
+            self.set_note(new_note)?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 
     #[inline]
