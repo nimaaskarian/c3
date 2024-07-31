@@ -686,8 +686,7 @@ impl App {
     }
 
     #[inline]
-    /// Clone current todo message and return
-    pub fn get_message(&mut self) -> Option<String> {
+    pub fn get_cloned_current_message(&mut self) -> Option<String> {
         self.todo().map(|todo| todo.message.clone())
     }
 

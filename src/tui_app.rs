@@ -182,6 +182,7 @@ impl<'a> TuiApp<'a> {
         placeholder: &str,
     ) {
         self.on_input = None;
+        self.on_delete = None;
         self.on_submit = Some(on_submit);
         self.turn_on_text_mode(title, placeholder);
     }
@@ -216,6 +217,7 @@ impl<'a> TuiApp<'a> {
         const TITLE: &str = "Search todo";
         const PLACEHOLDER: &str = "Enter search query";
         self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.on_submit = None;
         self.set_responsive_text_mode(Self::on_search, TITLE, PLACEHOLDER);
         self.on_delete = Some(Self::on_search_delete);
     }
@@ -341,7 +343,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn edit_prompt(&mut self, start: bool) {
-        if let Some(message) = &self.todo_app.get_message() {
+        if let Some(message) = &self.todo_app.get_cloned_current_message() {
             self.set_text_mode(Self::on_edit_todo, "Edit todo", message);
             self.textarea.insert_str(message);
             if start {
