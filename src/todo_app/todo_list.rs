@@ -63,7 +63,7 @@ impl TodoList {
             if let Some(dependency) = todo.dependency.as_mut() {
                 dependency
                     .todo_list
-                    .delete_removed_dependent_files(filename);
+                    .delete_removed_dependent_files(filename)?;
             }
             todo.delete_removed_dependent_files(filename)?;
         }
@@ -73,7 +73,7 @@ impl TodoList {
     #[inline]
     pub fn prepend(&mut self, todo: Todo) {
         self.changed = true;
-        self.insert(0, todo);
+        self.todos.insert(0, todo);
     }
 
     #[inline]
@@ -269,11 +269,6 @@ impl TodoList {
         self.todos.push(item);
     }
 
-    fn insert(&mut self, index: usize, item: Todo) {
-        self.changed = true;
-        self.todos.insert(index, item)
-    }
-
     #[inline(always)]
     fn reorder_low_high(&self, index: usize) -> (usize, usize) {
         if index + 1 < self.todos.len() && self.todos[index] > self.todos[index + 1] {
@@ -346,7 +341,7 @@ mod tests {
     fn get_todo_list() -> TodoList {
         let path = PathBuf::from("tests/TODO_LIST");
         let mut todolist = TodoList::read(&path);
-        todolist.read_dependencies(&path);
+        todolist.read_dependencies(&path).expect("reading todo dependencies failed");
         todolist
     }
 

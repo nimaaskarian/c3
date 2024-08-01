@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::fmt::Write;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
@@ -205,31 +204,14 @@ impl App {
     }
 
     pub fn batch_editor_messages(&mut self) {
-        let restriction = &self.restriction;
-
-        let mut todos_iter = self.current_list().filter(restriction);
-        let first_item = todos_iter.next();
-        let mut content = if let Some(item) = first_item {
-            format!(
-                "# INDEX PRIORITY MESSAGE\n{: <7} {: <8} {}\n",
-                0,
-                item.priority(),
-                item.message
-            )
-        } else {
-            String::new()
-        };
-        for (i, line) in todos_iter.enumerate() {
-            writeln!(
-                content,
-                "{: <7} {: <8} {}",
-                i + 1,
-                line.priority(),
-                line.message
-            );
-        }
-        let new_messages =
-            fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
+        let content = String::from("# INDEX PRIORITY MESSAGE\n") + self
+            .current_list()
+            .filter(&self.restriction)
+            .enumerate()
+            .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
+            .collect::<Vec<String>>()
+            .join("\n").as_str();
+        let new_messages = fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
     }
@@ -238,7 +220,6 @@ impl App {
     fn batch_edit_current_list(&mut self, messages: Lines<'_>) {
         let restriction = self.restriction.clone();
         let mut lines: Vec<IndexedLine> = messages
-            .into_iter()
             .filter(|message| !message.starts_with('#'))
             .flat_map(|message| message.parse())
             .collect();
@@ -254,10 +235,8 @@ impl App {
 
         for line in lines {
             if let Some(index) = line.index {
-                let index = todolist.true_position_in_list(index, &restriction);
-                let todo = &todolist.todos[index];
-                if todo.priority() != line.priority || todo.message != line.message {
-                    let todo = &mut todolist.todos[index];
+                let todo = todolist.index_mut(index, &restriction);
+                if false {
                     changed = true;
                     todo.set_message(line.message);
                     todo.set_priority(line.priority);
@@ -1026,7 +1005,6 @@ mod tests {
             .map(|dir| dir.map(|entry| entry.path()))
             .collect();
         let expected = vec![PathBuf::from("test-remove-current-dependency-partial/notes/63c5498f09d086fca6d870345350bfb210945790.todo")];
-        dbg!(&names);
         assert_eq!(names.unwrap(), expected);
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0]>63c5498f09d086fca6d870345350bfb210945790.todo Hello there\n");
