@@ -235,8 +235,9 @@ impl App {
 
         for line in lines {
             if let Some(index) = line.index {
-                let todo = todolist.index_mut(index, &restriction);
-                if false {
+                let index = todolist.true_position_in_list(index, &restriction);
+                let todo = &mut todolist.todos[index];
+                if line.priority != todo.priority() || line.message != todo.message {
                     changed = true;
                     todo.set_message(line.message);
                     todo.set_priority(line.priority);

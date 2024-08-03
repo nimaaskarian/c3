@@ -251,10 +251,10 @@ impl TodoList {
     }
 
     pub fn true_position_in_list(&self, index: usize, restriction: &RestrictionFunction) -> usize {
-        let binding = self.todos(restriction);
+        let binding = self.filter(restriction).nth(index).unwrap();
         self.todos
             .iter()
-            .position(|x| x == binding[index])
+            .position(|x| x == binding)
             .unwrap_or_default()
     }
 
