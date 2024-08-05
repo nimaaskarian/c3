@@ -25,9 +25,8 @@ use tui_textarea::{CursorMove, Input, TextArea};
 // mod {{{
 
 mod modules;
-use super::todo_app::{App, Todo};
-use crate::{date, todo_app::PriorityType};
-use crate::{todo_app::RestrictionFunction, TuiArgs};
+use super::todo_app::{App, Todo, RestrictionFunction};
+use crate::{date, TuiArgs};
 use modules::{potato::Potato, Module};
 // }}}
 
@@ -89,9 +88,8 @@ pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
     startup()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let mut potato_module = Potato::new(None);
     let mut list_state = ListState::default().with_selected(Some(0));
-    let mut app = TuiApp::new(app, &mut potato_module, args);
+    let mut app = TuiApp::new(app, Potato::new(), args);
 
     loop {
         terminal.draw(|frame| app.ui(frame, &mut list_state))?;
@@ -127,14 +125,14 @@ pub struct TuiApp<'a> {
     on_delete: Option<fn(&mut Self, HandlerParameter, String) -> ()>,
     on_input: Option<fn(&mut Self, HandlerParameter) -> ()>,
     args: TuiArgs,
-    module: &'a mut dyn Module<'a>,
+    module: Potato,
     textarea: TextArea<'a>,
     todo_app: &'a mut App,
 }
 
 impl<'a> TuiApp<'a> {
     #[inline]
-    pub fn new(app: &'a mut App, module: &'a mut dyn Module<'a>, args: TuiArgs) -> Self {
+    pub fn new(app: &'a mut App, module: Potato, args: TuiArgs) -> Self {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         TuiApp {
@@ -611,7 +609,7 @@ impl<'a> TuiApp<'a> {
                     }
                     Char(c) if c.is_ascii_digit() => {
                         let priority = c.to_digit(10).unwrap();
-                        self.todo_app.set_current_priority(priority as PriorityType);
+                        self.todo_app.set_current_priority(priority as u8);
                     }
 
                     Char('s') => self.module.on_s(),

@@ -15,11 +15,10 @@ use note::{open_note_temp_editor, sha1};
 use schedule::Schedule;
 //}}}
 
-pub type PriorityType = u8;
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Todo {
     pub message: String,
-    priority: PriorityType,
+    priority: u8,
     pub dependency: Option<Dependency>,
     removed_dependency: Option<Dependency>,
     done: bool,
@@ -95,7 +94,7 @@ impl FromStr for Todo {
                     if c == '-' {
                         done = true;
                     } else if c.is_ascii_digit() {
-                        priority = c.to_digit(10).unwrap() as PriorityType;
+                        priority = c.to_digit(10).unwrap() as u8;
                     } else if c == ' ' {
                         state = State::Message;
                     } else if c == '>' {
@@ -152,11 +151,11 @@ impl Todo {
     }
 
     #[inline]
-    pub fn priority(&self) -> PriorityType {
+    pub fn priority(&self) -> u8 {
         self.priority
     }
     #[inline]
-    pub fn new(message: String, priority: PriorityType) -> Self {
+    pub fn new(message: String, priority: u8) -> Self {
         Todo {
             message,
             priority: Self::fixed_priority(priority),
@@ -311,7 +310,7 @@ impl Todo {
     }
 
     #[inline(always)]
-    fn standardize_priority(priority: PriorityType) -> PriorityType {
+    fn standardize_priority(priority: u8) -> u8 {
         match priority {
             0 => 10,
             any => any,
@@ -319,7 +318,7 @@ impl Todo {
     }
 
     #[inline(always)]
-    fn standardized_priority(&self) -> PriorityType {
+    fn standardized_priority(&self) -> u8 {
         Self::standardize_priority(self.priority)
     }
 
@@ -342,7 +341,7 @@ impl Todo {
     }
 
     #[inline]
-    pub fn set_priority(&mut self, priority: PriorityType) {
+    pub fn set_priority(&mut self, priority: u8) {
         self.priority = priority;
         self.fix_priority();
     }
@@ -353,7 +352,7 @@ impl Todo {
     }
 
     #[inline(always)]
-    fn cmp_value(&self) -> PriorityType {
+    fn cmp_value(&self) -> u8 {
         let mut priority = self.standardized_priority() * 2;
         if self.schedule.is_reminder() {
             priority -= 1;
@@ -366,7 +365,7 @@ impl Todo {
     }
 
     #[inline]
-    fn fixed_priority(priority: PriorityType) -> PriorityType {
+    fn fixed_priority(priority: u8) -> u8 {
         match priority {
             10.. => 0,
             0 => 0,

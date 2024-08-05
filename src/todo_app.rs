@@ -11,7 +11,6 @@ use crate::{fileio, AppArgs};
 use std::rc::Rc;
 pub use todo::Todo;
 
-pub use self::todo::PriorityType;
 pub use self::todo_list::TodoList;
 
 #[derive(Clone)]
@@ -640,7 +639,7 @@ impl App {
     #[inline]
     pub fn set_priority_restriction(
         &mut self,
-        priority: PriorityType,
+        priority: u8,
         last_restriction: Option<RestrictionFunction>,
     ) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
@@ -650,7 +649,7 @@ impl App {
     }
 
     #[inline]
-    pub fn set_priority_limit_no_done(&mut self, priority: PriorityType) {
+    pub fn set_priority_limit_no_done(&mut self, priority: u8) {
         self.args.display_args.show_done = false;
         self.set_restriction(Rc::new(move |todo| {
             todo.priority() == priority && !todo.done()
@@ -658,7 +657,7 @@ impl App {
     }
 
     #[inline]
-    pub fn set_current_priority(&mut self, priority: PriorityType) {
+    pub fn set_current_priority(&mut self, priority: u8) {
         if let Some(todo) = self.todo_mut() {
             todo.set_priority(priority);
             self.reorder_current();
