@@ -4,7 +4,7 @@ use std::io::{stdout, BufRead, BufWriter, Write};
 use std::path::Path;
 
 use super::{App, RestrictionFunction, Todo};
-use crate::{DisplayArgs, DisplayWithArgs};
+use crate::{DisplayArgs, TodoDisplay};
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TodoList {

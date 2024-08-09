@@ -10,7 +10,7 @@ mod dependency;
 mod note;
 pub mod schedule;
 use super::TodoList;
-use crate::{DisplayArgs, DisplayWithArgs};
+use crate::{DisplayArgs, TodoDisplay};
 use dependency::Dependency;
 use note::{open_note_temp_editor, sha1};
 use schedule::Schedule;
@@ -38,7 +38,7 @@ impl fmt::Display for Todo {
     }
 }
 
-impl DisplayWithArgs for Todo {
+impl TodoDisplay for Todo {
     fn display_with_args(&self, args: &DisplayArgs) -> String {
         let done_string = if args.show_done {
             if self.done() {

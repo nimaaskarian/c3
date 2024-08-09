@@ -1,5 +1,5 @@
 use super::todo_app::{App, RestrictionFunction, Todo, TodoList};
-use crate::{Args, DisplayWithArgs};
+use crate::{Args, TodoDisplay};
 use crate::{CliArgs, DisplayArgs, DoOnSelected};
 use clap::{Command, CommandFactory};
 use clap_complete::{generate, Generator};

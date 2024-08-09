@@ -16,11 +16,9 @@ fn main() -> io::Result<()> {
     let mut app = App::new(args.app_args);
 
     if cli_app::run(&mut app, args.cli_args).is_err() {
-        let output = tui_app::run(&mut app, args.tui_args);
-        {
-            tui_app::shutdown()?;
-            output
-        }
+        let result = tui_app::run(&mut app, args.tui_args);
+        tui_app::shutdown()?;
+        result
     } else {
         Ok(())
     }
@@ -142,6 +140,6 @@ pub struct DisplayArgs {
     undone_string: String,
 }
 
-trait DisplayWithArgs: fmt::Display {
-    fn display_with_args(&self, args: &DisplayArgs) -> String;
+trait TodoDisplay: fmt::Display {
+    fn display_with_args(&self,args: &DisplayArgs) -> String;
 }
