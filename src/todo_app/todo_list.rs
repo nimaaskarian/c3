@@ -161,9 +161,9 @@ impl TodoList {
     }
 
     #[inline]
-    pub(super) fn force_write_dependencies(&mut self, filename: &Path) -> io::Result<()> {
-        for todo in &mut self.todos {
-            if let Some(dependency) = todo.dependency.as_mut() {
+    pub(super) fn force_write_dependencies(&self, filename: &Path) -> io::Result<()> {
+        for todo in &self.todos {
+            if let Some(dependency) = todo.dependency.as_ref() {
                 dependency.todo_list.force_write_dependencies(filename)?;
                 dependency.force_write(filename)?;
             }
@@ -172,11 +172,10 @@ impl TodoList {
     }
 
     #[inline]
-    pub fn force_write(&mut self, filename: &Path) -> io::Result<()> {
+    pub fn force_write(&self, filename: &Path) -> io::Result<()> {
         let file = File::create(filename)?;
         let mut writer = BufWriter::new(file);
         self.write_to_buf(&mut writer)?;
-        self.changed = false;
         Ok(())
     }
 
@@ -184,6 +183,7 @@ impl TodoList {
     pub fn write(&mut self, filename: &Path) -> io::Result<()> {
         if self.changed {
             self.force_write(filename)?;
+            self.changed = false;
         }
         Ok(())
     }

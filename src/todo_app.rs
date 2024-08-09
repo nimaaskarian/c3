@@ -137,8 +137,8 @@ impl App {
     }
 
     #[inline]
-    pub fn output_list_to_path(&mut self, path: &Path) -> io::Result<()> {
-        let list = self.current_list_mut();
+    pub fn output_list_to_path(&self, path: &Path) -> io::Result<()> {
+        let list = self.current_list();
         let dependency_path = fileio::append_notes_to_path_parent(path);
         create_dir_all(&dependency_path)?;
         list.force_write(path)?;

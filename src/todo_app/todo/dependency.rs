@@ -131,14 +131,14 @@ impl Dependency {
     }
 
     #[inline]
-    fn write_note(&mut self, path: &Path) -> io::Result<()> {
+    fn write_note(&self, path: &Path) -> io::Result<()> {
         let mut file = File::create(path.join(&self.name))?;
         write!(file, "{}", self.note)?;
         Ok(())
     }
 
     #[inline]
-    pub fn force_write(&mut self, path: &Path) -> io::Result<()> {
+    pub fn force_write(&self, path: &Path) -> io::Result<()> {
         match self.mode {
             DependencyMode::TodoList => {
                 self.todo_list.force_write(&path.join(&self.name))?;
@@ -147,7 +147,6 @@ impl Dependency {
                 self.write_note(path)?;
             }
         };
-        self.written = true;
         Ok(())
     }
 
