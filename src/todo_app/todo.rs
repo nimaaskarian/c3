@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::Path;
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
@@ -9,7 +10,7 @@ mod dependency;
 mod note;
 pub mod schedule;
 use super::TodoList;
-use crate::DisplayArgs;
+use crate::{DisplayArgs, DisplayWithArgs};
 use dependency::Dependency;
 use note::{open_note_temp_editor, sha1};
 use schedule::Schedule;
@@ -23,6 +24,33 @@ pub struct Todo {
     removed_dependency: Option<Dependency>,
     done: bool,
     pub schedule: Schedule,
+}
+
+impl fmt::Display for Todo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let daily_str = self.schedule.display();
+        let note_string = self.dependency.as_ref().map_or(".", |dep| dep.display());
+        let Todo {
+            priority, message, ..
+        } = self;
+
+        write!(f, "{priority}{note_string} {message}{daily_str}")
+    }
+}
+
+impl DisplayWithArgs for Todo {
+    fn display_with_args(&self, args: &DisplayArgs) -> String {
+        let done_string = if args.show_done {
+            if self.done() {
+                args.done_string.as_str()
+            } else {
+                args.undone_string.as_str()
+            }
+        } else {
+            ""
+        };
+        format!("{done_string}{self}")
+    }
 }
 
 impl Ord for Todo {
@@ -213,25 +241,6 @@ impl Todo {
     #[inline]
     pub fn done(&self) -> bool {
         self.done
-    }
-
-    #[inline]
-    pub fn display(&self, args: &DisplayArgs) -> String {
-        let done_string = if args.show_done {
-            if self.done() {
-                args.done_string.as_str()
-            } else {
-                args.undone_string.as_str()
-            }
-        } else {
-            ""
-        };
-        let note_string = self.dependency.as_ref().map_or(".", |dep| dep.display());
-        let daily_str = self.schedule.display();
-        format!(
-            "{done_string}{}{note_string} {}{daily_str}",
-            self.priority, self.message
-        )
     }
 
     #[inline]
@@ -565,7 +574,7 @@ mod tests {
         };
         let expected = "2. this one should be daily (Daily)";
 
-        assert_eq!(test.display(&DisplayArgs::parse()), expected)
+        assert_eq!(test.display_with_args(&DisplayArgs::parse()), expected)
     }
 
     #[test]

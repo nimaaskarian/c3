@@ -4,7 +4,7 @@ use std::io::{stdout, BufRead, BufWriter, Write};
 use std::path::Path;
 
 use super::{App, RestrictionFunction, Todo};
-use crate::DisplayArgs;
+use crate::{DisplayArgs, DisplayWithArgs};
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TodoList {
@@ -222,7 +222,7 @@ impl TodoList {
         self.todos
             .iter()
             .filter(|todo| restriction(todo))
-            .map(|todo| todo.display(args))
+            .map(|todo| todo.display_with_args(args))
             .collect()
     }
 
@@ -238,7 +238,7 @@ impl TodoList {
             .filter(|todo| restriction(todo))
             .skip(min)
             .take(max)
-            .map(|todo| todo.display(args))
+            .map(|todo| todo.display_with_args(args))
             .collect()
     }
 
@@ -341,7 +341,9 @@ mod tests {
     fn get_todo_list() -> TodoList {
         let path = PathBuf::from("tests/TODO_LIST");
         let mut todolist = TodoList::read(&path);
-        todolist.read_dependencies(&path).expect("reading todo dependencies failed");
+        todolist
+            .read_dependencies(&path)
+            .expect("reading todo dependencies failed");
         todolist
     }
 

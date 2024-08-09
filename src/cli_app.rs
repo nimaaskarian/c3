@@ -1,5 +1,5 @@
 use super::todo_app::{App, RestrictionFunction, Todo, TodoList};
-use crate::Args;
+use crate::{Args, DisplayWithArgs};
 use crate::{CliArgs, DisplayArgs, DoOnSelected};
 use clap::{Command, CommandFactory};
 use clap_complete::{generate, Generator};
@@ -142,7 +142,7 @@ impl PrintTodoTree {
 
     #[inline]
     fn print_todo(&self, todo: &Todo, display_args: &DisplayArgs) {
-        println!("{}", todo.display(display_args));
+        println!("{}", todo.display_with_args(display_args));
     }
 
     #[inline]

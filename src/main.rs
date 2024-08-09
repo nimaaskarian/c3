@@ -1,7 +1,7 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 use clap::{Parser, ValueEnum};
 use clap_complete::Shell;
-use std::io;
+use std::{fmt, io};
 pub(crate) mod cli_app;
 pub(crate) mod date;
 pub(crate) mod fileio;
@@ -140,4 +140,8 @@ pub struct DisplayArgs {
     /// String before undone todos
     #[arg(long, default_value_t=String::from("[ ] "))]
     undone_string: String,
+}
+
+trait DisplayWithArgs: fmt::Display {
+    fn display_with_args(&self, args: &DisplayArgs) -> String;
 }

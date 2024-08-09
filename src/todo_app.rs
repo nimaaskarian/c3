@@ -111,7 +111,7 @@ impl App {
     fn read_a_todo_list(path: &Path, notes_dir: &Path, args: &AppArgs) -> TodoList {
         let mut todo_list = TodoList::read(path);
         if !args.no_tree {
-            todo_list.read_dependencies(&notes_dir);
+            todo_list.read_dependencies(notes_dir);
         }
         todo_list
     }
@@ -203,14 +203,17 @@ impl App {
     }
 
     pub fn batch_editor_messages(&mut self) {
-        let content = String::from("# INDEX PRIORITY MESSAGE\n") + self
-            .current_list()
-            .filter(&self.restriction)
-            .enumerate()
-            .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
-            .collect::<Vec<String>>()
-            .join("\n").as_str();
-        let new_messages = fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
+        let content = String::from("# INDEX PRIORITY MESSAGE\n")
+            + self
+                .current_list()
+                .filter(&self.restriction)
+                .enumerate()
+                .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
+                .collect::<Vec<String>>()
+                .join("\n")
+                .as_str();
+        let new_messages =
+            fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
     }

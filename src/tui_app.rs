@@ -25,7 +25,7 @@ use tui_textarea::{CursorMove, Input, TextArea};
 // mod {{{
 
 mod modules;
-use super::todo_app::{App, Todo, RestrictionFunction};
+use super::todo_app::{App, RestrictionFunction, Todo};
 use crate::{date, TuiArgs};
 use modules::{potato::Potato, Module};
 // }}}
