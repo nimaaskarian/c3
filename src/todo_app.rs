@@ -19,7 +19,7 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
-pub type RestrictionFunction = Rc<dyn Fn(&Todo) -> bool>;
+pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
     clipboard: Clipboard,
@@ -32,7 +32,7 @@ pub struct App {
     tree_search_positions: Vec<SearchPosition>,
     x_index: usize,
     y_index: usize,
-    restriction: RestrictionFunction,
+    restriction: Restriction,
 }
 
 #[derive(Debug)]
@@ -124,7 +124,7 @@ impl App {
     }
 
     #[inline]
-    pub fn restriction(&self) -> &RestrictionFunction {
+    pub fn restriction(&self) -> &Restriction {
         &self.restriction
     }
 
@@ -155,7 +155,7 @@ impl App {
     pub fn set_query_restriction(
         &mut self,
         query: String,
-        last_restriction: Option<RestrictionFunction>,
+        last_restriction: Option<Restriction>,
     ) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
         self.set_restriction(Rc::new(move |todo| {
@@ -613,18 +613,18 @@ impl App {
 
     #[inline]
     pub fn is_undone_empty(&self) -> bool {
-        let restriction: RestrictionFunction = Rc::new(move |todo| !todo.done());
+        let restriction: Restriction = Rc::new(move |todo| !todo.done());
         self.current_list().is_empty(&restriction)
     }
 
     #[inline]
     pub fn is_done_empty(&self) -> bool {
-        let restriction: RestrictionFunction = Rc::new(move |todo| todo.done());
+        let restriction: Restriction = Rc::new(move |todo| todo.done());
         self.current_list().is_empty(&restriction)
     }
 
     #[inline(always)]
-    pub fn no_restriction() -> RestrictionFunction {
+    pub fn no_restriction() -> Restriction {
         Rc::new(|_| true)
     }
 
@@ -634,7 +634,7 @@ impl App {
     }
 
     #[inline(always)]
-    pub fn set_restriction(&mut self, restriction: RestrictionFunction) {
+    pub fn set_restriction(&mut self, restriction: Restriction) {
         self.restriction = restriction;
         self.fix_index();
     }
@@ -643,7 +643,7 @@ impl App {
     pub fn set_priority_restriction(
         &mut self,
         priority: u8,
-        last_restriction: Option<RestrictionFunction>,
+        last_restriction: Option<Restriction>,
     ) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
         self.set_restriction(Rc::new(move |todo| {

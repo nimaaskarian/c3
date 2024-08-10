@@ -24,7 +24,7 @@ use tui_textarea::{CursorMove, Input, TextArea};
 // mod {{{
 
 mod modules;
-use super::todo_app::{App, RestrictionFunction, Todo};
+use super::todo_app::{App, Restriction, Todo};
 use crate::{date, TuiArgs};
 use modules::{potato::Potato, Module};
 // }}}
@@ -50,7 +50,7 @@ enum Mode {
 }
 
 pub struct TuiApp<'a> {
-    last_restriction: Option<RestrictionFunction>,
+    last_restriction: Option<Restriction>,
     show_right: bool,
     mode: Mode,
     on_submit: Option<fn(&mut Self, String) -> ()>,

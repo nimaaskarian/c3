@@ -1,4 +1,4 @@
-use super::todo_app::{App, RestrictionFunction, Todo, TodoList};
+use super::todo_app::{App, Restriction, Todo, TodoList};
 use crate::{Args, TodoDisplay};
 use crate::{CliArgs, DisplayArgs, DoOnSelected};
 use clap::{Command, CommandFactory};
@@ -120,7 +120,7 @@ impl PrintTodoTree {
         &mut self,
         todo_list: &TodoList,
         display_args: &DisplayArgs,
-        restriction: &RestrictionFunction,
+        restriction: &Restriction,
     ) {
         let todos = todo_list.todos(restriction);
 

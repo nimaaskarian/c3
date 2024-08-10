@@ -3,7 +3,7 @@ use std::io;
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::path::Path;
 
-use super::{App, RestrictionFunction, Todo};
+use super::{App, Restriction, Todo};
 use crate::{DisplayArgs, TodoDisplay};
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -29,7 +29,7 @@ impl TodoList {
         }
     }
 
-    pub fn index(&self, index: usize, restriction: &RestrictionFunction) -> &Output {
+    pub fn index(&self, index: usize, restriction: &Restriction) -> &Output {
         self.todos
             .iter()
             .filter(|todo| restriction(todo))
@@ -37,7 +37,7 @@ impl TodoList {
             .unwrap()
     }
 
-    pub fn index_mut(&mut self, index: usize, restriction: &RestrictionFunction) -> &mut Output {
+    pub fn index_mut(&mut self, index: usize, restriction: &Restriction) -> &mut Output {
         self.changed = true;
         self.todos
             .iter_mut()
@@ -46,11 +46,11 @@ impl TodoList {
             .unwrap()
     }
 
-    pub fn todos(&self, restriction: &RestrictionFunction) -> Vec<&Todo> {
+    pub fn todos(&self, restriction: &Restriction) -> Vec<&Todo> {
         self.todos.iter().filter(|todo| restriction(todo)).collect()
     }
 
-    pub fn todos_mut(&mut self, restriction: &RestrictionFunction) -> Vec<&mut Todo> {
+    pub fn todos_mut(&mut self, restriction: &Restriction) -> Vec<&mut Todo> {
         self.todos
             .iter_mut()
             .filter(|todo| restriction(todo))
@@ -203,7 +203,7 @@ impl TodoList {
         self.todos.iter_mut()
     }
 
-    pub fn messages(&self, restriction: &RestrictionFunction) -> Vec<&str> {
+    pub fn messages(&self, restriction: &Restriction) -> Vec<&str> {
         self.todos
             .iter()
             .filter(|todo| restriction(todo))
@@ -213,12 +213,12 @@ impl TodoList {
 
     pub fn filter<'a>(
         &'a self,
-        restriction: &'a RestrictionFunction,
+        restriction: &'a Restriction,
     ) -> impl Iterator<Item = &Todo> {
         self.todos.iter().filter(|todo| restriction(todo))
     }
 
-    pub fn display(&self, args: &DisplayArgs, restriction: &RestrictionFunction) -> Vec<String> {
+    pub fn display(&self, args: &DisplayArgs, restriction: &Restriction) -> Vec<String> {
         self.todos
             .iter()
             .filter(|todo| restriction(todo))
@@ -229,7 +229,7 @@ impl TodoList {
     pub fn display_slice(
         &self,
         args: &DisplayArgs,
-        restriction: &RestrictionFunction,
+        restriction: &Restriction,
         min: usize,
         max: usize,
     ) -> Vec<String> {
@@ -242,15 +242,15 @@ impl TodoList {
             .collect()
     }
 
-    pub fn len(&self, restriction: &RestrictionFunction) -> usize {
+    pub fn len(&self, restriction: &Restriction) -> usize {
         self.todos.iter().filter(|todo| restriction(todo)).count()
     }
 
-    pub fn is_empty(&self, restriction: &RestrictionFunction) -> bool {
+    pub fn is_empty(&self, restriction: &Restriction) -> bool {
         self.len(restriction) == 0
     }
 
-    pub fn true_position_in_list(&self, index: usize, restriction: &RestrictionFunction) -> usize {
+    pub fn true_position_in_list(&self, index: usize, restriction: &Restriction) -> usize {
         let binding = self.filter(restriction).nth(index).unwrap();
         self.todos
             .iter()
@@ -258,7 +258,7 @@ impl TodoList {
             .unwrap_or_default()
     }
 
-    pub fn remove(&mut self, index: usize, restriction: &RestrictionFunction) -> Todo {
+    pub fn remove(&mut self, index: usize, restriction: &Restriction) -> Todo {
         self.changed = true;
         let index_in_vec = self.true_position_in_list(index, restriction);
         self.todos.remove(index_in_vec)
