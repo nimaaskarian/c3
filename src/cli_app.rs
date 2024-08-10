@@ -122,10 +122,12 @@ impl PrintTodoTree {
         display_args: &DisplayArgs,
         restriction: &Restriction,
     ) {
-        let todos = todo_list.todos(restriction);
+        let mut iter = todo_list.todos(restriction);
+        let mut next = iter.next();
 
-        for (index, todo) in todos.iter().enumerate() {
-            self.is_last = index == todos.len() - 1;
+        while let Some(todo) = next {
+            next = iter.next();
+            self.is_last = next.is_none();
             if !self.last_stack.is_empty() {
                 self.print_indention();
             }

@@ -46,15 +46,16 @@ impl TodoList {
             .unwrap()
     }
 
-    pub fn todos(&self, restriction: &Restriction) -> Vec<&Todo> {
-        self.todos.iter().filter(|todo| restriction(todo)).collect()
+    #[inline(always)]
+    pub fn todos<'a>(&'a self, restriction: &'a Restriction) -> impl Iterator<Item = &Todo> {
+        self.todos.iter().filter(|todo| restriction(todo))
     }
 
-    pub fn todos_mut(&mut self, restriction: &Restriction) -> Vec<&mut Todo> {
+    #[inline(always)]
+    pub fn todos_mut<'a>(&'a mut self, restriction: &'a Restriction) -> impl Iterator<Item = &mut Todo> {
         self.todos
             .iter_mut()
             .filter(|todo| restriction(todo))
-            .collect()
     }
 
     #[inline]
