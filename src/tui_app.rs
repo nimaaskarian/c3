@@ -13,7 +13,7 @@ use crossterm::{
         self,
         Event::Key,
         KeyCode::{self, Char},
-        KeyModifiers,
+        KeyModifiers
     },
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
@@ -43,7 +43,7 @@ enum EditorOperation {
 }
 
 #[derive(Default, PartialEq)]
-enum UiMode {
+enum Mode {
     #[default]
     Normal,
     Editing,
@@ -52,7 +52,7 @@ enum UiMode {
 pub struct TuiApp<'a> {
     last_restriction: Option<RestrictionFunction>,
     show_right: bool,
-    ui_mode: UiMode,
+    mode: Mode,
     on_submit: Option<fn(&mut Self, String) -> ()>,
     on_delete: Option<fn(&mut Self, String, String) -> ()>,
     on_input: Option<fn(&mut Self, String) -> ()>,
@@ -76,7 +76,7 @@ impl<'a> TuiApp<'a> {
             on_input: None,
             on_delete: None,
             show_right: true,
-            ui_mode: Default::default(),
+            mode: Default::default(),
             last_restriction: None,
         }
     }
@@ -132,14 +132,14 @@ impl<'a> TuiApp<'a> {
     fn turn_on_text_mode(&mut self, title: &'a str, placeholder: &str) {
         self.textarea.set_placeholder_text(placeholder);
         self.textarea.set_block(default_block(title));
-        self.ui_mode = UiMode::Editing;
+        self.mode = Mode::Editing;
     }
 
     #[inline(always)]
     fn turn_off_text_mode(&mut self) {
         self.textarea.delete_line_by_head();
         self.textarea.delete_line_by_end();
-        self.ui_mode = UiMode::Normal;
+        self.mode = Mode::Normal;
     }
 
     #[inline]
@@ -424,9 +424,9 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn handle_key_and_return_operation(&mut self) -> io::Result<HandlerOperation> {
-        let input_handler = match self.ui_mode {
-            UiMode::Editing => Self::handle_text_input,
-            UiMode::Normal => Self::handle_normal_input,
+        let input_handler = match self.mode {
+            Mode::Editing => Self::handle_text_input,
+            Mode::Normal => Self::handle_normal_input,
         };
         if self.args.enable_module {
             if event::poll(std::time::Duration::from_millis(
@@ -447,7 +447,19 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn handle_normal_input(&mut self) -> io::Result<HandlerOperation> {
-        if let Key(key) = event::read()? {
+        let event = event::read()?;
+        if let event::Event::Mouse(mouse) = event {
+            match mouse.kind {
+                event::MouseEventKind::ScrollUp => {
+                    self.todo_app.decrement();
+                }
+                event::MouseEventKind::ScrollDown => {
+                    self.todo_app.increment();
+                }
+                _ => {}
+            }
+        }
+        if let Key(key) = event {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
                     Char('o') if key.modifiers == KeyModifiers::CONTROL => {
@@ -677,7 +689,7 @@ impl<'a> TuiApp<'a> {
         let todo_and_textarea_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3 * (self.ui_mode == UiMode::Editing) as u16),
+                Constraint::Length(3 * (self.mode == Mode::Editing) as u16),
                 Constraint::Min(0),
             ])
             .split(todo_app_layout[0]);
@@ -723,14 +735,19 @@ pub fn create_todo_widget(
 
 pub fn shutdown() -> io::Result<()> {
     disable_raw_mode()?;
-    io::stdout().execute(crossterm::cursor::Show)?;
-    io::stdout().execute(LeaveAlternateScreen)?;
+    io::stdout()
+        .execute(LeaveAlternateScreen)?
+        .execute(crossterm::cursor::Show)?
+        .execute(crossterm::event::DisableMouseCapture)?;
     Ok(())
 }
 
 pub fn startup() -> io::Result<()> {
     enable_raw_mode()?;
-    io::stdout().execute(EnterAlternateScreen)?;
+    io::stdout()
+        .execute(EnterAlternateScreen)?
+        .execute(crossterm::cursor::Hide)?
+        .execute(crossterm::event::EnableMouseCapture)?;
     Ok(())
 }
 
