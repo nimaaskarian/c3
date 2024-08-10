@@ -94,7 +94,7 @@ pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
     loop {
         terminal.draw(|frame| app.ui(frame, &mut list_state))?;
 
-        let operation = app.update_return_operation()?;
+        let operation = app.handle_key_and_return_operation()?;
         match operation {
             Operation::Restart => restart(&mut terminal)?,
             Operation::Nothing => {}
@@ -116,11 +116,18 @@ enum EditorOperation {
     Delete(String),
 }
 
+#[derive(Default, PartialEq)]
+enum UiMode {
+    #[default]
+    Normal,
+    Editing,
+}
+
 type HandlerParameter = String;
 pub struct TuiApp<'a> {
     last_restriction: Option<RestrictionFunction>,
     show_right: bool,
-    text_mode: bool,
+    ui_mode: UiMode,
     on_submit: Option<fn(&mut Self, HandlerParameter) -> ()>,
     on_delete: Option<fn(&mut Self, HandlerParameter, String) -> ()>,
     on_input: Option<fn(&mut Self, HandlerParameter) -> ()>,
@@ -139,12 +146,12 @@ impl<'a> TuiApp<'a> {
             todo_app: app,
             args,
             textarea,
-            potato_module: Potato::default(),
+            potato_module: Default::default(),
             on_submit: None,
             on_input: None,
             on_delete: None,
             show_right: true,
-            text_mode: false,
+            ui_mode: Default::default(),
             last_restriction: None,
         }
     }
@@ -200,14 +207,14 @@ impl<'a> TuiApp<'a> {
     fn turn_on_text_mode(&mut self, title: &'a str, placeholder: &str) {
         self.textarea.set_placeholder_text(placeholder);
         self.textarea.set_block(default_block(title));
-        self.text_mode = true;
+        self.ui_mode = UiMode::Editing;
     }
 
     #[inline(always)]
     fn turn_off_text_mode(&mut self) {
         self.textarea.delete_line_by_head();
         self.textarea.delete_line_by_end();
-        self.text_mode = false;
+        self.ui_mode = UiMode::Normal;
     }
 
     #[inline]
@@ -433,7 +440,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn enable_text_editor(&mut self) -> io::Result<()> {
+    fn handle_text_input(&mut self) -> io::Result<Operation> {
         let operation = self.editor()?;
         match operation {
             EditorOperation::Input => {
@@ -458,20 +465,6 @@ impl<'a> TuiApp<'a> {
                     on_delete(self, message, before_delete);
                 }
             }
-        }
-        Ok(())
-    }
-
-    #[inline]
-    pub fn update_editor(&mut self) -> io::Result<Operation> {
-        if self.args.enable_module {
-            if event::poll(std::time::Duration::from_millis(
-                self.potato_module.update_time_ms(),
-            ))? {
-                self.enable_text_editor()?
-            }
-        } else {
-            self.enable_text_editor()?
         }
         Ok(Operation::Nothing)
     }
@@ -510,27 +503,23 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    pub fn update_return_operation(&mut self) -> io::Result<Operation> {
-        let output;
-        if self.text_mode {
-            output = self.update_editor()?;
-        } else {
-            output = self.update_no_editor()?;
-            self.todo_app.fix_index();
-        }
-        Ok(output)
-    }
-
-    #[inline]
-    fn update_no_editor(&mut self) -> io::Result<Operation> {
+    pub fn handle_key_and_return_operation(&mut self) -> io::Result<Operation> {
+        let input_handler = match self.ui_mode {
+            UiMode::Editing => {
+                Self::handle_text_input
+            }
+            UiMode::Normal => {
+                Self::handle_normal_input
+            }
+        };
         if self.args.enable_module {
             if event::poll(std::time::Duration::from_millis(
                 self.potato_module.update_time_ms(),
             ))? {
-                return self.read_keys();
+                return input_handler(self);
             }
         } else {
-            return self.read_keys();
+            return input_handler(self);
         }
         Ok(Operation::Nothing)
     }
@@ -541,7 +530,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn read_keys(&mut self) -> io::Result<Operation> {
+    fn handle_normal_input(&mut self) -> io::Result<Operation> {
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
@@ -772,7 +761,7 @@ impl<'a> TuiApp<'a> {
         let todo_and_textarea_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3 * self.text_mode as u16),
+                Constraint::Length(3 * (self.ui_mode == UiMode::Editing) as u16),
                 Constraint::Min(0),
             ])
             .split(todo_app_layout[0]);
