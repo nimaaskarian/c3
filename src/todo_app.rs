@@ -738,7 +738,7 @@ impl App {
     #[inline]
     pub fn edit_or_add_note(&mut self) {
         if self.is_tree() {
-            let list_changed = self.current_list_mut().changed;
+            let list_changed = self.current_list().changed;
             let changed = self.changed;
             if let Some(todo) = self.todo_mut() {
                 if !todo.edit_note().unwrap_or_default() {
