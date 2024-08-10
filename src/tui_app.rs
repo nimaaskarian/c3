@@ -1,10 +1,9 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std {{{
 use std::{
-    io::{self, stdout, BufRead, BufReader},
-    iter,
+    io::{self, BufRead, BufReader},
     path::PathBuf,
-    process::{self, Command, Stdio},
+    process::{Command, Stdio},
     rc::Rc,
 };
 // }}}
@@ -65,14 +64,14 @@ pub fn create_todo_widget(
 
 pub fn shutdown() -> io::Result<()> {
     disable_raw_mode()?;
-    stdout().execute(crossterm::cursor::Show)?;
-    stdout().execute(LeaveAlternateScreen)?;
+    io::stdout().execute(crossterm::cursor::Show)?;
+    io::stdout().execute(LeaveAlternateScreen)?;
     Ok(())
 }
 
 pub fn startup() -> io::Result<()> {
     enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
+    io::stdout().execute(EnterAlternateScreen)?;
     Ok(())
 }
 
@@ -181,7 +180,7 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn set_text_mode(
         &mut self,
-        on_submit: fn(&mut Self, HandlerParameter) -> (),
+        on_submit: fn(&mut Self, String) -> (),
         title: &'a str,
         placeholder: &str,
     ) {
@@ -194,7 +193,7 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn set_responsive_text_mode(
         &mut self,
-        on_input: fn(&mut Self, HandlerParameter) -> (),
+        on_input: fn(&mut Self, String) -> (),
         title: &'a str,
         placeholder: &str,
     ) {
@@ -273,7 +272,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_schedule(&mut self, str: HandlerParameter) {
+    fn on_schedule(&mut self, str: String) {
         let day = str.parse::<u64>().ok();
         if day.is_none() {
             return;
@@ -288,12 +287,7 @@ impl<'a> TuiApp<'a> {
         self.set_text_mode(Self::on_reminder, "Date reminder", "");
     }
 
-    fn nnn_paths() -> Option<
-        iter::Map<
-            io::Lines<BufReader<process::ChildStdout>>,
-            impl FnMut(Result<String, io::Error>) -> PathBuf,
-        >,
-    > {
+    fn nnn_paths() -> Option<impl Iterator<Item = PathBuf>> {
         let mut output = Command::new("nnn")
             .args(["-p", "-"])
             .stdin(Stdio::inherit())
@@ -337,7 +331,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_reminder(&mut self, str: HandlerParameter) {
+    fn on_reminder(&mut self, str: String) {
         if let Ok(date) = date::parse_user_input(&str) {
             if let Some(todo) = self.todo_app.todo_mut() {
                 todo.schedule.enable_reminder(date);
@@ -406,7 +400,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_save_prompt(&mut self, str: HandlerParameter) {
+    fn on_save_prompt(&mut self, str: String) {
         let lower = str.to_lowercase();
         if lower.starts_with('y') {
             let _ = self.todo_app.write();
@@ -417,17 +411,17 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_append_todo(&mut self, str: HandlerParameter) {
+    fn on_append_todo(&mut self, str: String) {
         self.todo_app.append(str);
     }
 
     #[inline]
-    fn on_prepend_todo(&mut self, str: HandlerParameter) {
+    fn on_prepend_todo(&mut self, str: String) {
         self.todo_app.prepend(str);
     }
 
     #[inline]
-    fn on_edit_todo(&mut self, str: HandlerParameter) {
+    fn on_edit_todo(&mut self, str: String) {
         if !str.is_empty() {
             self.todo_app.todo_mut().unwrap().set_message(str);
         }
@@ -504,12 +498,8 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn handle_key_and_return_operation(&mut self) -> io::Result<Operation> {
         let input_handler = match self.ui_mode {
-            UiMode::Editing => {
-                Self::handle_text_input
-            }
-            UiMode::Normal => {
-                Self::handle_normal_input
-            }
+            UiMode::Editing => Self::handle_text_input,
+            UiMode::Normal => Self::handle_normal_input,
         };
         if self.args.enable_module {
             if event::poll(std::time::Duration::from_millis(

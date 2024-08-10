@@ -189,16 +189,16 @@ impl TodoList {
     }
 
     #[inline(always)]
-    pub(super) fn filter_indices(&mut self, sorted_indices: Vec<usize>) {
+    pub(super) fn retrain_indices(&mut self, sorted_indices: Vec<usize>) {
         self.todos
             .retain(with_index(|i, _| sorted_indices.binary_search(&i).is_err()))
     }
 
-    pub fn iter(&self) -> std::slice::Iter<Todo> {
+    pub fn iter(&self) -> impl Iterator<Item = &Todo> {
         self.todos.iter()
     }
 
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<Todo> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Todo> {
         self.changed = true;
         self.todos.iter_mut()
     }
@@ -214,7 +214,7 @@ impl TodoList {
     pub fn filter<'a>(
         &'a self,
         restriction: &'a RestrictionFunction,
-    ) -> std::iter::Filter<std::slice::Iter<Todo>, impl FnMut(&&'a Todo) -> bool> {
+    ) -> impl Iterator<Item = &Todo> {
         self.todos.iter().filter(|todo| restriction(todo))
     }
 

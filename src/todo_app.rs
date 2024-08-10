@@ -248,7 +248,7 @@ impl App {
                 todolist.push(Todo::new(line.message, line.priority));
             }
         }
-        todolist.filter_indices(delete_indices);
+        todolist.retrain_indices(delete_indices);
         todolist.changed = todolist.changed || changed;
         if todolist.changed {
             todolist.sort();

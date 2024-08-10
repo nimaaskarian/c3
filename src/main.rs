@@ -141,5 +141,5 @@ pub struct DisplayArgs {
 }
 
 trait TodoDisplay: fmt::Display {
-    fn display_with_args(&self,args: &DisplayArgs) -> String;
+    fn display_with_args(&self, args: &DisplayArgs) -> String;
 }
