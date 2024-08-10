@@ -4,25 +4,20 @@ use ratatui::widgets::Paragraph;
 use std::io;
 use std::process::{Command, Output};
 
+#[derive(Default)]
 pub struct Potato {
     index: usize,
 }
 
-static COMMAND: &str = "potctl";
 impl Potato {
     #[inline]
-    pub fn new() -> Self {
-        Self { index: 0 }
-    }
-
-    #[inline]
     fn run(&self, args: Vec<String>) {
-        let _ = Command::new(COMMAND).args(args).status();
+        let _ = Command::new("potctl").args(args).status();
     }
 
     #[inline]
     fn output(&self, args: Vec<String>) -> io::Result<Output> {
-        Command::new(COMMAND).args(args).output()
+        Command::new("potctl").args(args).output()
     }
 
     #[inline]

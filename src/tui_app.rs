@@ -89,7 +89,7 @@ pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut list_state = ListState::default().with_selected(Some(0));
-    let mut app = TuiApp::new(app, Potato::new(), args);
+    let mut app = TuiApp::new(app, args);
 
     loop {
         terminal.draw(|frame| app.ui(frame, &mut list_state))?;
@@ -125,26 +125,26 @@ pub struct TuiApp<'a> {
     on_delete: Option<fn(&mut Self, HandlerParameter, String) -> ()>,
     on_input: Option<fn(&mut Self, HandlerParameter) -> ()>,
     args: TuiArgs,
-    module: Potato,
+    potato_module: Potato,
     textarea: TextArea<'a>,
     todo_app: &'a mut App,
 }
 
 impl<'a> TuiApp<'a> {
     #[inline]
-    pub fn new(app: &'a mut App, module: Potato, args: TuiArgs) -> Self {
+    pub fn new(app: &'a mut App, args: TuiArgs) -> Self {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         TuiApp {
             todo_app: app,
+            args,
             textarea,
-            module,
+            potato_module: Potato::default(),
             on_submit: None,
             on_input: None,
             on_delete: None,
             show_right: true,
             text_mode: false,
-            args,
             last_restriction: None,
         }
     }
@@ -466,7 +466,7 @@ impl<'a> TuiApp<'a> {
     pub fn update_editor(&mut self) -> io::Result<Operation> {
         if self.args.enable_module {
             if event::poll(std::time::Duration::from_millis(
-                self.module.update_time_ms(),
+                self.potato_module.update_time_ms(),
             ))? {
                 self.enable_text_editor()?
             }
@@ -525,7 +525,7 @@ impl<'a> TuiApp<'a> {
     fn update_no_editor(&mut self) -> io::Result<Operation> {
         if self.args.enable_module {
             if event::poll(std::time::Duration::from_millis(
-                self.module.update_time_ms(),
+                self.potato_module.update_time_ms(),
             ))? {
                 return self.read_keys();
             }
@@ -612,16 +612,16 @@ impl<'a> TuiApp<'a> {
                         self.todo_app.set_current_priority(priority as u8);
                     }
 
-                    Char('s') => self.module.on_s(),
-                    Char('H') => self.module.on_capital_h(),
-                    Char('c') => self.module.on_c(),
-                    Char('C') => self.module.on_capital_c(),
-                    Char('L') => self.module.on_capital_l(),
-                    Char('f') => self.module.on_f(),
-                    Char('+') | Char('=') => self.module.on_plus(),
-                    Char('-') => self.module.on_minus(),
-                    Char('.') => self.module.on_dot(),
-                    Char(',') => self.module.on_comma(),
+                    Char('s') => self.potato_module.on_s(),
+                    Char('H') => self.potato_module.on_capital_h(),
+                    Char('c') => self.potato_module.on_c(),
+                    Char('C') => self.potato_module.on_capital_c(),
+                    Char('L') => self.potato_module.on_capital_l(),
+                    Char('f') => self.potato_module.on_f(),
+                    Char('+') | Char('=') => self.potato_module.on_plus(),
+                    Char('-') => self.potato_module.on_minus(),
+                    Char('.') => self.potato_module.on_dot(),
+                    Char(',') => self.potato_module.on_comma(),
                     _ => {}
                 }
             }
@@ -653,7 +653,7 @@ impl<'a> TuiApp<'a> {
             .direction(direction)
             .constraints([constraint1, constraint2])
             .split(frame.size());
-        frame.render_widget(self.module.get_widget(), main_layout[0]);
+        frame.render_widget(self.potato_module.get_widget(), main_layout[0]);
         main_layout
     }
 
