@@ -28,81 +28,8 @@ use super::todo_app::{App, RestrictionFunction, Todo};
 use crate::{date, TuiArgs};
 use modules::{potato::Potato, Module};
 // }}}
-
-pub fn default_block<'a, T>(title: T) -> Block<'a>
-where
-    T: Into<Line<'a>>,
-{
-    Block::default()
-        .title(title)
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-}
-
-pub enum TodoWidget<'a> {
-    List(ratatui::widgets::List<'a>),
-    Paragraph(ratatui::widgets::Paragraph<'a>),
-}
-
-pub fn create_todo_widget(
-    display_list: Vec<String>,
-    title: String,
-    highlight_symbol: &str,
-) -> TodoWidget<'_> {
-    if display_list.is_empty() {
-        TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
-    } else {
-        TodoWidget::List(
-            List::new(display_list)
-                .block(default_block(title))
-                .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-                .highlight_symbol(highlight_symbol)
-                .repeat_highlight_symbol(true),
-        )
-    }
-}
-
-pub fn shutdown() -> io::Result<()> {
-    disable_raw_mode()?;
-    io::stdout().execute(crossterm::cursor::Show)?;
-    io::stdout().execute(LeaveAlternateScreen)?;
-    Ok(())
-}
-
-pub fn startup() -> io::Result<()> {
-    enable_raw_mode()?;
-    io::stdout().execute(EnterAlternateScreen)?;
-    Ok(())
-}
-
-#[inline]
-pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
-    terminal.clear()?;
-    startup()?;
-    Ok(())
-}
-
-#[inline]
-pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
-    startup()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
-    let mut list_state = ListState::default().with_selected(Some(0));
-    let mut app = TuiApp::new(app, args);
-
-    loop {
-        terminal.draw(|frame| app.ui(frame, &mut list_state))?;
-
-        let operation = app.handle_key_and_return_operation()?;
-        match operation {
-            Operation::Restart => restart(&mut terminal)?,
-            Operation::Nothing => {}
-        }
-    }
-}
-
 #[derive(Debug)]
-pub enum Operation {
+pub enum HandlerOperation {
     Nothing,
     Restart,
 }
@@ -433,7 +360,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn handle_text_input(&mut self) -> io::Result<Operation> {
+    fn handle_text_input(&mut self) -> io::Result<HandlerOperation> {
         let operation = self.editor()?;
         match operation {
             EditorOperation::Input => {
@@ -459,7 +386,7 @@ impl<'a> TuiApp<'a> {
                 }
             }
         }
-        Ok(Operation::Nothing)
+        Ok(HandlerOperation::Nothing)
     }
 
     #[inline]
@@ -496,7 +423,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    pub fn handle_key_and_return_operation(&mut self) -> io::Result<Operation> {
+    pub fn handle_key_and_return_operation(&mut self) -> io::Result<HandlerOperation> {
         let input_handler = match self.ui_mode {
             UiMode::Editing => Self::handle_text_input,
             UiMode::Normal => Self::handle_normal_input,
@@ -510,7 +437,7 @@ impl<'a> TuiApp<'a> {
         } else {
             return input_handler(self);
         }
-        Ok(Operation::Nothing)
+        Ok(HandlerOperation::Nothing)
     }
 
     #[inline]
@@ -519,13 +446,13 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn handle_normal_input(&mut self) -> io::Result<Operation> {
+    fn handle_normal_input(&mut self) -> io::Result<HandlerOperation> {
         if let Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
                     Char('o') if key.modifiers == KeyModifiers::CONTROL => {
                         self.nnn_open();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
@@ -541,11 +468,11 @@ impl<'a> TuiApp<'a> {
                     Char('I') => self.todo_app.decrease_day_done(),
                     Char('o') => {
                         self.nnn_append_todo();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     Char('O') => {
                         self.nnn_output_todo();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up | Char('k') => self.todo_app.decrement(),
@@ -563,7 +490,7 @@ impl<'a> TuiApp<'a> {
                     Char('P') => self.args.enable_module = !self.args.enable_module,
                     Char('>') => {
                         self.todo_app.edit_or_add_note();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     Char('t') => self.todo_app.add_dependency(),
                     Char('D') => {
@@ -583,7 +510,7 @@ impl<'a> TuiApp<'a> {
                     Char('q') => self.quit_save_prompt(),
                     Char('r') => {
                         self.todo_app.batch_editor_messages();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     Char(c) if c.is_ascii_digit() => {
                         let priority = c.to_digit(10).unwrap();
@@ -604,7 +531,7 @@ impl<'a> TuiApp<'a> {
                 }
             }
         }
-        Ok(Operation::Nothing)
+        Ok(HandlerOperation::Nothing)
     }
 
     #[inline]
@@ -760,3 +687,76 @@ impl<'a> TuiApp<'a> {
         self.render_current_todos_widget(frame, list_state, todo_and_textarea_layout[1]);
     }
 }
+
+pub fn default_block<'a, T>(title: T) -> Block<'a>
+where
+    T: Into<Line<'a>>,
+{
+    Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+}
+
+pub enum TodoWidget<'a> {
+    List(ratatui::widgets::List<'a>),
+    Paragraph(ratatui::widgets::Paragraph<'a>),
+}
+
+pub fn create_todo_widget(
+    display_list: Vec<String>,
+    title: String,
+    highlight_symbol: &str,
+) -> TodoWidget<'_> {
+    if display_list.is_empty() {
+        TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
+    } else {
+        TodoWidget::List(
+            List::new(display_list)
+                .block(default_block(title))
+                .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+                .highlight_symbol(highlight_symbol)
+                .repeat_highlight_symbol(true),
+        )
+    }
+}
+
+pub fn shutdown() -> io::Result<()> {
+    disable_raw_mode()?;
+    io::stdout().execute(crossterm::cursor::Show)?;
+    io::stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
+}
+
+pub fn startup() -> io::Result<()> {
+    enable_raw_mode()?;
+    io::stdout().execute(EnterAlternateScreen)?;
+    Ok(())
+}
+
+#[inline]
+pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+    terminal.clear()?;
+    startup()?;
+    Ok(())
+}
+
+#[inline]
+pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
+    startup()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+
+    let mut list_state = ListState::default().with_selected(Some(0));
+    let mut app = TuiApp::new(app, args);
+
+    loop {
+        terminal.draw(|frame| app.ui(frame, &mut list_state))?;
+
+        let operation = app.handle_key_and_return_operation()?;
+        match operation {
+            HandlerOperation::Restart => restart(&mut terminal)?,
+            HandlerOperation::Nothing => {}
+        }
+    }
+}
+
