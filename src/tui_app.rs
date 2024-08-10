@@ -123,14 +123,13 @@ enum UiMode {
     Editing,
 }
 
-type HandlerParameter = String;
 pub struct TuiApp<'a> {
     last_restriction: Option<RestrictionFunction>,
     show_right: bool,
     ui_mode: UiMode,
-    on_submit: Option<fn(&mut Self, HandlerParameter) -> ()>,
-    on_delete: Option<fn(&mut Self, HandlerParameter, String) -> ()>,
-    on_input: Option<fn(&mut Self, HandlerParameter) -> ()>,
+    on_submit: Option<fn(&mut Self, String) -> ()>,
+    on_delete: Option<fn(&mut Self, String, String) -> ()>,
+    on_input: Option<fn(&mut Self, String) -> ()>,
     args: TuiArgs,
     potato_module: Potato,
     textarea: TextArea<'a>,
