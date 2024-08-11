@@ -373,6 +373,7 @@ impl App {
             self.index = self.current_list_mut().reorder(index);
         } else {
             self.current_list_mut().sort();
+            self.fix_index();
         }
         while self.is_undone_empty() && self.traverse_up() {
             self.toggle_current_done()
