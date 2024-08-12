@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::cmp;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
@@ -19,12 +20,17 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
+pub(crate) fn ord_by_abandonment_coefficient(a: &Todo, b: &Todo) -> cmp::Ordering {
+    b.abandonment_coefficient().total_cmp(&a.abandonment_coefficient())
+}
+
+
 pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
     clipboard: Clipboard,
     pub(super) todo_list: TodoList,
-    index: usize,
+    pub(super) index: usize,
     changed: bool,
     tree_path: Vec<usize>,
     pub(super) args: AppArgs,
@@ -103,19 +109,20 @@ impl App {
 
     pub fn toggle_schedule(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.toggle_schedule()
+            todo.toggle_schedule();
         }
     }
 
     #[inline(always)]
     fn read_a_todo_list(path: &Path, notes_dir: &Path, args: &AppArgs) -> TodoList {
         let mut todo_list = TodoList::read(path);
+        if args.sort_method == SortMethod::AbandonedFirst {
+            todo_list.set_sort(ord_by_abandonment_coefficient);
+            todo_list.sort();
+            todo_list.changed = false;
+        }
         if !args.no_tree {
             todo_list.read_dependencies(notes_dir);
-        }
-        if args.sort_method != SortMethod::Normal {
-            todo_list.sort_by_abandonment();
-            todo_list.changed = false;
         }
         todo_list
     }
@@ -227,7 +234,6 @@ impl App {
             .collect();
 
         lines.sort_by_key(|a| a.index);
-        let sort_method = self.args.sort_method.clone();
         let todolist = self.current_list_mut();
         let size = todolist.len(&restriction);
         let indices: Vec<usize> = lines.iter().filter_map(|x| x.index).collect();
@@ -252,10 +258,7 @@ impl App {
         todolist.retrain_indices(delete_indices);
         todolist.changed = todolist.changed || changed;
         if todolist.changed {
-            match sort_method {
-                SortMethod::Normal => todolist.sort(),
-                SortMethod::AbandonedFirst => todolist.sort_by_abandonment(),
-            }
+            todolist.sort();
         }
         self.changed = todolist.changed;
     }
@@ -277,22 +280,22 @@ impl App {
 
     #[inline]
     pub fn increase_day_done(&mut self) {
-        if let Some(todo) = self.todo_mut() {
-            todo.schedule.as_mut().map(|sch| sch.add_days_to_date(-1));
+        if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
+            schedule.add_days_to_date(-1)
         }
     }
 
     #[inline]
     pub fn decrease_day_done(&mut self) {
-        if let Some(todo) = self.todo_mut() {
-            todo.schedule.as_mut().map(|sch| sch.add_days_to_date(1));
+        if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
+            schedule.add_days_to_date(1)
         }
     }
 
     #[inline]
     pub fn prepend(&mut self, message: String) {
         self.current_list_mut().prepend(Todo::new(message, 1));
-        self.go_top();
+        self.index = 0;
     }
 
     #[inline]
@@ -376,10 +379,7 @@ impl App {
         if self.show_done() {
             self.index = self.current_list_mut().reorder(index);
         } else {
-            match self.args.sort_method {
-                SortMethod::Normal => self.current_list_mut().sort(),
-                SortMethod::AbandonedFirst => self.current_list_mut().sort_by_abandonment(),
-            }
+            self.current_list_mut().sort();
             self.fix_index();
         }
         while self.is_undone_empty() && self.traverse_up() {
@@ -426,13 +426,10 @@ impl App {
     #[inline]
     pub fn increment(&mut self) {
         let size = self.len();
-        if size == 0 {
-            return self.go_top();
-        };
-        if self.index != size - 1 {
-            self.index += 1
+        if size == 0 || self.index == size - 1 {
+            self.index = 0;
         } else {
-            self.go_top()
+            self.index += 1
         }
     }
 
@@ -446,11 +443,6 @@ impl App {
     }
 
     #[inline]
-    pub fn go_top(&mut self) {
-        self.index = 0;
-    }
-
-    #[inline]
     pub fn traverse_down(&mut self) {
         if self.is_tree() {
             match self.todo() {
@@ -461,7 +453,7 @@ impl App {
                         .current_list()
                         .true_position_in_list(index, &restriction);
                     self.tree_path.push(true_index);
-                    self.go_top();
+                    self.index = 0;
                     self.update_show_done_restriction();
                 }
                 _ => {}
@@ -610,14 +602,16 @@ impl App {
     #[inline]
     pub fn toggle_current_daily(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.toggle_daily()
+            todo.toggle_daily();
+            self.reorder_current();
         }
     }
 
     #[inline]
     pub fn toggle_current_weekly(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.toggle_weekly()
+            todo.toggle_weekly();
+            self.reorder_current();
         }
     }
 
@@ -788,7 +782,7 @@ impl App {
         if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
             if let Some(dependency) = todo.dependency.as_mut() {
                 if dependency.is_written() {
-                    let _ = dependency.read(&self.notes_dir);
+                    let _ = dependency.read(&self.notes_dir, self.todo_list.todo_cmp);
                 }
             }
             let list = &mut self.current_list_mut();

@@ -96,11 +96,10 @@ impl From<&Schedule> for String {
 }
 
 impl Schedule {
-    pub fn new() -> Self {
+    pub fn new(day: i64) -> Self {
         Schedule {
-            day: 0,
-            date: None,
-            mode: ScheduleMode::default(),
+            day,
+            ..Default::default()
         }
     }
 

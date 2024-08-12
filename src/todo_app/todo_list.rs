@@ -6,10 +6,12 @@ use std::{cmp, io};
 use super::{App, Restriction, Todo};
 use crate::{DisplayArgs, TodoDisplay};
 
+pub type TodoCmp = fn(&Todo, &Todo) -> cmp::Ordering;
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TodoList {
     pub todos: Vec<Todo>,
     pub(super) changed: bool,
+    pub todo_cmp: Option<TodoCmp>,
 }
 
 type Output = Todo;
@@ -121,15 +123,19 @@ impl TodoList {
                 .collect(),
             ..Default::default()
         };
-        todolist.sort();
+        todolist.sort_normal();
         todolist.changed = false;
         todolist
+    }
+
+    pub fn set_sort(&mut self, sort: TodoCmp) {
+        self.todo_cmp = Some(sort);
     }
 
     pub fn read_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
             if let Some(dependency) = todo.dependency.as_mut() {
-                dependency.read(folder_name)?;
+                dependency.read(folder_name,self.todo_cmp)?;
             }
         }
         Ok(())
@@ -268,9 +274,22 @@ impl TodoList {
         self.todos.push(item);
     }
 
+    fn todo_cmp(&self) -> TodoCmp {
+        if let Some(todo_cmp) = self.todo_cmp {
+            todo_cmp
+        } else {
+            Todo::cmp
+        }
+    }
+
+    fn compare_todos(&self, a:&Todo, b: &Todo) -> cmp::Ordering {
+        let todo_cmp = self.todo_cmp();
+        todo_cmp(a, b)
+    }
+
     #[inline(always)]
     fn reorder_low_high(&self, index: usize) -> (usize, usize) {
-        if index + 1 < self.todos.len() && self.todos[index] > self.todos[index + 1] {
+        if index + 1 < self.todos.len() && self.compare_todos(&self.todos[index], &self.todos[index + 1]).is_gt() {
             (index + 1, self.todos.len() - 1)
         } else {
             (0, index)
@@ -285,13 +304,13 @@ impl TodoList {
 
     pub fn reorder(&mut self, index: usize) -> usize {
         self.changed = true;
-        if self.todos[index] < self.todos[0] {
+        if self.compare_todos(&self.todos[index], &self.todos[0]).is_lt() {
             return self.move_index(index, 0, 1);
         }
 
         let (low, high) = self.reorder_low_high(index);
         for i in low..high {
-            if self.todos[index] < self.todos[i + 1] && self.todos[index] >= self.todos[i] {
+            if self.compare_todos(&self.todos[index], &self.todos[i + 1]).is_lt() && self.compare_todos(&self.todos[index], &self.todos[i]).is_ge() {
                 return self.move_index(index, i, 0);
             }
         }
@@ -318,11 +337,15 @@ impl TodoList {
     pub fn append_list(&mut self, mut todo_list: TodoList) {
         self.changed = true;
         self.todos.append(&mut todo_list.todos);
-        self.sort();
+    }
+
+    pub fn sort(&mut self) {
+        let todo_cmp = self.todo_cmp();
+        self.sort_by(todo_cmp);
     }
 
     #[inline(always)]
-    pub fn sort(&mut self) {
+    fn sort_normal(&mut self) {
         self.changed = true;
         self.todos.sort()
     }
@@ -332,22 +355,6 @@ impl TodoList {
         self.changed = true;
         self.todos.sort_by(f)
     }
-
-    #[inline(always)]
-    pub fn sort_by_abandonment(&mut self) {
-        self.changed = true;
-        self.sort_by(|a, b| {
-            let abandonment_coefficient = |todo: &Todo| {
-                todo.schedule
-                    .as_ref()
-                    .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64)
-            };
-            let a: f64 = abandonment_coefficient(a);
-            let b: f64 = abandonment_coefficient(b);
-            b.total_cmp(&a)
-        });
-    }
-
 }
 
 #[cfg(test)]
@@ -462,7 +469,7 @@ mod tests {
     fn test_initially_sorted() {
         let todo_list = get_todo_list();
         let mut sorted_list = todo_list.clone();
-        sorted_list.sort();
+        sorted_list.sort_normal();
         sorted_list.changed = false;
 
         assert_eq!(todo_list, sorted_list)

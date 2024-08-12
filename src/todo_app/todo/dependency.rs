@@ -1,3 +1,5 @@
+use crate::todo_app::todo_list::TodoCmp;
+
 use super::Todo;
 use super::TodoList;
 use std::str::FromStr;
@@ -71,7 +73,7 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn read(&mut self, path: &Path) -> io::Result<()> {
+    pub fn read(&mut self, path: &Path, todo_cmp: Option<TodoCmp>) -> io::Result<()> {
         let file_path = path.join(&self.name);
         let name_todo = format!("{}.todo", self.name);
         match self.mode {
@@ -82,13 +84,18 @@ impl Dependency {
                 // Sometimes calcurse likes to remove the extra .todo from the file name
                 // That's why we have the first part of the if statement. c3 itself usually writes
                 // the list files to a <sha1>.todo format in notes directory
-                if file_path.is_file() || path.join(&name_todo).is_file() => {
-                    if self.mode == DependencyMode::Note {
-                        self.name = name_todo;
-                        self.mode = DependencyMode::TodoList;
-                    }
-                    self.todo_list = TodoList::read(&path.join(&self.name));
-                    self.todo_list.read_dependencies(path);
+            if file_path.is_file() || path.join(&name_todo).is_file() => {
+                if self.mode == DependencyMode::Note {
+                    self.name = name_todo;
+                    self.mode = DependencyMode::TodoList;
+                }
+                self.todo_list = TodoList::read(&path.join(&self.name));
+                if let Some(todo_cmp) = todo_cmp {
+                    self.todo_list.set_sort(todo_cmp);
+                    self.todo_list.sort();
+                    self.todo_list.changed = false;
+                }
+                self.todo_list.read_dependencies(path);
             }
             _ => {}
         };
