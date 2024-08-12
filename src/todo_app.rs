@@ -102,16 +102,15 @@ impl App {
         app
     }
 
-    pub fn sort_by_schedule_days(&mut self) {
+    pub fn sort_by_abandonment(&mut self) {
         self.current_list_mut().sort_by(|a, b| {
-            let a: f64 = a
-                .schedule
-                .as_ref()
-                .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64);
-            let b: f64 = b
-                .schedule
-                .as_ref()
-                .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64);
+            let abandonment_coefficient = |todo: &Todo| {
+                todo.schedule
+                    .as_ref()
+                    .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64)
+            };
+            let a: f64 = abandonment_coefficient(a);
+            let b: f64 = abandonment_coefficient(b);
             b.total_cmp(&a)
         });
     }

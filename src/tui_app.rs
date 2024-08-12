@@ -469,7 +469,7 @@ impl<'a> TuiApp<'a> {
                         return Ok(HandlerOperation::Restart);
                     }
                     Char('d') if key.modifiers == KeyModifiers::CONTROL => {
-                        self.todo_app.sort_by_schedule_days()
+                        self.todo_app.sort_by_abandonment()
                     }
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
