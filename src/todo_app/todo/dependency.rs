@@ -91,7 +91,7 @@ impl Dependency {
                 }
                 self.todo_list = TodoList::read(&path.join(&self.name));
                 if let Some(todo_cmp) = todo_cmp {
-                    self.todo_list.set_sort(todo_cmp);
+                    self.todo_list.set_todo_cmp(todo_cmp);
                     self.todo_list.sort();
                     self.todo_list.changed = false;
                 }

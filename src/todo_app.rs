@@ -21,7 +21,11 @@ struct SearchPosition {
 }
 
 pub(crate) fn ord_by_abandonment_coefficient(a: &Todo, b: &Todo) -> cmp::Ordering {
-    b.abandonment_coefficient().total_cmp(&a.abandonment_coefficient())
+    let order = b.abandonment_coefficient().total_cmp(&a.abandonment_coefficient());
+    if order.is_eq() {
+        return a.cmp(b)
+    }
+    order
 }
 
 
@@ -117,7 +121,7 @@ impl App {
     fn read_a_todo_list(path: &Path, notes_dir: &Path, args: &AppArgs) -> TodoList {
         let mut todo_list = TodoList::read(path);
         if args.sort_method == SortMethod::AbandonedFirst {
-            todo_list.set_sort(ord_by_abandonment_coefficient);
+            todo_list.set_todo_cmp(ord_by_abandonment_coefficient);
             todo_list.sort();
             todo_list.changed = false;
         }
@@ -281,14 +285,16 @@ impl App {
     #[inline]
     pub fn increase_day_done(&mut self) {
         if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
-            schedule.add_days_to_date(-1)
+            schedule.add_days_to_date(-1);
+            self.reorder_current();
         }
     }
 
     #[inline]
     pub fn decrease_day_done(&mut self) {
         if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
-            schedule.add_days_to_date(1)
+            schedule.add_days_to_date(1);
+            self.reorder_current();
         }
     }
 

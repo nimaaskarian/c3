@@ -128,7 +128,7 @@ impl TodoList {
         todolist
     }
 
-    pub fn set_sort(&mut self, sort: TodoCmp) {
+    pub fn set_todo_cmp(&mut self, sort: TodoCmp) {
         self.todo_cmp = Some(sort);
     }
 

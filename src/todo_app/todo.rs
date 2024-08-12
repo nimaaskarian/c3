@@ -216,7 +216,14 @@ impl Todo {
     pub fn abandonment_coefficient(&self) -> f64 {
         self.schedule
             .as_ref()
-            .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64)
+            .map_or(0., |sch| {
+                let days_diff = sch.days_diff();
+                if days_diff == 0 {
+                    0.9
+                } else {
+                    sch.days_diff() as f64 / sch.days() as f64
+                }
+            })
     }
 
     #[inline]
