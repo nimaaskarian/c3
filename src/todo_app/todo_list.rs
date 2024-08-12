@@ -332,6 +332,22 @@ impl TodoList {
         self.changed = true;
         self.todos.sort_by(f)
     }
+
+    #[inline(always)]
+    pub fn sort_by_abandonment(&mut self) {
+        self.changed = true;
+        self.sort_by(|a, b| {
+            let abandonment_coefficient = |todo: &Todo| {
+                todo.schedule
+                    .as_ref()
+                    .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64)
+            };
+            let a: f64 = abandonment_coefficient(a);
+            let b: f64 = abandonment_coefficient(b);
+            b.total_cmp(&a)
+        });
+    }
+
 }
 
 #[cfg(test)]

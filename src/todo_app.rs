@@ -5,10 +5,9 @@ use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
-use todo::schedule::Schedule;
 mod todo;
 mod todo_list;
-use crate::{fileio, AppArgs};
+use crate::{fileio, AppArgs, SortMethod};
 use std::rc::Rc;
 pub use todo::Todo;
 
@@ -102,19 +101,6 @@ impl App {
         app
     }
 
-    pub fn sort_by_abandonment(&mut self) {
-        self.current_list_mut().sort_by(|a, b| {
-            let abandonment_coefficient = |todo: &Todo| {
-                todo.schedule
-                    .as_ref()
-                    .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64)
-            };
-            let a: f64 = abandonment_coefficient(a);
-            let b: f64 = abandonment_coefficient(b);
-            b.total_cmp(&a)
-        });
-    }
-
     pub fn toggle_schedule(&mut self) {
         if let Some(todo) = self.todo_mut() {
             todo.toggle_schedule()
@@ -126,6 +112,10 @@ impl App {
         let mut todo_list = TodoList::read(path);
         if !args.no_tree {
             todo_list.read_dependencies(notes_dir);
+        }
+        if args.sort_method != SortMethod::Normal {
+            todo_list.sort_by_abandonment();
+            todo_list.changed = false;
         }
         todo_list
     }
@@ -237,6 +227,7 @@ impl App {
             .collect();
 
         lines.sort_by_key(|a| a.index);
+        let sort_method = self.args.sort_method.clone();
         let todolist = self.current_list_mut();
         let size = todolist.len(&restriction);
         let indices: Vec<usize> = lines.iter().filter_map(|x| x.index).collect();
@@ -261,7 +252,10 @@ impl App {
         todolist.retrain_indices(delete_indices);
         todolist.changed = todolist.changed || changed;
         if todolist.changed {
-            todolist.sort();
+            match sort_method {
+                SortMethod::Normal => todolist.sort(),
+                SortMethod::AbandonedFirst => todolist.sort_by_abandonment(),
+            }
         }
         self.changed = todolist.changed;
     }
@@ -382,7 +376,10 @@ impl App {
         if self.show_done() {
             self.index = self.current_list_mut().reorder(index);
         } else {
-            self.current_list_mut().sort();
+            match self.args.sort_method {
+                SortMethod::Normal => self.current_list_mut().sort(),
+                SortMethod::AbandonedFirst => self.current_list_mut().sort_by_abandonment(),
+            }
             self.fix_index();
         }
         while self.is_undone_empty() && self.traverse_up() {

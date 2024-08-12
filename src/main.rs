@@ -109,6 +109,12 @@ struct TuiArgs {
     enable_module: bool,
 }
 
+#[derive(ValueEnum, Clone, Debug, PartialEq)]
+pub enum SortMethod {
+    AbandonedFirst,
+    Normal,
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct AppArgs {
@@ -122,6 +128,10 @@ struct AppArgs {
     /// Path to todo file (and notes sibling directory)
     #[arg(default_value=get_todo_path().unwrap().into_os_string())]
     todo_path: PathBuf,
+
+    /// Sort method, how sortings are done in the app
+    #[arg(long, default_value="normal")]
+    sort_method: SortMethod,
 }
 
 #[derive(Parser, Debug)]
