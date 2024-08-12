@@ -1,7 +1,7 @@
 use std::fs::{read, File};
-use std::io;
 use std::io::{stdout, BufRead, BufWriter, Write};
 use std::path::Path;
+use std::{cmp, io};
 
 use super::{App, Restriction, Todo};
 use crate::{DisplayArgs, TodoDisplay};
@@ -52,10 +52,11 @@ impl TodoList {
     }
 
     #[inline(always)]
-    pub fn todos_mut<'a>(&'a mut self, restriction: &'a Restriction) -> impl Iterator<Item = &mut Todo> {
-        self.todos
-            .iter_mut()
-            .filter(|todo| restriction(todo))
+    pub fn todos_mut<'a>(
+        &'a mut self,
+        restriction: &'a Restriction,
+    ) -> impl Iterator<Item = &mut Todo> {
+        self.todos.iter_mut().filter(|todo| restriction(todo))
     }
 
     #[inline]
@@ -212,10 +213,7 @@ impl TodoList {
             .collect()
     }
 
-    pub fn filter<'a>(
-        &'a self,
-        restriction: &'a Restriction,
-    ) -> impl Iterator<Item = &Todo> {
+    pub fn filter<'a>(&'a self, restriction: &'a Restriction) -> impl Iterator<Item = &Todo> {
         self.todos.iter().filter(|todo| restriction(todo))
     }
 
@@ -327,6 +325,12 @@ impl TodoList {
     pub fn sort(&mut self) {
         self.changed = true;
         self.todos.sort()
+    }
+
+    #[inline(always)]
+    pub fn sort_by(&mut self, f: impl FnMut(&Todo, &Todo) -> cmp::Ordering) {
+        self.changed = true;
+        self.todos.sort_by(f)
     }
 }
 

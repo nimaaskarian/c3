@@ -5,6 +5,7 @@ use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
+use todo::schedule::Schedule;
 mod todo;
 mod todo_list;
 use crate::{fileio, AppArgs};
@@ -101,9 +102,23 @@ impl App {
         app
     }
 
+    pub fn sort_by_schedule_days(&mut self) {
+        self.current_list_mut().sort_by(|a, b| {
+            let a: f64 = a
+                .schedule
+                .as_ref()
+                .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64);
+            let b: f64 = b
+                .schedule
+                .as_ref()
+                .map_or(0., |sch| sch.days_diff() as f64 / sch.days() as f64);
+            b.total_cmp(&a)
+        });
+    }
+
     pub fn toggle_schedule(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.schedule.toggle();
+            todo.toggle_schedule()
         }
     }
 
@@ -152,11 +167,7 @@ impl App {
         self.current_list_mut().append_list(todo_list)
     }
 
-    pub fn set_query_restriction(
-        &mut self,
-        query: String,
-        last_restriction: Option<Restriction>,
-    ) {
+    pub fn set_query_restriction(&mut self, query: String, last_restriction: Option<Restriction>) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
         self.set_restriction(Rc::new(move |todo| {
             todo.matches(query.as_str()) && last_restriction(todo)
@@ -274,14 +285,14 @@ impl App {
     #[inline]
     pub fn increase_day_done(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.schedule.add_days_to_date(-1)
+            todo.schedule.as_mut().map(|sch| sch.add_days_to_date(-1));
         }
     }
 
     #[inline]
     pub fn decrease_day_done(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.schedule.add_days_to_date(1)
+            todo.schedule.as_mut().map(|sch| sch.add_days_to_date(1));
         }
     }
 
@@ -539,7 +550,9 @@ impl App {
         let mut list = &mut self.todo_list;
 
         for &index in &self.tree_path {
-            list = &mut list.todos[index].dependency.as_mut().unwrap().todo_list
+            if list.todos[index].dependency.is_some() {
+                list = &mut list.todos[index].dependency.as_mut().unwrap().todo_list
+            }
         }
         list
     }

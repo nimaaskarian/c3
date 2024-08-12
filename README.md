@@ -77,6 +77,7 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | o | open nnn file picker to choose a file to append to current list |
 | O | open nnn file picker to choose a file to output current list to |
 | Ctrl+o | open nnn file picker to choose a file to open |
+| Ctrl+d | sort by how long you haven't done the todo |
 | w | write changes to file |
 | R | read from file (discard changes)|
 #### Modules

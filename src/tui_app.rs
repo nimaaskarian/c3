@@ -13,7 +13,7 @@ use crossterm::{
         self,
         Event::Key,
         KeyCode::{self, Char},
-        KeyModifiers
+        KeyModifiers,
     },
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
@@ -261,7 +261,9 @@ impl<'a> TuiApp<'a> {
     fn on_reminder(&mut self, str: String) {
         if let Ok(date) = date::parse_user_input(&str) {
             if let Some(todo) = self.todo_app.todo_mut() {
-                todo.schedule.enable_reminder(date);
+                todo.schedule
+                    .as_mut()
+                    .map(|schedule| schedule.enable_reminder(date));
             }
         }
     }
@@ -465,6 +467,9 @@ impl<'a> TuiApp<'a> {
                     Char('o') if key.modifiers == KeyModifiers::CONTROL => {
                         self.nnn_open();
                         return Ok(HandlerOperation::Restart);
+                    }
+                    Char('d') if key.modifiers == KeyModifiers::CONTROL => {
+                        self.todo_app.sort_by_schedule_days()
                     }
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
@@ -776,4 +781,3 @@ pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
         }
     }
 }
-

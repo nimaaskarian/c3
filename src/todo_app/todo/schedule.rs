@@ -1,11 +1,12 @@
+use std::str::FromStr;
+
 use crate::date;
 
 #[derive(Eq, Debug, PartialEq, Clone, Default)]
 pub enum ScheduleMode {
+    #[default]
     Scheduled,
     Reminder,
-    #[default]
-    None,
 }
 
 #[derive(Eq, Debug, PartialEq, Clone, Default)]
@@ -13,7 +14,6 @@ pub struct Schedule {
     day: i64,
     date: Option<date::Type>,
     mode: ScheduleMode,
-    pub last_mode: ScheduleMode,
 }
 
 #[derive(Default)]
@@ -25,24 +25,24 @@ enum State {
     Date,
 }
 
-impl<T> From<T> for Schedule
-where
-    T: ToString,
-{
-    fn from(input: T) -> Schedule {
+pub struct NotScheduled;
+
+impl FromStr for Schedule {
+    type Err = NotScheduled;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut date_string = String::new();
         let mut state = State::default();
-        let mut mode = ScheduleMode::None;
+        let mut mode = None;
         let mut day_str = String::new();
 
-        for c in input.to_string().chars() {
+        for c in s.to_string().chars() {
             match state {
                 State::Type => {
                     if c == 'D' {
-                        mode = ScheduleMode::Scheduled;
+                        mode = Some(ScheduleMode::Scheduled);
                         state = State::Days;
                     } else if c == 'R' {
-                        mode = ScheduleMode::Reminder;
+                        mode = Some(ScheduleMode::Reminder);
                         state = State::PreDate;
                     } else {
                         break;
@@ -76,12 +76,10 @@ where
             Ok(value) => Some(value),
             Err(_) => None,
         };
-
-        Schedule {
-            day,
-            date,
-            mode,
-            last_mode: ScheduleMode::default(),
+        if let Some(mode) = mode {
+            Ok(Schedule { day, date, mode })
+        } else {
+            Err(Self::Err {})
         }
     }
 }
@@ -93,7 +91,6 @@ impl From<&Schedule> for String {
         match schedule.mode {
             ScheduleMode::Reminder => format!(" [R({date_str})]"),
             ScheduleMode::Scheduled => format!(" [D{}({date_str})]", schedule.day),
-            ScheduleMode::None => String::new(),
         }
     }
 }
@@ -104,7 +101,6 @@ impl Schedule {
             day: 0,
             date: None,
             mode: ScheduleMode::default(),
-            last_mode: ScheduleMode::default(),
         }
     }
 
@@ -116,6 +112,20 @@ impl Schedule {
     #[inline(always)]
     fn date_diff_days(&self) -> i64 {
         date::diff_days(self.date, Some(date::current()))
+    }
+
+    pub fn days(&self) -> i64 {
+        match self.mode {
+            ScheduleMode::Scheduled => self.day,
+            ScheduleMode::Reminder => 1,
+        }
+    }
+
+    pub fn days_diff(&self) -> i64 {
+        match self.mode {
+            ScheduleMode::Scheduled => self.current_date_diff_days(),
+            ScheduleMode::Reminder => self.date_diff_days(),
+        }
     }
 
     #[inline(always)]
@@ -150,7 +160,6 @@ impl Schedule {
         match self.mode {
             ScheduleMode::Reminder => self.display_reminder(),
             ScheduleMode::Scheduled => self.display_scheduled(),
-            ScheduleMode::None => String::new(),
         }
     }
 
@@ -198,13 +207,6 @@ impl Schedule {
         }
     }
 
-    pub fn toggle(&mut self) {
-        match self.mode {
-            ScheduleMode::None => self.mode = std::mem::take(&mut self.last_mode),
-            _ => self.last_mode = std::mem::take(&mut self.mode),
-        };
-    }
-
     pub fn enable_schedule(&mut self) {
         self.mode = ScheduleMode::Scheduled;
     }
@@ -233,7 +235,6 @@ impl Schedule {
         match self.mode {
             ScheduleMode::Reminder => self.reminder_should_undone(),
             ScheduleMode::Scheduled => self.current_date_diff_days() >= self.day,
-            ScheduleMode::None => false,
         }
     }
 
