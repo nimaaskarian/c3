@@ -135,7 +135,7 @@ impl TodoList {
     pub fn read_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
         for todo in &mut self.todos {
             if let Some(dependency) = todo.dependency.as_mut() {
-                dependency.read(folder_name,self.todo_cmp)?;
+                dependency.read(folder_name, self.todo_cmp)?;
             }
         }
         Ok(())
@@ -282,14 +282,18 @@ impl TodoList {
         }
     }
 
-    fn compare_todos(&self, a:&Todo, b: &Todo) -> cmp::Ordering {
+    fn compare_todos(&self, a: &Todo, b: &Todo) -> cmp::Ordering {
         let todo_cmp = self.todo_cmp();
         todo_cmp(a, b)
     }
 
     #[inline(always)]
     fn reorder_low_high(&self, index: usize) -> (usize, usize) {
-        if index + 1 < self.todos.len() && self.compare_todos(&self.todos[index], &self.todos[index + 1]).is_gt() {
+        if index + 1 < self.todos.len()
+            && self
+                .compare_todos(&self.todos[index], &self.todos[index + 1])
+                .is_gt()
+        {
             (index + 1, self.todos.len() - 1)
         } else {
             (0, index)
@@ -304,13 +308,22 @@ impl TodoList {
 
     pub fn reorder(&mut self, index: usize) -> usize {
         self.changed = true;
-        if self.compare_todos(&self.todos[index], &self.todos[0]).is_lt() {
+        if self
+            .compare_todos(&self.todos[index], &self.todos[0])
+            .is_lt()
+        {
             return self.move_index(index, 0, 1);
         }
 
         let (low, high) = self.reorder_low_high(index);
         for i in low..high {
-            if self.compare_todos(&self.todos[index], &self.todos[i + 1]).is_lt() && self.compare_todos(&self.todos[index], &self.todos[i]).is_ge() {
+            if self
+                .compare_todos(&self.todos[index], &self.todos[i + 1])
+                .is_lt()
+                && self
+                    .compare_todos(&self.todos[index], &self.todos[i])
+                    .is_ge()
+            {
                 return self.move_index(index, i, 0);
             }
         }

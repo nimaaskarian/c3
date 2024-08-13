@@ -103,6 +103,14 @@ impl Schedule {
         }
     }
 
+    pub fn new_reminder(date: date::Type) -> Self {
+        Self {
+            mode: ScheduleMode::Reminder,
+            date: Some(date),
+            ..Default::default()
+        }
+    }
+
     #[inline(always)]
     fn current_date_diff_days(&self) -> i64 {
         date::diff_days(Some(date::current()), self.date)
@@ -174,45 +182,14 @@ impl Schedule {
         }
     }
 
-    pub fn set_daily(&mut self) {
-        self.set_day(1);
-    }
-
     pub fn set_day(&mut self, day: i64) {
         self.day = day;
-    }
-
-    pub fn set_weekly(&mut self) {
-        self.set_day(7)
-    }
-
-    #[inline]
-    pub fn is_weekly(&self) -> bool {
-        self.is_scheduled() && self.day == 7
-    }
-
-    #[inline]
-    pub fn is_daily(&self) -> bool {
-        self.is_scheduled() && self.day == 1
-    }
-
-    pub fn none_date(&mut self) {
-        self.date = None
     }
 
     pub fn set_current_date(&mut self) {
         if self.mode == ScheduleMode::Scheduled {
             self.date = Some(date::current())
         }
-    }
-
-    pub fn enable_schedule(&mut self) {
-        self.mode = ScheduleMode::Scheduled;
-    }
-
-    pub fn enable_reminder(&mut self, date: date::Type) {
-        self.mode = ScheduleMode::Reminder;
-        self.date = Some(date);
     }
 
     #[inline(always)]

@@ -130,7 +130,7 @@ struct AppArgs {
     todo_path: PathBuf,
 
     /// Sort method, how sortings are done in the app
-    #[arg(long, default_value="normal")]
+    #[arg(long, default_value = "normal")]
     sort_method: SortMethod,
 }
 

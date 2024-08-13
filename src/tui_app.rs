@@ -25,7 +25,11 @@ use tui_textarea::{CursorMove, Input, TextArea};
 
 mod modules;
 use super::todo_app::{App, Restriction, Todo};
-use crate::{date, todo_app::ord_by_abandonment_coefficient, TuiArgs};
+use crate::{
+    date,
+    todo_app::{ord_by_abandonment_coefficient, Schedule},
+    TuiArgs,
+};
 use modules::{potato::Potato, Module};
 // }}}
 #[derive(Debug)]
@@ -260,8 +264,9 @@ impl<'a> TuiApp<'a> {
     #[inline]
     fn on_reminder(&mut self, str: String) {
         if let Ok(date) = date::parse_user_input(&str) {
-            if let Some(Some(schedule)) = self.todo_app.todo_mut().map(|todo| todo.schedule.as_mut()) {
-                    schedule.enable_reminder(date)
+            if let Some(todo) = self.todo_app.todo_mut() {
+                todo.schedule = Some(Schedule::new_reminder(date));
+                self.todo_app.reorder_current();
             }
         }
     }
@@ -466,9 +471,10 @@ impl<'a> TuiApp<'a> {
                         self.nnn_open();
                         return Ok(HandlerOperation::Restart);
                     }
-                    Char('d') if key.modifiers == KeyModifiers::CONTROL => {
-                        self.todo_app.current_list_mut().sort_by(ord_by_abandonment_coefficient)
-                    }
+                    Char('d') if key.modifiers == KeyModifiers::CONTROL => self
+                        .todo_app
+                        .current_list_mut()
+                        .sort_by(ord_by_abandonment_coefficient),
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
@@ -496,9 +502,9 @@ impl<'a> TuiApp<'a> {
                     KeyCode::Left | Char('h') => {
                         self.todo_app.traverse_up();
                     }
-                    KeyCode::Home | Char('g') => { 
+                    KeyCode::Home | Char('g') => {
                         self.todo_app.index = 0;
-                    },
+                    }
                     KeyCode::End | Char('G') => self.todo_app.go_bottom(),
                     Char('w') => self.write()?,
                     Char('J') => self.todo_app.decrease_current_priority(),

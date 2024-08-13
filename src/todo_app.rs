@@ -1,11 +1,12 @@
-use std::collections::VecDeque;
 use std::cmp;
+use std::collections::VecDeque;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
+pub use todo::schedule::Schedule;
 mod todo;
 mod todo_list;
 use crate::{fileio, AppArgs, SortMethod};
@@ -21,13 +22,14 @@ struct SearchPosition {
 }
 
 pub(crate) fn ord_by_abandonment_coefficient(a: &Todo, b: &Todo) -> cmp::Ordering {
-    let order = b.abandonment_coefficient().total_cmp(&a.abandonment_coefficient());
+    let order = b
+        .abandonment_coefficient()
+        .total_cmp(&a.abandonment_coefficient());
     if order.is_eq() {
-        return a.cmp(b)
+        return a.cmp(b);
     }
     order
 }
-
 
 pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {

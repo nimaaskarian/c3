@@ -76,12 +76,10 @@ impl From<&Todo> for String {
         let dep_str: String = todo
             .dependency
             .as_ref()
-            .map(|x| x.into()).unwrap_or_default();
+            .map(|x| x.into())
+            .unwrap_or_default();
 
-        let schedule_str: String = todo
-            .schedule
-            .as_ref()
-            .map(|x| x.into()).unwrap_or_default();
+        let schedule_str: String = todo.schedule.as_ref().map(|x| x.into()).unwrap_or_default();
 
         format!(
             "[{done_str}{}]{dep_str} {}{schedule_str}",
@@ -202,8 +200,8 @@ impl Todo {
     }
 
     pub fn toggle_schedule(&mut self) -> bool {
-        if self.schedule == None && self.last_schedule == None {
-            return false
+        if self.schedule.is_none() && self.last_schedule.is_none() {
+            return false;
         }
         if self.schedule.is_some() {
             self.last_schedule = std::mem::take(&mut self.schedule);
@@ -214,16 +212,14 @@ impl Todo {
     }
 
     pub fn abandonment_coefficient(&self) -> f64 {
-        self.schedule
-            .as_ref()
-            .map_or(0., |sch| {
-                let days_diff = sch.days_diff();
-                if days_diff == 0 {
-                    0.9
-                } else {
-                    sch.days_diff() as f64 / sch.days() as f64
-                }
-            })
+        self.schedule.as_ref().map_or(0., |sch| {
+            let days_diff = sch.days_diff();
+            if days_diff == 0 {
+                0.9
+            } else {
+                sch.days_diff() as f64 / sch.days() as f64
+            }
+        })
     }
 
     #[inline]
@@ -325,7 +321,7 @@ impl Todo {
     pub fn toggle_daily(&mut self) {
         if self.toggle_schedule() {
             if let Some(schedule) = self.schedule.as_mut() {
-                schedule.set_daily()
+                schedule.set_day(1);
             }
         } else {
             self.schedule = Some(Schedule::new(1))
@@ -336,7 +332,7 @@ impl Todo {
     pub fn toggle_weekly(&mut self) {
         if self.toggle_schedule() {
             if let Some(schedule) = self.schedule.as_mut() {
-                schedule.set_weekly()
+                schedule.set_day(7);
             }
         } else {
             self.schedule = Some(Schedule::new(7))
