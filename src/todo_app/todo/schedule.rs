@@ -12,7 +12,7 @@ pub enum ScheduleMode {
 #[derive(Eq, Debug, PartialEq, Clone, Default)]
 pub struct Schedule {
     day: i64,
-    date: Option<date::Type>,
+    saved_date: Option<date::Type>,
     mode: ScheduleMode,
 }
 
@@ -77,7 +77,7 @@ impl FromStr for Schedule {
             Err(_) => None,
         };
         if let Some(mode) = mode {
-            Ok(Schedule { day, date, mode })
+            Ok(Schedule { day, saved_date: date, mode })
         } else {
             Err(Self::Err {})
         }
@@ -86,7 +86,7 @@ impl FromStr for Schedule {
 
 impl From<&Schedule> for String {
     fn from(schedule: &Schedule) -> String {
-        let date_str = date::format(schedule.date);
+        let date_str = date::format(schedule.saved_date);
 
         match schedule.mode {
             ScheduleMode::Reminder => format!(" [R({date_str})]"),
@@ -106,19 +106,19 @@ impl Schedule {
     pub fn new_reminder(date: date::Type) -> Self {
         Self {
             mode: ScheduleMode::Reminder,
-            date: Some(date),
+            saved_date: Some(date),
             ..Default::default()
         }
     }
 
     #[inline(always)]
-    fn current_date_diff_days(&self) -> i64 {
-        date::diff_days(Some(date::current()), self.date)
+    fn current_minus_saved_date(&self) -> i64 {
+        date::diff_days(Some(date::current()), self.saved_date)
     }
 
     #[inline(always)]
-    fn date_diff_days(&self) -> i64 {
-        date::diff_days(self.date, Some(date::current()))
+    fn saved_minus_current_date(&self) -> i64 {
+        date::diff_days(self.saved_date, Some(date::current()))
     }
 
     pub fn days(&self) -> i64 {
@@ -130,15 +130,15 @@ impl Schedule {
 
     pub fn days_diff(&self) -> i64 {
         match self.mode {
-            ScheduleMode::Scheduled => self.current_date_diff_days(),
-            ScheduleMode::Reminder => self.date_diff_days(),
+            ScheduleMode::Scheduled => self.current_minus_saved_date(),
+            ScheduleMode::Reminder => self.saved_minus_current_date(),
         }
     }
 
     #[inline(always)]
     fn display_reminder(&self) -> String {
-        let date_str = date::display(self.date);
-        match self.date_diff_days() {
+        let date_str = date::display(self.saved_date);
+        match self.saved_minus_current_date() {
             any if any < 0 => format!(" (Reminder for {} [{} days ago])", date_str, -any),
             0 => format!(" (Reminder for today [{}])", date_str),
             1 => format!(" (Reminder for tomorrow [{}])", date_str),
@@ -148,7 +148,7 @@ impl Schedule {
 
     #[inline(always)]
     fn display_scheduled(&self) -> String {
-        let inner_str = match self.current_date_diff_days() {
+        let inner_str = match self.current_minus_saved_date() {
             ..=0 => String::new(),
             1 => String::from(", last done yesterday"),
             7 => String::from(", last done a week ago"),
@@ -171,14 +171,14 @@ impl Schedule {
     }
 
     pub fn add_days_to_date(&mut self, days: i64) {
-        if let Some(date) = self.date {
+        if let Some(date) = self.saved_date {
             if days > 0
                 && self.mode == ScheduleMode::Scheduled
-                && self.current_date_diff_days() <= 0
+                && self.current_minus_saved_date() <= 0
             {
                 return;
             }
-            self.date = Some(date::add_days(date, days))
+            self.saved_date = Some(date::add_days(date, days))
         }
     }
 
@@ -188,7 +188,7 @@ impl Schedule {
 
     pub fn set_current_date(&mut self) {
         if self.mode == ScheduleMode::Scheduled {
-            self.date = Some(date::current())
+            self.saved_date = Some(date::current())
         }
     }
 
@@ -197,27 +197,10 @@ impl Schedule {
         self.mode == ScheduleMode::Reminder
     }
 
-    #[inline(always)]
-    pub fn is_scheduled(&self) -> bool {
-        self.mode == ScheduleMode::Scheduled
-    }
-
-    #[inline(always)]
-    fn reminder_should_undone(&self) -> bool {
-        self.date == Some(date::current())
-    }
-
-    pub fn should_undone(&self) -> bool {
+    pub fn date_should_be_done(&self) -> bool {
         match self.mode {
-            ScheduleMode::Reminder => self.reminder_should_undone(),
-            ScheduleMode::Scheduled => self.current_date_diff_days() >= self.day,
-        }
-    }
-
-    pub fn should_done(&self) -> bool {
-        match self.mode {
-            ScheduleMode::Reminder => !self.reminder_should_undone(),
-            _ => false,
+            ScheduleMode::Reminder => self.saved_date != Some(date::current()),
+            ScheduleMode::Scheduled => self.current_minus_saved_date() < self.day,
         }
     }
 }

@@ -28,8 +28,9 @@ pub struct Todo {
 }
 
 impl fmt::Display for Todo {
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let daily_str = self
+        let shcedule_str = self
             .schedule
             .as_ref()
             .map(|schedule| schedule.display())
@@ -39,11 +40,12 @@ impl fmt::Display for Todo {
             priority, message, ..
         } = self;
 
-        write!(f, "{priority}{note_string} {message}{daily_str}")
+        write!(f, "{priority}{note_string} {message}{shcedule_str}")
     }
 }
 
 impl TodoDisplay for Todo {
+    #[inline(always)]
     fn display_with_args(&self, args: &DisplayArgs) -> String {
         let done_string = if args.show_done {
             if self.done() {
@@ -159,12 +161,7 @@ impl FromStr for Todo {
             let dependency = dependency_string.parse().ok();
 
             if let Some(schedule) = schedule.as_ref() {
-                if schedule.should_undone() {
-                    done = false;
-                }
-                if schedule.should_done() {
-                    done = true;
-                }
+                done =  schedule.date_should_be_done();
             }
             Ok(Todo {
                 dependency,
@@ -235,13 +232,6 @@ impl Todo {
     #[inline]
     pub fn no_dependency(&self) -> bool {
         self.dependency.is_none()
-    }
-
-    #[inline]
-    pub fn remove_note(&mut self) {
-        if self.is_note() {
-            self.remove_dependency();
-        }
     }
 
     #[inline]
@@ -520,16 +510,6 @@ mod tests {
             todo.dependency.unwrap().get_name(),
             "2c924e3088204ee77ba681f72be3444357932fca"
         );
-    }
-
-    #[test]
-    fn test_remove_note() {
-        let mut todo = Todo::new("Test".to_string(), 1);
-        todo.set_note("Note".to_string())
-            .expect("Error setting note");
-        todo.remove_note();
-
-        assert!(todo.dependency.is_none());
     }
 
     #[test]
