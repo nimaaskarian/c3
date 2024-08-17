@@ -446,7 +446,7 @@ impl App {
         if self.index != 0 {
             self.index -= 1;
         } else {
-            self.go_bottom()
+            self.index = self.bottom();
         }
     }
 
@@ -487,11 +487,6 @@ impl App {
     }
 
     #[inline]
-    pub fn go_bottom(&mut self) {
-        self.index = self.bottom();
-    }
-
-    #[inline]
     pub fn bottom(&self) -> usize {
         match self.len() {
             0 => 0,
@@ -506,18 +501,9 @@ impl App {
 
     #[inline]
     pub fn todo_mut(&mut self) -> Option<&mut Todo> {
-        if self.is_todos_empty() {
-            return None;
-        }
-        let index = self.index.min(self.len() - 1);
-        let size = self.len();
-        let res_cloned = self.restriction.clone();
-
-        if size <= index {
-            return Some(self.current_list_mut().index_mut(size - 1, &res_cloned));
-        }
-
-        Some(self.current_list_mut().index_mut(index, &res_cloned))
+        let index = self.index;
+        let restriction = self.restriction.clone();
+        self.current_list_mut().index_mut(index, &restriction)
     }
 
     #[inline]
@@ -686,19 +672,7 @@ impl App {
 
     #[inline]
     pub fn todo(&self) -> Option<&Todo> {
-        if self.is_todos_empty() {
-            return None;
-        }
-
-        let current_list = self.current_list();
-        let index = self.index.min(self.len() - 1);
-        let size = self.len();
-
-        if size <= index {
-            return Some(current_list.index(size - 1, &self.restriction));
-        }
-
-        Some(self.current_list().index(index, &self.restriction))
+        self.current_list().index(self.index, &self.restriction)
     }
 
     #[inline]
@@ -762,7 +736,17 @@ impl App {
     }
 
     #[inline]
-    pub fn decrease_current_priority(&mut self) {
+    pub fn move_current_down(&mut self) {
+        let index = self.index;
+        let restriction = self.restriction.clone();
+        let next_priority = self.current_list().index(index+1, &restriction).map(|x|x.priority());
+        let current_priority = self.current_list().index(index, &restriction).map(|x|x.priority());
+        if current_priority.is_some() && current_priority == next_priority {
+            let list = self.current_list_mut();
+            list.changed = true;
+            self.index = list.move_index(index, index+1, 0);
+            return
+        }
         if let Some(todo) = self.todo_mut() {
             todo.decrease_priority();
             self.reorder_current();
@@ -770,7 +754,20 @@ impl App {
     }
 
     #[inline]
-    pub fn increase_current_priority(&mut self) {
+    pub fn move_current_up(&mut self) {
+        if self.index == 0 {
+            return
+        }
+        let index = self.index;
+        let restriction = self.restriction.clone();
+        let prev_priority = self.current_list().index(index-1, &restriction).map(|x|x.priority());
+        let current_priority = self.current_list().index(index, &restriction).map(|x|x.priority());
+        if current_priority.is_some() && current_priority == prev_priority {
+            let list = self.current_list_mut();
+            list.changed = true;
+            self.index = list.move_index(index, index-1, 1);
+            return
+        }
         if let Some(todo) = self.todo_mut() {
             todo.increase_priority();
             self.reorder_current();

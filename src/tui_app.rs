@@ -505,10 +505,12 @@ impl<'a> TuiApp<'a> {
                     KeyCode::Home | Char('g') => {
                         self.todo_app.index = 0;
                     }
-                    KeyCode::End | Char('G') => self.todo_app.go_bottom(),
+                    KeyCode::End | Char('G') => {
+                        self.todo_app.index = self.todo_app.bottom()
+                    },
                     Char('w') => self.write()?,
-                    Char('J') => self.todo_app.decrease_current_priority(),
-                    Char('K') => self.todo_app.increase_current_priority(),
+                    Char('J') => self.todo_app.move_current_down(),
+                    Char('K') => self.todo_app.move_current_up(),
                     Char(']') => self.show_right = !self.show_right,
                     Char('P') => self.args.enable_module = !self.args.enable_module,
                     Char('>') => {

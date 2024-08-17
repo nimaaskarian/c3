@@ -31,21 +31,25 @@ impl TodoList {
         }
     }
 
-    pub fn index(&self, index: usize, restriction: &Restriction) -> &Output {
+    pub fn index(&self, index: usize, restriction: &Restriction) -> Option<&Output> {
+        let size = self.len(restriction);
+        let index = index.min(size);
+
         self.todos
             .iter()
             .filter(|todo| restriction(todo))
             .nth(index)
-            .unwrap()
     }
 
-    pub fn index_mut(&mut self, index: usize, restriction: &Restriction) -> &mut Output {
+    pub fn index_mut(&mut self, index: usize, restriction: &Restriction) -> Option<&mut Output> {
+        let size = self.len(restriction);
+        let index = index.min(size);
         self.changed = true;
+
         self.todos
             .iter_mut()
             .filter(|todo| restriction(todo))
             .nth(index)
-            .unwrap()
     }
 
     #[inline(always)]
@@ -331,7 +335,7 @@ impl TodoList {
     }
 
     #[inline(always)]
-    fn move_index(&mut self, from: usize, to: usize, shift: usize) -> usize {
+    pub fn move_index(&mut self, from: usize, to: usize, shift: usize) -> usize {
         let mut i = from;
         if from < to {
             for j in from..to {
