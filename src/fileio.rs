@@ -55,18 +55,11 @@ pub fn get_todo_path() -> io::Result<PathBuf> {
 
 #[inline(always)]
 pub fn temp_path(name: &str) -> PathBuf {
-    let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Err(_) => 12345,
-        Ok(some) => some.as_secs(),
-    };
-    let filename = format!("c3-{name}.{time}");
-    let tmpdir = PathBuf::from("/tmp");
-    let path = if tmpdir.is_dir() {
-        tmpdir.join(filename)
-    } else {
-        home_dir().unwrap().join(filename)
-    };
-    path.to_path_buf()
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(String::new(), |time| time.as_secs().to_string());
+    let tmpdir = env::temp_dir();
+    tmpdir.join(format!("c3-{name}-{time}"))
 }
 
 #[inline(always)]

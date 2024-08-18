@@ -1,7 +1,7 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 use clap::{Parser, ValueEnum};
 use clap_complete::Shell;
-use std::io;
+use std::{fmt, io};
 pub(crate) mod cli_app;
 pub(crate) mod date;
 pub(crate) mod fileio;
@@ -16,11 +16,9 @@ fn main() -> io::Result<()> {
     let mut app = App::new(args.app_args);
 
     if cli_app::run(&mut app, args.cli_args).is_err() {
-        let output = tui_app::run(&mut app, args.tui_args);
-        {
-            tui_app::shutdown()?;
-            output
-        }
+        let result = tui_app::run(&mut app, args.tui_args);
+        tui_app::shutdown()?;
+        result
     } else {
         Ok(())
     }
@@ -56,7 +54,7 @@ struct CliArgs {
     #[arg(long)]
     do_on_selected: Option<DoOnSelected>,
 
-    #[arg(short='b',long, default_value_t=false)]
+    #[arg(short = 'b', long, default_value_t = false)]
     batch_edit: bool,
 
     /// A todo message to append
@@ -72,10 +70,10 @@ struct CliArgs {
     append_file: Option<PathBuf>,
 
     /// A todo file to output to
-    #[arg(short='o', long)]
+    #[arg(short = 'o', long)]
     output_file: Option<PathBuf>,
 
-    #[arg(short='p', long, default_value_t=false)]
+    #[arg(short = 'p', long, default_value_t = false)]
     print_path: bool,
 
     /// Minimal tree with no tree graphics
@@ -111,6 +109,12 @@ struct TuiArgs {
     enable_module: bool,
 }
 
+#[derive(ValueEnum, Clone, Debug, PartialEq)]
+pub enum SortMethod {
+    AbandonedFirst,
+    Normal,
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct AppArgs {
@@ -124,6 +128,10 @@ struct AppArgs {
     /// Path to todo file (and notes sibling directory)
     #[arg(default_value=get_todo_path().unwrap().into_os_string())]
     todo_path: PathBuf,
+
+    /// Sort method, how sortings are done in the app
+    #[arg(long, default_value = "normal")]
+    sort_method: SortMethod,
 }
 
 #[derive(Parser, Debug)]
@@ -140,4 +148,8 @@ pub struct DisplayArgs {
     /// String before undone todos
     #[arg(long, default_value_t=String::from("[ ] "))]
     undone_string: String,
+}
+
+trait TodoDisplay: fmt::Display {
+    fn display_with_args(&self, args: &DisplayArgs) -> String;
 }

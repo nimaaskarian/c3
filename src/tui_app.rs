@@ -1,10 +1,9 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // std {{{
 use std::{
-    iter,
-    io::{self, stdout, BufRead, BufReader},
+    io::{self, BufRead, BufReader},
     path::PathBuf,
-    process::{Command, self, Stdio},
+    process::{Command, Stdio},
     rc::Rc,
 };
 // }}}
@@ -25,87 +24,16 @@ use tui_textarea::{CursorMove, Input, TextArea};
 // mod {{{
 
 mod modules;
-use super::todo_app::{App, Todo};
-use crate::{todo_app::RestrictionFunction, TuiArgs};
-use crate::{date, todo_app::PriorityType};
+use super::todo_app::{App, Restriction, Todo};
+use crate::{
+    date,
+    todo_app::{ord_by_abandonment_coefficient, Schedule},
+    TuiArgs,
+};
 use modules::{potato::Potato, Module};
 // }}}
-
-pub fn default_block<'a, T>(title: T) -> Block<'a>
-where
-    T: Into<Line<'a>>,
-{
-    Block::default()
-        .title(title)
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-}
-
-pub enum TodoWidget<'a> {
-    List(ratatui::widgets::List<'a>),
-    Paragraph(ratatui::widgets::Paragraph<'a>),
-}
-
-pub fn create_todo_widget(
-    display_list: Vec<String>,
-    title: String,
-    highlight_symbol: &str,
-) -> TodoWidget<'_> {
-    if display_list.is_empty() {
-        TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
-    } else {
-        TodoWidget::List(
-            List::new(display_list)
-                .block(default_block(title))
-                .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-                .highlight_symbol(highlight_symbol)
-                .repeat_highlight_symbol(true),
-        )
-    }
-}
-
-pub fn shutdown() -> io::Result<()> {
-    disable_raw_mode()?;
-    stdout().execute(crossterm::cursor::Show)?;
-    stdout().execute(LeaveAlternateScreen)?;
-    Ok(())
-}
-
-pub fn startup() -> io::Result<()> {
-    enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
-    Ok(())
-}
-
-#[inline]
-pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
-    terminal.clear()?;
-    startup()?;
-    Ok(())
-}
-
-#[inline]
-pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
-    startup()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
-    let mut potato_module = Potato::new(None);
-    let mut list_state = ListState::default();
-    let mut app = TuiApp::new(app, &mut potato_module, args);
-
-    loop {
-        terminal.draw(|frame| app.ui(frame, &mut list_state))?;
-
-        let operation = app.update_return_operation()?;
-        match operation {
-            Operation::Restart => restart(&mut terminal)?,
-            Operation::Nothing => {}
-        }
-    }
-}
-
 #[derive(Debug)]
-pub enum Operation {
+pub enum HandlerOperation {
     Nothing,
     Restart,
 }
@@ -118,42 +46,52 @@ enum EditorOperation {
     Delete(String),
 }
 
-type HandlerParameter = String;
+#[derive(Default, PartialEq)]
+enum Mode {
+    #[default]
+    Normal,
+    Editing,
+}
+
 pub struct TuiApp<'a> {
-    last_restriction: Option<RestrictionFunction>,
+    last_restriction: Option<Restriction>,
     show_right: bool,
-    text_mode: bool,
-    on_submit: Option<fn(&mut Self, HandlerParameter) -> ()>,
-    on_delete: Option<fn(&mut Self, HandlerParameter, String) -> ()>,
-    on_input: Option<fn(&mut Self, HandlerParameter) -> ()>,
+    mode: Mode,
+    on_submit: Option<fn(&mut Self, String) -> ()>,
+    on_delete: Option<fn(&mut Self, String, String) -> ()>,
+    on_input: Option<fn(&mut Self, String) -> ()>,
     args: TuiArgs,
-    module: &'a mut dyn Module<'a>,
+    potato_module: Potato,
     textarea: TextArea<'a>,
     todo_app: &'a mut App,
 }
 
 impl<'a> TuiApp<'a> {
     #[inline]
-    pub fn new(app: &'a mut App, module: &'a mut dyn Module<'a>, args: TuiArgs) -> Self {
+    pub fn new(app: &'a mut App, args: TuiArgs) -> Self {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         TuiApp {
             todo_app: app,
+            args,
             textarea,
-            module,
+            potato_module: Default::default(),
             on_submit: None,
             on_input: None,
             on_delete: None,
             show_right: true,
-            text_mode: false,
-            args,
+            mode: Default::default(),
             last_restriction: None,
         }
     }
 
     #[inline]
     pub fn title(&mut self) -> String {
-        let changed_str = if self.todo_app.is_current_changed() { "*" } else { "" };
+        let changed_str = if self.todo_app.is_current_changed() {
+            "*"
+        } else {
+            ""
+        };
         let size = self.todo_app.len();
         let todo_string = format!("Todos ({size}){changed_str}");
 
@@ -173,11 +111,12 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn set_text_mode(
         &mut self,
-        on_submit: fn(&mut Self, HandlerParameter) -> (),
+        on_submit: fn(&mut Self, String) -> (),
         title: &'a str,
         placeholder: &str,
     ) {
         self.on_input = None;
+        self.on_delete = None;
         self.on_submit = Some(on_submit);
         self.turn_on_text_mode(title, placeholder);
     }
@@ -185,7 +124,7 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn set_responsive_text_mode(
         &mut self,
-        on_input: fn(&mut Self, HandlerParameter) -> (),
+        on_input: fn(&mut Self, String) -> (),
         title: &'a str,
         placeholder: &str,
     ) {
@@ -197,14 +136,14 @@ impl<'a> TuiApp<'a> {
     fn turn_on_text_mode(&mut self, title: &'a str, placeholder: &str) {
         self.textarea.set_placeholder_text(placeholder);
         self.textarea.set_block(default_block(title));
-        self.text_mode = true;
+        self.mode = Mode::Editing;
     }
 
     #[inline(always)]
     fn turn_off_text_mode(&mut self) {
         self.textarea.delete_line_by_head();
         self.textarea.delete_line_by_end();
-        self.text_mode = false;
+        self.mode = Mode::Normal;
     }
 
     #[inline]
@@ -212,6 +151,7 @@ impl<'a> TuiApp<'a> {
         const TITLE: &str = "Search todo";
         const PLACEHOLDER: &str = "Enter search query";
         self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.on_submit = None;
         self.set_responsive_text_mode(Self::on_search, TITLE, PLACEHOLDER);
         self.on_delete = Some(Self::on_search_delete);
     }
@@ -263,7 +203,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_schedule(&mut self, str: HandlerParameter) {
+    fn on_schedule(&mut self, str: String) {
         let day = str.parse::<u64>().ok();
         if day.is_none() {
             return;
@@ -278,7 +218,7 @@ impl<'a> TuiApp<'a> {
         self.set_text_mode(Self::on_reminder, "Date reminder", "");
     }
 
-    fn nnn_paths() -> Option<iter::Map<io::Lines<BufReader<process::ChildStdout>>, impl FnMut(Result<String, io::Error>) -> PathBuf>> {
+    fn nnn_paths() -> Option<impl Iterator<Item = PathBuf>> {
         let mut output = Command::new("nnn")
             .args(["-p", "-"])
             .stdin(Stdio::inherit())
@@ -290,9 +230,7 @@ impl<'a> TuiApp<'a> {
         let exit_status = output.wait().expect("Failed to wait on nnn.");
         if exit_status.success() {
             let reader = BufReader::new(output.stdout.unwrap());
-            return Some(reader
-                .lines()
-                .map(|x| PathBuf::from(x.unwrap_or_default())))
+            return Some(reader.lines().map(|x| PathBuf::from(x.unwrap_or_default())));
         }
         None
     }
@@ -324,22 +262,23 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_reminder(&mut self, str: HandlerParameter) {
+    fn on_reminder(&mut self, str: String) {
         if let Ok(date) = date::parse_user_input(&str) {
             if let Some(todo) = self.todo_app.todo_mut() {
-                todo.schedule.enable_reminder(date);
+                todo.schedule = Some(Schedule::new_reminder(date));
+                self.todo_app.reorder_current();
             }
         }
     }
 
     #[inline]
     pub fn edit_prompt(&mut self, start: bool) {
-        let todo_message = self.todo_app.get_message().unwrap_or_default();
-
-        self.set_text_mode(Self::on_edit_todo, "Edit todo", todo_message.as_str());
-        self.textarea.insert_str(todo_message);
-        if start {
-            self.textarea.move_cursor(CursorMove::Head);
+        if let Some(message) = &self.todo_app.get_cloned_current_message() {
+            self.set_text_mode(Self::on_edit_todo, "Edit todo", message);
+            self.textarea.insert_str(message);
+            if start {
+                self.textarea.move_cursor(CursorMove::Head);
+            }
         }
     }
 
@@ -393,7 +332,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_save_prompt(&mut self, str: HandlerParameter) {
+    fn on_save_prompt(&mut self, str: String) {
         let lower = str.to_lowercase();
         if lower.starts_with('y') {
             let _ = self.todo_app.write();
@@ -404,17 +343,17 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_append_todo(&mut self, str: HandlerParameter) {
+    fn on_append_todo(&mut self, str: String) {
         self.todo_app.append(str);
     }
 
     #[inline]
-    fn on_prepend_todo(&mut self, str: HandlerParameter) {
+    fn on_prepend_todo(&mut self, str: String) {
         self.todo_app.prepend(str);
     }
 
     #[inline]
-    fn on_edit_todo(&mut self, str: HandlerParameter) {
+    fn on_edit_todo(&mut self, str: String) {
         if !str.is_empty() {
             self.todo_app.todo_mut().unwrap().set_message(str);
         }
@@ -426,7 +365,7 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn enable_text_editor(&mut self) -> io::Result<()> {
+    fn handle_text_input(&mut self) -> io::Result<HandlerOperation> {
         let operation = self.editor()?;
         match operation {
             EditorOperation::Input => {
@@ -452,21 +391,7 @@ impl<'a> TuiApp<'a> {
                 }
             }
         }
-        Ok(())
-    }
-
-    #[inline]
-    pub fn update_editor(&mut self) -> io::Result<Operation> {
-        if self.args.enable_module {
-            if event::poll(std::time::Duration::from_millis(
-                self.module.update_time_ms(),
-            ))? {
-                self.enable_text_editor()?
-            }
-        } else {
-            self.enable_text_editor()?
-        }
-        Ok(Operation::Nothing)
+        Ok(HandlerOperation::Nothing)
     }
 
     #[inline]
@@ -503,29 +428,21 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    pub fn update_return_operation(&mut self) -> io::Result<Operation> {
-        let output;
-        if self.text_mode {
-            output = self.update_editor()?;
-        } else {
-            output = self.update_no_editor()?;
-            self.todo_app.fix_index();
-        }
-        Ok(output)
-    }
-
-    #[inline]
-    fn update_no_editor(&mut self) -> io::Result<Operation> {
+    pub fn handle_key_and_return_operation(&mut self) -> io::Result<HandlerOperation> {
+        let input_handler = match self.mode {
+            Mode::Editing => Self::handle_text_input,
+            Mode::Normal => Self::handle_normal_input,
+        };
         if self.args.enable_module {
             if event::poll(std::time::Duration::from_millis(
-                self.module.update_time_ms(),
+                self.potato_module.update_time_ms(),
             ))? {
-                return self.read_keys();
+                return input_handler(self);
             }
         } else {
-            return self.read_keys();
+            return input_handler(self);
         }
-        Ok(Operation::Nothing)
+        Ok(HandlerOperation::Nothing)
     }
 
     #[inline]
@@ -534,14 +451,30 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn read_keys(&mut self) -> io::Result<Operation> {
-        if let Key(key) = event::read()? {
+    fn handle_normal_input(&mut self) -> io::Result<HandlerOperation> {
+        let event = event::read()?;
+        if let event::Event::Mouse(mouse) = event {
+            match mouse.kind {
+                event::MouseEventKind::ScrollUp => {
+                    self.todo_app.decrement();
+                }
+                event::MouseEventKind::ScrollDown => {
+                    self.todo_app.increment();
+                }
+                _ => {}
+            }
+        }
+        if let Key(key) = event {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
                     Char('o') if key.modifiers == KeyModifiers::CONTROL => {
                         self.nnn_open();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
+                    Char('d') if key.modifiers == KeyModifiers::CONTROL => self
+                        .todo_app
+                        .current_list_mut()
+                        .sort_by(ord_by_abandonment_coefficient),
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
@@ -556,11 +489,11 @@ impl<'a> TuiApp<'a> {
                     Char('I') => self.todo_app.decrease_day_done(),
                     Char('o') => {
                         self.nnn_append_todo();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     Char('O') => {
                         self.nnn_output_todo();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     KeyCode::Down | Char('j') => self.todo_app.increment(),
                     KeyCode::Up | Char('k') => self.todo_app.decrement(),
@@ -569,16 +502,20 @@ impl<'a> TuiApp<'a> {
                     KeyCode::Left | Char('h') => {
                         self.todo_app.traverse_up();
                     }
-                    KeyCode::Home | Char('g') => self.todo_app.go_top(),
-                    KeyCode::End | Char('G') => self.todo_app.go_bottom(),
+                    KeyCode::Home | Char('g') => {
+                        self.todo_app.index = 0;
+                    }
+                    KeyCode::End | Char('G') => {
+                        self.todo_app.index = self.todo_app.bottom()
+                    },
                     Char('w') => self.write()?,
-                    Char('J') => self.todo_app.decrease_current_priority(),
-                    Char('K') => self.todo_app.increase_current_priority(),
+                    Char('J') => self.todo_app.move_current_down(),
+                    Char('K') => self.todo_app.move_current_up(),
                     Char(']') => self.show_right = !self.show_right,
                     Char('P') => self.args.enable_module = !self.args.enable_module,
                     Char('>') => {
                         self.todo_app.edit_or_add_note();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     Char('t') => self.todo_app.add_dependency(),
                     Char('D') => {
@@ -598,28 +535,28 @@ impl<'a> TuiApp<'a> {
                     Char('q') => self.quit_save_prompt(),
                     Char('r') => {
                         self.todo_app.batch_editor_messages();
-                        return Ok(Operation::Restart);
+                        return Ok(HandlerOperation::Restart);
                     }
                     Char(c) if c.is_ascii_digit() => {
                         let priority = c.to_digit(10).unwrap();
-                        self.todo_app.set_current_priority(priority as PriorityType);
+                        self.todo_app.set_current_priority(priority as u8);
                     }
 
-                    Char('s') => self.module.on_s(),
-                    Char('H') => self.module.on_capital_h(),
-                    Char('c') => self.module.on_c(),
-                    Char('C') => self.module.on_capital_c(),
-                    Char('L') => self.module.on_capital_l(),
-                    Char('f') => self.module.on_f(),
-                    Char('+') | Char('=') => self.module.on_plus(),
-                    Char('-') => self.module.on_minus(),
-                    Char('.') => self.module.on_dot(),
-                    Char(',') => self.module.on_comma(),
+                    Char('s') => self.potato_module.on_s(),
+                    Char('H') => self.potato_module.on_capital_h(),
+                    Char('c') => self.potato_module.on_c(),
+                    Char('C') => self.potato_module.on_capital_c(),
+                    Char('L') => self.potato_module.on_capital_l(),
+                    Char('f') => self.potato_module.on_f(),
+                    Char('+') | Char('=') => self.potato_module.on_plus(),
+                    Char('-') => self.potato_module.on_minus(),
+                    Char('.') => self.potato_module.on_dot(),
+                    Char(',') => self.potato_module.on_comma(),
                     _ => {}
                 }
             }
         }
-        Ok(Operation::Nothing)
+        Ok(HandlerOperation::Nothing)
     }
 
     #[inline]
@@ -646,7 +583,7 @@ impl<'a> TuiApp<'a> {
             .direction(direction)
             .constraints([constraint1, constraint2])
             .split(frame.size());
-        frame.render_widget(self.module.get_widget(), main_layout[0]);
+        frame.render_widget(self.potato_module.get_widget(), main_layout[0]);
         main_layout
     }
 
@@ -677,7 +614,6 @@ impl<'a> TuiApp<'a> {
                     dependency_layout,
                     self.todo_app.display_list(todo_list),
                     String::from("Todo dependencies"),
-                    self.todo_app.index(),
                 )
             }
         }
@@ -693,7 +629,10 @@ impl<'a> TuiApp<'a> {
         let title = self.title();
         let display = if self.args.minimal_render {
             let first = self.todo_app.index();
-            let last = self.todo_app.len().min(todo_layout.height as usize+first-2);
+            let last = self
+                .todo_app
+                .len()
+                .min(todo_layout.height as usize + first - 2);
             self.todo_app.display_current_slice(first, last)
         } else {
             self.todo_app.display_current()
@@ -705,7 +644,6 @@ impl<'a> TuiApp<'a> {
             todo_layout,
             display,
             title,
-            self.todo_app.index(),
         )
     }
 
@@ -717,16 +655,12 @@ impl<'a> TuiApp<'a> {
         todo_layout: Rect,
         display_list: Vec<String>,
         title: String,
-        index: usize,
     ) {
         match create_todo_widget(display_list, title, highlight_symbol) {
             TodoWidget::Paragraph(widget) => frame.render_widget(widget, todo_layout),
             TodoWidget::List(widget) => {
                 if let Some(list_state) = list_state {
-                    let widget = frame.render_stateful_widget(widget, todo_layout, list_state);
-                    list_state.select(Some(index-list_state.offset()));
-                    widget
-
+                    frame.render_stateful_widget(widget, todo_layout, list_state)
                 } else {
                     frame.render_widget(widget, todo_layout)
                 }
@@ -737,9 +671,7 @@ impl<'a> TuiApp<'a> {
     #[inline]
     pub fn ui(&mut self, frame: &mut Frame, list_state: &mut ListState) {
         let todo = self.todo_app.todo();
-        if self.args.minimal_render {
-            list_state.select(Some(0));
-        } else {
+        if !self.args.minimal_render {
             list_state.select(Some(self.todo_app.index()));
         }
 
@@ -770,7 +702,7 @@ impl<'a> TuiApp<'a> {
         let todo_and_textarea_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3 * self.text_mode as u16),
+                Constraint::Length(3 * (self.mode == Mode::Editing) as u16),
                 Constraint::Min(0),
             ])
             .split(todo_app_layout[0]);
@@ -778,5 +710,82 @@ impl<'a> TuiApp<'a> {
 
         frame.render_widget(self.textarea.widget(), todo_and_textarea_layout[0]);
         self.render_current_todos_widget(frame, list_state, todo_and_textarea_layout[1]);
+    }
+}
+
+pub fn default_block<'a, T>(title: T) -> Block<'a>
+where
+    T: Into<Line<'a>>,
+{
+    Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+}
+
+pub enum TodoWidget<'a> {
+    List(ratatui::widgets::List<'a>),
+    Paragraph(ratatui::widgets::Paragraph<'a>),
+}
+
+pub fn create_todo_widget(
+    display_list: Vec<String>,
+    title: String,
+    highlight_symbol: &str,
+) -> TodoWidget<'_> {
+    if display_list.is_empty() {
+        TodoWidget::Paragraph(Paragraph::new("No todo.").block(default_block(title)))
+    } else {
+        TodoWidget::List(
+            List::new(display_list)
+                .block(default_block(title))
+                .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+                .highlight_symbol(highlight_symbol)
+                .repeat_highlight_symbol(true),
+        )
+    }
+}
+
+pub fn shutdown() -> io::Result<()> {
+    disable_raw_mode()?;
+    io::stdout()
+        .execute(LeaveAlternateScreen)?
+        .execute(crossterm::cursor::Show)?
+        .execute(crossterm::event::DisableMouseCapture)?;
+    Ok(())
+}
+
+pub fn startup() -> io::Result<()> {
+    enable_raw_mode()?;
+    io::stdout()
+        .execute(EnterAlternateScreen)?
+        .execute(crossterm::cursor::Hide)?
+        .execute(crossterm::event::EnableMouseCapture)?;
+    Ok(())
+}
+
+#[inline]
+pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+    terminal.clear()?;
+    startup()?;
+    Ok(())
+}
+
+#[inline]
+pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
+    startup()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+
+    let mut list_state = ListState::default().with_selected(Some(0));
+    let mut app = TuiApp::new(app, args);
+
+    loop {
+        terminal.draw(|frame| app.ui(frame, &mut list_state))?;
+
+        let operation = app.handle_key_and_return_operation()?;
+        match operation {
+            HandlerOperation::Restart => restart(&mut terminal)?,
+            HandlerOperation::Nothing => {}
+        }
     }
 }

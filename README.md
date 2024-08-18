@@ -77,6 +77,7 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | o | open nnn file picker to choose a file to append to current list |
 | O | open nnn file picker to choose a file to output current list to |
 | Ctrl+o | open nnn file picker to choose a file to open |
+| Ctrl+d | sort by todo's abandonment (how hasn't been done compared to their schedule) |
 | w | write changes to file |
 | R | read from file (discard changes)|
 #### Modules
@@ -87,3 +88,7 @@ Keybinds that modules can use are **C, c, H, L, comma, period, +, -, s, r**
 
 ### Non interactive mode
 For command line arguments and such, run `c3 -h` to see full usage.
+
+## Performance
+If you're experiencing performance issues on very large todo lists (I begin to experience it with 500k todos, which can seem like a lot),
+you can use `--minimal-render` and `--no-tree` cli options. Also use `?` (tree) search instead of the normal search.

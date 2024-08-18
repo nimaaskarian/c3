@@ -4,95 +4,20 @@ use ratatui::widgets::Paragraph;
 use std::io;
 use std::process::{Command, Output};
 
-pub struct Potato<'a> {
-    command: &'a str,
+#[derive(Default)]
+pub struct Potato {
     index: usize,
 }
 
-impl<'a> Module<'a> for Potato<'a> {
-    #[inline]
-    fn get_widget(&self) -> Paragraph<'a> {
-        let args = vec!["+%m\n%t\n%p".to_string(), self.resolve_arg("1")];
-
-        let time_str = match self.output(args) {
-            Ok(output) => String::from_utf8(output.stdout).unwrap(),
-            Err(_) => String::from("potctl command not found at path."),
-        };
-
-        Paragraph::new(time_str).block(default_block("Potato"))
-    }
-
-    #[inline]
-    fn update_time_ms(&self) -> u64 {
-        500
-    }
-
-    #[inline]
-    fn on_c(&mut self) {
-        self.toggle_pause()
-    }
-
-    #[inline]
-    fn on_capital_c(&mut self) {
-        self.quit()
-    }
-
-    #[inline]
-    fn on_s(&mut self) {
-        self.skip();
-    }
-
-    #[inline]
-    fn on_capital_h(&mut self) {
-        self.increase_timer()
-    }
-
-    #[inline]
-    fn on_capital_l(&mut self) {
-        self.decrease_timer()
-    }
-
-    #[inline]
-    fn on_f(&mut self) {
-        self.restart()
-    }
-
-    #[inline]
-    fn on_plus(&mut self) {
-        self.increase_pomodoro();
-    }
-
-    #[inline]
-    fn on_minus(&mut self) {
-        self.decrease_pomodoro();
-    }
-
-    #[inline]
-    fn on_dot(&mut self) {
-        self.next();
-    }
-
-    #[inline]
-    fn on_comma(&mut self) {
-        self.prev();
-    }
-}
-
-impl<'a> Potato<'a> {
-    #[inline]
-    pub fn new(command_name: Option<&'a str>) -> Self {
-        let command = command_name.unwrap_or("potctl");
-        Self { command, index: 0 }
-    }
-
+impl Potato {
     #[inline]
     fn run(&self, args: Vec<String>) {
-        let _ = Command::new(self.command).args(args).status();
+        let _ = Command::new("potctl").args(args).status();
     }
 
     #[inline]
     fn output(&self, args: Vec<String>) -> io::Result<Output> {
-        Command::new(self.command).args(args).output()
+        Command::new("potctl").args(args).output()
     }
 
     #[inline]
@@ -164,5 +89,74 @@ impl<'a> Potato<'a> {
     #[inline]
     pub fn quit(&mut self) {
         self.run(vec![self.resolve_arg("q")])
+    }
+}
+
+impl Module for Potato {
+    #[inline]
+    fn get_widget(&self) -> Paragraph {
+        let args = vec!["+%m\n%t\n%p".to_string(), self.resolve_arg("1")];
+
+        let time_str = match self.output(args) {
+            Ok(output) => String::from_utf8(output.stdout).unwrap(),
+            Err(_) => String::from("potctl command not found at path."),
+        };
+
+        Paragraph::new(time_str).block(default_block("Potato"))
+    }
+
+    #[inline]
+    fn update_time_ms(&self) -> u64 {
+        500
+    }
+
+    #[inline]
+    fn on_c(&mut self) {
+        self.toggle_pause()
+    }
+
+    #[inline]
+    fn on_capital_c(&mut self) {
+        self.quit()
+    }
+
+    #[inline]
+    fn on_s(&mut self) {
+        self.skip();
+    }
+
+    #[inline]
+    fn on_capital_h(&mut self) {
+        self.increase_timer()
+    }
+
+    #[inline]
+    fn on_capital_l(&mut self) {
+        self.decrease_timer()
+    }
+
+    #[inline]
+    fn on_f(&mut self) {
+        self.restart()
+    }
+
+    #[inline]
+    fn on_plus(&mut self) {
+        self.increase_pomodoro();
+    }
+
+    #[inline]
+    fn on_minus(&mut self) {
+        self.decrease_pomodoro();
+    }
+
+    #[inline]
+    fn on_dot(&mut self) {
+        self.next();
+    }
+
+    #[inline]
+    fn on_comma(&mut self) {
+        self.prev();
     }
 }

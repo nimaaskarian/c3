@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::Path;
 // vim:fileencoding=utf-8:foldmethod=marker
 //std{{{
@@ -9,21 +10,54 @@ mod dependency;
 mod note;
 pub mod schedule;
 use super::TodoList;
-use crate::DisplayArgs;
+use crate::{DisplayArgs, TodoDisplay};
 use dependency::Dependency;
 use note::{open_note_temp_editor, sha1};
 use schedule::Schedule;
 //}}}
 
-pub type PriorityType = u8;
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Todo {
     pub message: String,
-    priority: PriorityType,
+    priority: u8,
     pub dependency: Option<Dependency>,
     removed_dependency: Option<Dependency>,
+    last_schedule: Option<Schedule>,
     done: bool,
-    pub schedule: Schedule,
+    pub schedule: Option<Schedule>,
+}
+
+impl fmt::Display for Todo {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let shcedule_str = self
+            .schedule
+            .as_ref()
+            .map(|schedule| schedule.display())
+            .unwrap_or_default();
+        let note_string = self.dependency.as_ref().map_or(".", |dep| dep.display());
+        let Todo {
+            priority, message, ..
+        } = self;
+
+        write!(f, "{priority}{note_string} {message}{shcedule_str}")
+    }
+}
+
+impl TodoDisplay for Todo {
+    #[inline(always)]
+    fn display_with_args(&self, args: &DisplayArgs) -> String {
+        let done_string = if args.show_done {
+            if self.done() {
+                args.done_string.as_str()
+            } else {
+                args.undone_string.as_str()
+            }
+        } else {
+            ""
+        };
+        format!("{done_string}{self}")
+    }
 }
 
 impl Ord for Todo {
@@ -41,9 +75,13 @@ impl PartialOrd for Todo {
 impl From<&Todo> for String {
     fn from(todo: &Todo) -> String {
         let done_str = if todo.done() { "-" } else { "" };
-        let dep_str: String = todo.dependency.as_ref().map_or(String::new(),|dep| dep.into());
+        let dep_str: String = todo
+            .dependency
+            .as_ref()
+            .map(|x| x.into())
+            .unwrap_or_default();
 
-        let schedule_str: String = (&todo.schedule).into();
+        let schedule_str: String = todo.schedule.as_ref().map(|x| x.into()).unwrap_or_default();
 
         format!(
             "[{done_str}{}]{dep_str} {}{schedule_str}",
@@ -92,7 +130,7 @@ impl FromStr for Todo {
                     if c == '-' {
                         done = true;
                     } else if c.is_ascii_digit() {
-                        priority = c.to_digit(10).unwrap() as PriorityType;
+                        priority = c.to_digit(10).unwrap() as u8;
                     } else if c == ' ' {
                         state = State::Message;
                     } else if c == '>' {
@@ -119,22 +157,19 @@ impl FromStr for Todo {
             }
         }
         if state == State::Message && !message.is_empty() {
-            let schedule = Schedule::from(schedule_string);
+            let schedule: Option<Schedule> = schedule_string.parse().ok();
             let dependency = dependency_string.parse().ok();
 
-            if schedule.should_undone() {
-                done = false;
-            }
-            if schedule.should_done() {
-                done = true;
+            if let Some(schedule) = schedule.as_ref() {
+                done =  schedule.date_should_be_done();
             }
             Ok(Todo {
                 dependency,
-                removed_dependency: None,
                 schedule,
                 message,
                 priority,
                 done,
+                ..Default::default()
             })
         } else {
             Err(TodoError::ReadFailed)
@@ -149,11 +184,11 @@ impl Todo {
     }
 
     #[inline]
-    pub fn priority(&self) -> PriorityType {
+    pub fn priority(&self) -> u8 {
         self.priority
     }
     #[inline]
-    pub fn new(message: String, priority: PriorityType) -> Self {
+    pub fn new(message: String, priority: u8) -> Self {
         Todo {
             message,
             priority: Self::fixed_priority(priority),
@@ -161,9 +196,32 @@ impl Todo {
         }
     }
 
+    pub fn toggle_schedule(&mut self) -> bool {
+        if self.schedule.is_none() && self.last_schedule.is_none() {
+            return false;
+        }
+        if self.schedule.is_some() {
+            self.last_schedule = std::mem::take(&mut self.schedule);
+        } else {
+            self.schedule = std::mem::take(&mut self.last_schedule);
+        }
+        true
+    }
+
+    pub fn abandonment_coefficient(&self) -> f64 {
+        self.schedule.as_ref().map_or(1., |sch| {
+            let days_diff = sch.days_diff();
+            if days_diff == 0 {
+                1.
+            } else {
+                sch.days_diff() as f64 / sch.days() as f64
+            }
+        })
+    }
+
     #[inline]
     pub fn is_note(&self) -> bool {
-        self.dependency.as_ref().map_or(false,|dep|dep.is_note())
+        self.dependency.as_ref().map_or(false, |dep| dep.is_note())
     }
 
     #[inline]
@@ -174,13 +232,6 @@ impl Todo {
     #[inline]
     pub fn no_dependency(&self) -> bool {
         self.dependency.is_none()
-    }
-
-    #[inline]
-    pub fn remove_note(&mut self) {
-        if self.is_note() {
-            self.remove_dependency();
-        }
     }
 
     #[inline]
@@ -214,30 +265,11 @@ impl Todo {
     }
 
     #[inline]
-    pub fn display(&self, args: &DisplayArgs) -> String {
-        let done_string = if args.show_done {
-            if self.done() {
-                args.done_string.as_str()
-            } else {
-                args.undone_string.as_str()
-            }
-        } else {
-            ""
-        };
-        let note_string = self.dependency.as_ref().map_or(".", |dep| dep.display());
-        let daily_str = self.schedule.display();
-        format!(
-            "{done_string}{}{note_string} {}{daily_str}",
-            self.priority, self.message
-        )
-    }
-
-    #[inline]
     pub fn remove_dependency(&mut self) {
         if let Some(dependency) = self.dependency.as_mut() {
             if dependency.is_written() {
                 self.removed_dependency = Some(std::mem::take(dependency));
-            } 
+            }
         }
         self.dependency = None;
     }
@@ -249,13 +281,15 @@ impl Todo {
     }
 
     #[inline]
-    pub fn edit_note(&mut self) -> io::Result<()> {
+    pub fn edit_note(&mut self) -> io::Result<bool> {
         let note = self.dependency.as_ref().and_then(|dep| dep.note());
-        let note = open_note_temp_editor(note)?;
-        if !note.is_empty() {
-            self.set_note(note)?;
+        let new_note = open_note_temp_editor(note)?;
+        if !new_note.is_empty() && note.map_or(true, |note| note != new_note) {
+            self.set_note(new_note)?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 
     #[inline]
@@ -275,38 +309,42 @@ impl Todo {
 
     #[inline]
     pub fn toggle_daily(&mut self) {
-        if self.schedule.is_daily() {
-            self.schedule.toggle();
+        if self.toggle_schedule() {
+            if let Some(schedule) = self.schedule.as_mut() {
+                schedule.set_day(1);
+            }
         } else {
-            self.schedule.enable_schedule();
+            self.schedule = Some(Schedule::new(1))
         }
-        self.schedule.set_daily();
     }
 
     #[inline]
     pub fn toggle_weekly(&mut self) {
-        if self.schedule.is_weekly() {
-            self.schedule.toggle();
+        if self.toggle_schedule() {
+            if let Some(schedule) = self.schedule.as_mut() {
+                schedule.set_day(7);
+            }
         } else {
-            self.schedule.enable_schedule();
+            self.schedule = Some(Schedule::new(7))
         }
-        self.schedule.set_weekly();
     }
 
     #[inline]
     pub fn enable_day(&mut self, day: i64) {
-        self.schedule.enable_schedule();
-        self.schedule.set_day(day);
+        self.schedule = Schedule::default().into();
+        self.schedule.as_mut().unwrap().set_day(day);
     }
 
     #[inline]
     pub fn set_done(&mut self, done: bool) {
-        self.schedule.set_current_date();
+        if let Some(schedule) = self.schedule.as_mut() {
+            schedule.set_current_date();
+        }
         self.done = done;
     }
 
     #[inline(always)]
-    fn standardize_priority(priority: PriorityType) -> PriorityType {
+    fn standardize_priority(priority: u8) -> u8 {
         match priority {
             0 => 10,
             any => any,
@@ -314,7 +352,7 @@ impl Todo {
     }
 
     #[inline(always)]
-    fn standardized_priority(&self) -> PriorityType {
+    fn standardized_priority(&self) -> u8 {
         Self::standardize_priority(self.priority)
     }
 
@@ -337,7 +375,7 @@ impl Todo {
     }
 
     #[inline]
-    pub fn set_priority(&mut self, priority: PriorityType) {
+    pub fn set_priority(&mut self, priority: u8) {
         self.priority = priority;
         self.fix_priority();
     }
@@ -348,9 +386,9 @@ impl Todo {
     }
 
     #[inline(always)]
-    fn cmp_value(&self) -> PriorityType {
+    fn cmp_value(&self) -> u8 {
         let mut priority = self.standardized_priority() * 2;
-        if self.schedule.is_reminder() {
+        if self.schedule.as_ref().map_or(false, Schedule::is_reminder) {
             priority -= 1;
         }
         if self.done() {
@@ -361,7 +399,7 @@ impl Todo {
     }
 
     #[inline]
-    fn fixed_priority(priority: PriorityType) -> PriorityType {
+    fn fixed_priority(priority: u8) -> u8 {
         match priority {
             10.. => 0,
             0 => 0,
@@ -396,8 +434,9 @@ mod tests {
     fn test_try_from_string() {
         let input = "[1]>2c924e3088204ee77ba681f72be3444357932fca Test";
         let expected = Ok(Todo {
+            last_schedule: None,
             removed_dependency: None,
-            schedule: Schedule::new(),
+            schedule: None,
             dependency: Some(Dependency::new_note(
                 "2c924e3088204ee77ba681f72be3444357932fca".to_string(),
                 "".to_string(),
@@ -474,16 +513,6 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_note() {
-        let mut todo = Todo::new("Test".to_string(), 1);
-        todo.set_note("Note".to_string())
-            .expect("Error setting note");
-        todo.remove_note();
-
-        assert!(todo.dependency.is_none());
-    }
-
-    #[test]
     fn test_add_dependency() {
         let mut todo = Todo::new("Test".to_string(), 1);
 
@@ -519,14 +548,12 @@ mod tests {
         let todo = Todo::from_str(input1).unwrap();
 
         let expected = Todo {
-            removed_dependency: None,
-            schedule: Schedule::new(),
             dependency: Some(Dependency::new_todo_list(
                 "1BE348656D84993A6DF0DB0DECF2E95EF2CF461c".to_string(),
             )),
             message: "Read for exams".to_string(),
             priority: 1,
-            done: false,
+            ..Default::default()
         };
         assert_eq!(todo, expected);
     }
@@ -536,12 +563,10 @@ mod tests {
         let input = "[-2] this one should be daily [D1(2023-09-05)]";
         let todo = Todo::from_str(input).unwrap();
         let expected = Todo {
-            removed_dependency: None,
-            schedule: Schedule::from("D1(2023-09-05)"),
-            dependency: None,
+            schedule: "D1(2023-09-05)".parse().ok(),
             message: "this one should be daily".to_string(),
             priority: 2,
-            done: false,
+            ..Default::default()
         };
         assert_eq!(todo, expected);
         let input = "[2] this one should be daily [D1(2023-09-05)]";
@@ -552,16 +577,14 @@ mod tests {
     #[test]
     fn test_daily_display() {
         let test = Todo {
-            removed_dependency: None,
-            dependency: None,
-            schedule: Schedule::from("D1()"),
+            schedule: "D1()".parse().ok(),
             message: "this one should be daily".to_string(),
             priority: 2,
-            done: false,
+            ..Default::default()
         };
         let expected = "2. this one should be daily (Daily)";
 
-        assert_eq!(test.display(&DisplayArgs::parse()), expected)
+        assert_eq!(test.display_with_args(&DisplayArgs::parse()), expected)
     }
 
     #[test]
@@ -569,12 +592,10 @@ mod tests {
         let input = "[-2] this one should be daily [D7(2023-09-05)]";
         let todo = Todo::from_str(input).unwrap();
         let expected = Todo {
-            removed_dependency: None,
-            dependency: None,
-            schedule: Schedule::from("D7(2023-09-05)"),
+            schedule: "D7(2023-09-05)".parse().ok(),
             message: "this one should be daily".to_string(),
             priority: 2,
-            done: false,
+            ..Default::default()
         };
         assert_eq!(todo, expected);
         let input = "[2] this one should be daily [D7(2023-09-05)]";

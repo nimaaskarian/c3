@@ -1,18 +1,18 @@
+use std::cmp;
 use std::collections::VecDeque;
-use std::fmt::Write;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
 use clipboard::Clipboard;
+pub use todo::schedule::Schedule;
 mod todo;
 mod todo_list;
-use crate::{fileio, AppArgs};
+use crate::{fileio, AppArgs, SortMethod};
 use std::rc::Rc;
 pub use todo::Todo;
 
-pub use self::todo::PriorityType;
 pub use self::todo_list::TodoList;
 
 #[derive(Clone)]
@@ -21,12 +21,22 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
-pub type RestrictionFunction = Rc<dyn Fn(&Todo) -> bool>;
+pub(crate) fn ord_by_abandonment_coefficient(a: &Todo, b: &Todo) -> cmp::Ordering {
+    let order = b
+        .abandonment_coefficient()
+        .total_cmp(&a.abandonment_coefficient());
+    if order.is_eq() {
+        return a.cmp(b);
+    }
+    order
+}
+
+pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
     clipboard: Clipboard,
     pub(super) todo_list: TodoList,
-    index: usize,
+    pub(super) index: usize,
     changed: bool,
     tree_path: Vec<usize>,
     pub(super) args: AppArgs,
@@ -34,7 +44,7 @@ pub struct App {
     tree_search_positions: Vec<SearchPosition>,
     x_index: usize,
     y_index: usize,
-    restriction: RestrictionFunction,
+    restriction: Restriction,
 }
 
 #[derive(Debug)]
@@ -67,7 +77,10 @@ impl FromStr for IndexedLine {
 
 fn first_word_parse<T: FromStr>(input: &str) -> (Option<T>, String) {
     let input = input.trim_start();
-    let position = input.chars().position(|x|x.is_whitespace()).unwrap_or(input.len());
+    let position = input
+        .chars()
+        .position(|x| x.is_whitespace())
+        .unwrap_or(input.len());
     match input[..position].parse::<T>() {
         Ok(num) => {
             let rest = input[position..].trim_start().to_string();
@@ -102,15 +115,20 @@ impl App {
 
     pub fn toggle_schedule(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.schedule.toggle();
+            todo.toggle_schedule();
         }
     }
 
     #[inline(always)]
     fn read_a_todo_list(path: &Path, notes_dir: &Path, args: &AppArgs) -> TodoList {
         let mut todo_list = TodoList::read(path);
+        if args.sort_method == SortMethod::AbandonedFirst {
+            todo_list.set_todo_cmp(ord_by_abandonment_coefficient);
+            todo_list.sort();
+            todo_list.changed = false;
+        }
         if !args.no_tree {
-            todo_list.read_dependencies(&notes_dir);
+            todo_list.read_dependencies(notes_dir);
         }
         todo_list
     }
@@ -123,7 +141,7 @@ impl App {
     }
 
     #[inline]
-    pub fn restriction(&self) -> &RestrictionFunction {
+    pub fn restriction(&self) -> &Restriction {
         &self.restriction
     }
 
@@ -136,8 +154,8 @@ impl App {
     }
 
     #[inline]
-    pub fn output_list_to_path(&mut self, path: &Path) -> io::Result<()> {
-        let list = self.current_list_mut();
+    pub fn output_list_to_path(&self, path: &Path) -> io::Result<()> {
+        let list = self.current_list();
         let dependency_path = fileio::append_notes_to_path_parent(path);
         create_dir_all(&dependency_path)?;
         list.force_write(path)?;
@@ -151,11 +169,7 @@ impl App {
         self.current_list_mut().append_list(todo_list)
     }
 
-    pub fn set_query_restriction(
-        &mut self,
-        query: String,
-        last_restriction: Option<RestrictionFunction>,
-    ) {
+    pub fn set_query_restriction(&mut self, query: String, last_restriction: Option<Restriction>) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
         self.set_restriction(Rc::new(move |todo| {
             todo.matches(query.as_str()) && last_restriction(todo)
@@ -178,17 +192,18 @@ impl App {
     }
 
     pub fn search_tree(&mut self, query: String) {
-        let mut lists: VecDeque<(Vec<usize>, &TodoList)> = VecDeque::from([(vec![],&self.todo_list)]);
+        let mut lists: VecDeque<(Vec<usize>, &TodoList)> =
+            VecDeque::from([(vec![], &self.todo_list)]);
         while let Some((indices, current_list)) = lists.pop_back() {
             let mut matching_indices: Vec<usize> = vec![];
-            for (i,todo) in current_list.filter(&self.restriction).enumerate() {
+            for (i, todo) in current_list.filter(&self.restriction).enumerate() {
                 let mut todo_indices = indices.clone();
                 todo_indices.push(i);
                 if todo.matches(&query) {
                     matching_indices.push(i)
                 }
                 if let Some(list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
-                    lists.push_back((todo_indices,list))
+                    lists.push_back((todo_indices, list))
                 }
             }
             if !matching_indices.is_empty() {
@@ -201,19 +216,17 @@ impl App {
     }
 
     pub fn batch_editor_messages(&mut self) {
-        let restriction = &self.restriction;
-        
-        let mut todos_iter = self.current_list().filter(restriction);
-        let first_item = todos_iter.next();
-        let mut content = if let Some(item) = first_item {
-            format!("# INDEX PRIORITY MESSAGE\n{: <7} {: <8} {}\n",0, item.priority(), item.message)
-        } else {
-            String::new()
-        };
-        for (i, line) in todos_iter.enumerate() {
-            writeln!(content, "{: <7} {: <8} {}",i+1, line.priority(), line.message);
-        }
-        let new_messages = fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
+        let content = String::from("# INDEX PRIORITY MESSAGE\n")
+            + self
+                .current_list()
+                .filter(&self.restriction)
+                .enumerate()
+                .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
+                .collect::<Vec<String>>()
+                .join("\n")
+                .as_str();
+        let new_messages =
+            fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
         self.batch_edit_current_list(new_messages)
     }
@@ -222,7 +235,6 @@ impl App {
     fn batch_edit_current_list(&mut self, messages: Lines<'_>) {
         let restriction = self.restriction.clone();
         let mut lines: Vec<IndexedLine> = messages
-            .into_iter()
             .filter(|message| !message.starts_with('#'))
             .flat_map(|message| message.parse())
             .collect();
@@ -231,15 +243,16 @@ impl App {
         let todolist = self.current_list_mut();
         let size = todolist.len(&restriction);
         let indices: Vec<usize> = lines.iter().filter_map(|x| x.index).collect();
-        let delete_indices: Vec<usize> = (0..size).filter(|i| indices.binary_search(i).is_err()).collect();
+        let delete_indices: Vec<usize> = (0..size)
+            .filter(|i| indices.binary_search(i).is_err())
+            .collect();
         let mut changed = !delete_indices.is_empty();
 
         for line in lines {
             if let Some(index) = line.index {
                 let index = todolist.true_position_in_list(index, &restriction);
-                let todo = &todolist.todos[index];
-                if todo.priority() != line.priority || todo.message != line.message {
-                    let todo = &mut todolist.todos[index];
+                let todo = &mut todolist.todos[index];
+                if line.priority != todo.priority() || line.message != todo.message {
                     changed = true;
                     todo.set_message(line.message);
                     todo.set_priority(line.priority);
@@ -248,7 +261,7 @@ impl App {
                 todolist.push(Todo::new(line.message, line.priority));
             }
         }
-        todolist.filter_indices(delete_indices);
+        todolist.retrain_indices(delete_indices);
         todolist.changed = todolist.changed || changed;
         if todolist.changed {
             todolist.sort();
@@ -273,22 +286,24 @@ impl App {
 
     #[inline]
     pub fn increase_day_done(&mut self) {
-        if let Some(todo) = self.todo_mut() {
-            todo.schedule.add_days_to_date(-1)
+        if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
+            schedule.add_days_to_date(-1);
+            self.reorder_current();
         }
     }
 
     #[inline]
     pub fn decrease_day_done(&mut self) {
-        if let Some(todo) = self.todo_mut() {
-            todo.schedule.add_days_to_date(1)
+        if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
+            schedule.add_days_to_date(1);
+            self.reorder_current();
         }
     }
 
     #[inline]
     pub fn prepend(&mut self, message: String) {
         self.current_list_mut().prepend(Todo::new(message, 1));
-        self.go_top();
+        self.index = 0;
     }
 
     #[inline]
@@ -351,13 +366,17 @@ impl App {
         let mut current_list = &self.todo_list;
         let mut max_i = 0;
         for &index in self.tree_path.iter() {
-            if let Some(dependency) = current_list.todos.get(index).and_then(|todo| todo.dependency.as_ref()) {
+            if let Some(dependency) = current_list
+                .todos
+                .get(index)
+                .and_then(|todo| todo.dependency.as_ref())
+            {
                 current_list = &dependency.todo_list;
-                max_i+=1;
+                max_i += 1;
             } else {
                 break;
             }
-        };
+        }
         max_i
     }
 
@@ -369,6 +388,7 @@ impl App {
             self.index = self.current_list_mut().reorder(index);
         } else {
             self.current_list_mut().sort();
+            self.fix_index();
         }
         while self.is_undone_empty() && self.traverse_up() {
             self.toggle_current_done()
@@ -398,7 +418,11 @@ impl App {
         let mut parent = None;
         for &index in &self.tree_path {
             parent = Some(&list.todos[index]);
-            if let Some(todo_list) = list.todos[index].dependency.as_ref().and_then(|dep| dep.todo_list()) {
+            if let Some(todo_list) = list.todos[index]
+                .dependency
+                .as_ref()
+                .and_then(|dep| dep.todo_list())
+            {
                 list = todo_list
             } else {
                 break;
@@ -410,13 +434,10 @@ impl App {
     #[inline]
     pub fn increment(&mut self) {
         let size = self.len();
-        if size == 0 {
-            return self.go_top();
-        };
-        if self.index != size - 1 {
-            self.index += 1
+        if size == 0 || self.index == size - 1 {
+            self.index = 0;
         } else {
-            self.go_top()
+            self.index += 1
         }
     }
 
@@ -425,13 +446,8 @@ impl App {
         if self.index != 0 {
             self.index -= 1;
         } else {
-            self.go_bottom()
+            self.index = self.bottom();
         }
-    }
-
-    #[inline]
-    pub fn go_top(&mut self) {
-        self.index = 0;
     }
 
     #[inline]
@@ -445,7 +461,7 @@ impl App {
                         .current_list()
                         .true_position_in_list(index, &restriction);
                     self.tree_path.push(true_index);
-                    self.go_top();
+                    self.index = 0;
                     self.update_show_done_restriction();
                 }
                 _ => {}
@@ -471,11 +487,6 @@ impl App {
     }
 
     #[inline]
-    pub fn go_bottom(&mut self) {
-        self.index = self.bottom();
-    }
-
-    #[inline]
     pub fn bottom(&self) -> usize {
         match self.len() {
             0 => 0,
@@ -490,18 +501,9 @@ impl App {
 
     #[inline]
     pub fn todo_mut(&mut self) -> Option<&mut Todo> {
-        if self.is_todos_empty() {
-            return None;
-        }
-        let index = self.index.min(self.len() - 1);
-        let size = self.len();
-        let res_cloned = self.restriction.clone();
-
-        if size <= index {
-            return Some(self.current_list_mut().index_mut(size - 1, &res_cloned));
-        }
-
-        Some(self.current_list_mut().index_mut(index, &res_cloned))
+        let index = self.index;
+        let restriction = self.restriction.clone();
+        self.current_list_mut().index_mut(index, &restriction)
     }
 
     #[inline]
@@ -530,7 +532,9 @@ impl App {
         let mut list = &mut self.todo_list;
 
         for &index in &self.tree_path {
-            list = &mut list.todos[index].dependency.as_mut().unwrap().todo_list
+            if list.todos[index].dependency.is_some() {
+                list = &mut list.todos[index].dependency.as_mut().unwrap().todo_list
+            }
         }
         list
     }
@@ -542,7 +546,11 @@ impl App {
             return list;
         }
         for &index in &self.tree_path {
-            if let Some(todo_list) = &list.todos[index].dependency.as_ref().and_then(|dep| dep.todo_list()) {
+            if let Some(todo_list) = &list.todos[index]
+                .dependency
+                .as_ref()
+                .and_then(|dep| dep.todo_list())
+            {
                 list = todo_list
             } else {
                 break;
@@ -567,8 +575,7 @@ impl App {
         let todo_path = self.args.todo_path.clone();
         self.handle_removed_todo_dependency_files(&note_dir);
         self.todo_list.write(&todo_path)?;
-        self.todo_list
-            .delete_removed_dependent_files(&note_dir)?;
+        self.todo_list.delete_removed_dependent_files(&note_dir)?;
         if self.is_tree() {
             self.todo_list.write_dependencies(&note_dir)?;
         }
@@ -589,31 +596,33 @@ impl App {
     #[inline]
     pub fn toggle_current_daily(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.toggle_daily()
+            todo.toggle_daily();
+            self.reorder_current();
         }
     }
 
     #[inline]
     pub fn toggle_current_weekly(&mut self) {
         if let Some(todo) = self.todo_mut() {
-            todo.toggle_weekly()
+            todo.toggle_weekly();
+            self.reorder_current();
         }
     }
 
     #[inline]
     pub fn is_undone_empty(&self) -> bool {
-        let restriction: RestrictionFunction = Rc::new(move |todo| !todo.done());
+        let restriction: Restriction = Rc::new(move |todo| !todo.done());
         self.current_list().is_empty(&restriction)
     }
 
     #[inline]
     pub fn is_done_empty(&self) -> bool {
-        let restriction: RestrictionFunction = Rc::new(move |todo| todo.done());
+        let restriction: Restriction = Rc::new(move |todo| todo.done());
         self.current_list().is_empty(&restriction)
     }
 
     #[inline(always)]
-    pub fn no_restriction() -> RestrictionFunction {
+    pub fn no_restriction() -> Restriction {
         Rc::new(|_| true)
     }
 
@@ -623,7 +632,7 @@ impl App {
     }
 
     #[inline(always)]
-    pub fn set_restriction(&mut self, restriction: RestrictionFunction) {
+    pub fn set_restriction(&mut self, restriction: Restriction) {
         self.restriction = restriction;
         self.fix_index();
     }
@@ -631,8 +640,8 @@ impl App {
     #[inline]
     pub fn set_priority_restriction(
         &mut self,
-        priority: PriorityType,
-        last_restriction: Option<RestrictionFunction>,
+        priority: u8,
+        last_restriction: Option<Restriction>,
     ) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
         self.set_restriction(Rc::new(move |todo| {
@@ -641,7 +650,7 @@ impl App {
     }
 
     #[inline]
-    pub fn set_priority_limit_no_done(&mut self, priority: PriorityType) {
+    pub fn set_priority_limit_no_done(&mut self, priority: u8) {
         self.args.display_args.show_done = false;
         self.set_restriction(Rc::new(move |todo| {
             todo.priority() == priority && !todo.done()
@@ -649,7 +658,7 @@ impl App {
     }
 
     #[inline]
-    pub fn set_current_priority(&mut self, priority: PriorityType) {
+    pub fn set_current_priority(&mut self, priority: u8) {
         if let Some(todo) = self.todo_mut() {
             todo.set_priority(priority);
             self.reorder_current();
@@ -657,28 +666,13 @@ impl App {
     }
 
     #[inline]
-    pub fn get_message(&mut self) -> Option<String> {
-        if let Some(todo) = self.todo() {
-            return Some(todo.message.clone());
-        };
-        None
+    pub fn get_cloned_current_message(&mut self) -> Option<String> {
+        self.todo().map(|todo| todo.message.clone())
     }
 
     #[inline]
     pub fn todo(&self) -> Option<&Todo> {
-        if self.is_todos_empty() {
-            return None;
-        }
-
-        let current_list = self.current_list();
-        let index = self.index.min(self.len() - 1);
-        let size = self.len();
-
-        if size <= index {
-            return Some(current_list.index(size - 1, &self.restriction));
-        }
-
-        Some(self.current_list().index(index, &self.restriction))
+        self.current_list().index(self.index, &self.restriction)
     }
 
     #[inline]
@@ -704,9 +698,9 @@ impl App {
 
     #[inline]
     pub fn display_current_slice(&self, min: usize, max: usize) -> Vec<String> {
-        self.current_list().display_slice(&self.args.display_args, &self.restriction, min, max)
+        self.current_list()
+            .display_slice(&self.args.display_args, &self.restriction, min, max)
     }
-
 
     #[inline]
     pub fn display_list(&self, todo_list: &TodoList) -> Vec<String> {
@@ -730,14 +724,29 @@ impl App {
     #[inline]
     pub fn edit_or_add_note(&mut self) {
         if self.is_tree() {
+            let list_changed = self.current_list().changed;
+            let changed = self.changed;
             if let Some(todo) = self.todo_mut() {
-                let _ = todo.edit_note();
+                if !todo.edit_note().unwrap_or_default() {
+                    self.current_list_mut().changed = list_changed;
+                    self.changed = changed;
+                }
             }
         }
     }
 
     #[inline]
-    pub fn decrease_current_priority(&mut self) {
+    pub fn move_current_down(&mut self) {
+        let index = self.index;
+        let restriction = self.restriction.clone();
+        let next_priority = self.current_list().index(index+1, &restriction).map(|x|x.priority());
+        let current_priority = self.current_list().index(index, &restriction).map(|x|x.priority());
+        if current_priority.is_some() && current_priority == next_priority {
+            let list = self.current_list_mut();
+            list.changed = true;
+            self.index = list.move_index(index, index+1, 0);
+            return
+        }
         if let Some(todo) = self.todo_mut() {
             todo.decrease_priority();
             self.reorder_current();
@@ -745,7 +754,20 @@ impl App {
     }
 
     #[inline]
-    pub fn increase_current_priority(&mut self) {
+    pub fn move_current_up(&mut self) {
+        if self.index == 0 {
+            return
+        }
+        let index = self.index;
+        let restriction = self.restriction.clone();
+        let prev_priority = self.current_list().index(index-1, &restriction).map(|x|x.priority());
+        let current_priority = self.current_list().index(index, &restriction).map(|x|x.priority());
+        if current_priority.is_some() && current_priority == prev_priority {
+            let list = self.current_list_mut();
+            list.changed = true;
+            self.index = list.move_index(index, index-1, 1);
+            return
+        }
         if let Some(todo) = self.todo_mut() {
             todo.increase_priority();
             self.reorder_current();
@@ -765,7 +787,7 @@ impl App {
         if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
             if let Some(dependency) = todo.dependency.as_mut() {
                 if dependency.is_written() {
-                    let _ = dependency.read(&self.notes_dir);
+                    let _ = dependency.read(&self.notes_dir, self.todo_list.todo_cmp);
                 }
             }
             let list = &mut self.current_list_mut();
@@ -828,7 +850,10 @@ mod tests {
             app.add_dependency_traverse_down();
             app.append(String::from(dependency));
         }
-        app.todo_mut().unwrap().set_note("Heaven from hell".to_string()).unwrap();
+        app.todo_mut()
+            .unwrap()
+            .set_note("Heaven from hell".to_string())
+            .unwrap();
         for _ in 0..3 {
             app.traverse_up();
         }
@@ -967,7 +992,7 @@ mod tests {
 
         let names: io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))
             .unwrap()
-            .map(|dir|dir.map(|entry|entry.path()))
+            .map(|dir| dir.map(|entry| entry.path()))
             .collect();
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0] Hello there\n");
@@ -989,10 +1014,9 @@ mod tests {
 
         let names: io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))
             .unwrap()
-            .map(|dir|dir.map(|entry|entry.path()))
+            .map(|dir| dir.map(|entry| entry.path()))
             .collect();
         let expected = vec![PathBuf::from("test-remove-current-dependency-partial/notes/63c5498f09d086fca6d870345350bfb210945790.todo")];
-        dbg!(&names);
         assert_eq!(names.unwrap(), expected);
         let string = fs::read_to_string(&dir.join("todo"))?;
         let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0]>63c5498f09d086fca6d870345350bfb210945790.todo Hello there\n");
