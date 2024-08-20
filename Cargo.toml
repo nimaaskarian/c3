@@ -18,3 +18,10 @@ codegen-units = 1
 lto = "fat"
 panic = "abort"
 strip = "debuginfo"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "test_100k_todo_sort"
+harness = false
