@@ -1,10 +1,62 @@
-use super::todo_app::{App, Restriction, Todo, TodoList};
-use crate::{Args, TodoDisplay};
-use crate::{CliArgs, DisplayArgs, DoOnSelected};
+use c3::todo_app::{App, Restriction, Todo, TodoList};
+use clap_complete::Shell;
+use crate::Args;
+use c3::{DisplayArgs, TodoDisplay, DoOnSelected};
 use clap::{Command, CommandFactory};
 use clap_complete::{generate, Generator};
 use std::io;
 use std::process;
+use std::path::PathBuf;
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct CliArgs {
+    /// Search and select todo. Used for batch change operations
+    #[arg(short = 'S', long)]
+    search_and_select: Vec<String>,
+
+    #[arg(long)]
+    do_on_selected: Option<DoOnSelected>,
+
+    #[arg(short = 'b', long, default_value_t = false)]
+    batch_edit: bool,
+
+    /// A todo message to append
+    #[arg(short = 'a', long)]
+    append_todo: Vec<String>,
+
+    /// A todo message to prepend
+    #[arg(short = 'A', long)]
+    prepend_todo: Vec<String>,
+
+    /// A todo file to append to current list
+    #[arg(long)]
+    append_file: Option<PathBuf>,
+
+    /// A todo file to output to
+    #[arg(short = 'o', long)]
+    output_file: Option<PathBuf>,
+
+    #[arg(short = 'p', long, default_value_t = false)]
+    print_path: bool,
+
+    /// Minimal tree with no tree graphics
+    #[arg(short = 'M', long)]
+    minimal_tree: bool,
+
+    /// List todos (non interactive)
+    #[arg(short = 'l', long)]
+    list: bool,
+
+    /// Write contents of todo file in the stdout (non interactive)
+    #[arg(short = 's', long)]
+    stdout: bool,
+
+    /// Generate completion for a certain shell
+    #[arg(short = 'c', long)]
+    completion: Option<Shell>,
+}
 
 pub struct NotCli;
 #[inline]

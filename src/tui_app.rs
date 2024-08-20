@@ -8,6 +8,7 @@ use std::{
 };
 // }}}
 // lib {{{
+use clap::Parser;
 use crossterm::{
     event::{
         self,
@@ -24,12 +25,11 @@ use tui_textarea::{CursorMove, Input, TextArea};
 // mod {{{
 
 mod modules;
-use super::todo_app::{App, Restriction, Todo};
-use crate::{
+use c3::{
+    todo_app::{App, Restriction, Todo, Schedule, ord_by_abandonment_coefficient},
     date,
-    todo_app::{ord_by_abandonment_coefficient, Schedule},
-    TuiArgs,
 };
+
 use modules::{potato::Potato, Module};
 // }}}
 #[derive(Debug)]
@@ -64,6 +64,22 @@ pub struct TuiApp<'a> {
     potato_module: Potato,
     textarea: TextArea<'a>,
     todo_app: &'a mut App,
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct TuiArgs {
+    /// Alternative way of rendering, render minimum amount of todos
+    #[arg(long)]
+    minimal_render: bool,
+
+    /// String behind highlighted todo in TUI mode
+    #[arg(short='H', long, default_value_t=String::from(">>"))]
+    highlight_string: String,
+
+    /// Enable TUI module at startup
+    #[arg(short = 'm', long)]
+    enable_module: bool,
 }
 
 impl<'a> TuiApp<'a> {

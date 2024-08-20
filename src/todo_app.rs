@@ -21,7 +21,7 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
-pub(crate) fn ord_by_abandonment_coefficient(a: &Todo, b: &Todo) -> cmp::Ordering {
+pub fn ord_by_abandonment_coefficient(a: &Todo, b: &Todo) -> cmp::Ordering {
     let order = b
         .abandonment_coefficient()
         .total_cmp(&a.abandonment_coefficient());
@@ -35,11 +35,11 @@ pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
     clipboard: Clipboard,
-    pub(super) todo_list: TodoList,
-    pub(super) index: usize,
+    pub todo_list: TodoList,
+    pub index: usize,
     changed: bool,
     tree_path: Vec<usize>,
-    pub(super) args: AppArgs,
+    pub args: AppArgs,
     removed_todos: Vec<Todo>,
     tree_search_positions: Vec<SearchPosition>,
     x_index: usize,
@@ -92,7 +92,7 @@ fn first_word_parse<T: FromStr>(input: &str) -> (Option<T>, String) {
 
 impl App {
     #[inline]
-    pub(crate) fn new(args: AppArgs) -> Self {
+    pub fn new(args: AppArgs) -> Self {
         let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
         let todo_list = Self::read_a_todo_list(&args.todo_path, &notes_dir, &args);
         let mut app = App {
