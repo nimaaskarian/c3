@@ -3,15 +3,25 @@ use std::io::{stdout, BufRead, BufWriter, Write};
 use std::path::Path;
 use std::{cmp, io};
 
-use super::{App, Restriction, Todo};
+use super::{App, Restriction, SortMethod, Todo};
 use crate::{DisplayArgs, TodoDisplay};
 
 pub type TodoCmp = fn(&Todo, &Todo) -> cmp::Ordering;
-#[derive(Debug, Eq, PartialEq, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TodoList {
     pub todos: Vec<Todo>,
     pub(super) changed: bool,
-    pub todo_cmp: Option<TodoCmp>,
+    pub todo_cmp: TodoCmp,
+}
+
+impl Default for TodoList {
+    fn default() -> Self {
+        Self {
+            todos: Vec::new(),
+            changed: false,
+            todo_cmp: SortMethod::Normal.cmp_function(),
+        }
+    }
 }
 
 type Output = Todo;
@@ -119,21 +129,18 @@ impl TodoList {
             return Self::new();
         }
         let file_data = read(filename).unwrap();
-        let mut todolist = Self {
+        Self {
             todos: file_data
                 .lines()
                 .map_while(Result::ok)
                 .flat_map(|line| line.parse())
                 .collect(),
             ..Default::default()
-        };
-        todolist.sort_normal();
-        todolist.changed = false;
-        todolist
+        }
     }
 
     pub fn set_todo_cmp(&mut self, sort: TodoCmp) {
-        self.todo_cmp = Some(sort);
+        self.todo_cmp = sort;
     }
 
     pub fn read_dependencies(&mut self, folder_name: &Path) -> io::Result<()> {
@@ -278,16 +285,8 @@ impl TodoList {
         self.todos.push(item);
     }
 
-    fn todo_cmp(&self) -> TodoCmp {
-        if let Some(todo_cmp) = self.todo_cmp {
-            todo_cmp
-        } else {
-            Todo::cmp
-        }
-    }
-
     fn compare_todos(&self, a: &Todo, b: &Todo) -> cmp::Ordering {
-        let todo_cmp = self.todo_cmp();
+        let todo_cmp = self.todo_cmp;
         todo_cmp(a, b)
     }
 
@@ -357,14 +356,7 @@ impl TodoList {
     }
 
     pub fn sort(&mut self) {
-        let todo_cmp = self.todo_cmp();
-        self.sort_by(todo_cmp);
-    }
-
-    #[inline(always)]
-    fn sort_normal(&mut self) {
-        self.changed = true;
-        self.todos.sort()
+        self.sort_by(self.todo_cmp);
     }
 
     #[inline(always)]
@@ -386,9 +378,11 @@ mod tests {
     fn get_todo_list() -> TodoList {
         let path = PathBuf::from("tests/TODO_LIST");
         let mut todolist = TodoList::read(&path);
+        todolist.sort();
         todolist
             .read_dependencies(&path)
             .expect("reading todo dependencies failed");
+        todolist.changed = false;
         todolist
     }
 
@@ -486,7 +480,7 @@ mod tests {
     fn test_initially_sorted() {
         let todo_list = get_todo_list();
         let mut sorted_list = todo_list.clone();
-        sorted_list.sort_normal();
+        sorted_list.sort();
         sorted_list.changed = false;
 
         assert_eq!(todo_list, sorted_list)

@@ -26,7 +26,7 @@ use tui_textarea::{CursorMove, Input, TextArea};
 
 mod modules;
 use c3::{
-    todo_app::{App, Restriction, Todo, Schedule, ord_by_abandonment_coefficient},
+    todo_app::{App, Restriction, Todo, Schedule},
     date,
 };
 
@@ -487,10 +487,6 @@ impl<'a> TuiApp<'a> {
                         self.nnn_open();
                         return Ok(HandlerOperation::Restart);
                     }
-                    Char('d') if key.modifiers == KeyModifiers::CONTROL => self
-                        .todo_app
-                        .current_list_mut()
-                        .sort_by(ord_by_abandonment_coefficient),
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),

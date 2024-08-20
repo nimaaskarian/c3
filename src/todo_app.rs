@@ -5,11 +5,12 @@ use std::path::Path;
 use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
+use clap::ValueEnum;
 use clipboard::Clipboard;
 pub use todo::schedule::Schedule;
 mod todo;
 mod todo_list;
-use crate::{fileio, AppArgs, SortMethod};
+use crate::{fileio, AppArgs};
 use std::rc::Rc;
 pub use todo::Todo;
 
@@ -21,14 +22,33 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
-pub fn ord_by_abandonment_coefficient(a: &Todo, b: &Todo) -> cmp::Ordering {
-    let order = b
-        .abandonment_coefficient()
-        .total_cmp(&a.abandonment_coefficient());
-    if order.is_eq() {
-        return a.cmp(b);
+#[derive(ValueEnum, Clone, Debug, PartialEq)]
+pub enum SortMethod {
+    AbandonedFirst,
+    Normal,
+}
+
+impl SortMethod {
+    pub  fn cmp_function(&self) -> fn(&Todo, &Todo) -> cmp::Ordering {
+        match self {
+            Self::AbandonedFirst => {
+                |a:&Todo, b:&Todo| {
+                    let order = b
+                        .abandonment_coefficient()
+                        .total_cmp(&a.abandonment_coefficient());
+                    if order.is_eq() {
+                        return a.cmp(b);
+                    }
+                    order
+                }
+            }
+            Self::Normal => {
+                |a:&Todo, b:&Todo| {
+                    a.cmp(b)
+                }
+            }
+        }
     }
-    order
 }
 
 pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
@@ -122,11 +142,10 @@ impl App {
     #[inline(always)]
     fn read_a_todo_list(path: &Path, notes_dir: &Path, args: &AppArgs) -> TodoList {
         let mut todo_list = TodoList::read(path);
-        if args.sort_method == SortMethod::AbandonedFirst {
-            todo_list.set_todo_cmp(ord_by_abandonment_coefficient);
-            todo_list.sort();
-            todo_list.changed = false;
-        }
+
+        todo_list.set_todo_cmp(args.sort_method.cmp_function());
+        todo_list.sort();
+        todo_list.changed = false;
         if !args.no_tree {
             todo_list.read_dependencies(notes_dir);
         }

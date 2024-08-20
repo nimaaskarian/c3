@@ -1,4 +1,5 @@
 use clap::{Parser, ValueEnum};
+use todo_app::SortMethod;
 use std::path::PathBuf;
 use fileio::get_todo_path;
 use std::fmt;
@@ -13,12 +14,6 @@ pub enum DoOnSelected {
     Done,
 }
 
-
-#[derive(ValueEnum, Clone, Debug, PartialEq)]
-pub enum SortMethod {
-    AbandonedFirst,
-    Normal,
-}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -59,6 +54,3 @@ pub trait TodoDisplay: fmt::Display {
     fn display_with_args(&self, args: &DisplayArgs) -> String;
 }
 
-impl SortMethod {
-
-}
