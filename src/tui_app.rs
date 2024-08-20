@@ -8,6 +8,7 @@ use std::{
 };
 // }}}
 // lib {{{
+use clap::Parser;
 use crossterm::{
     event::{
         self,
@@ -24,12 +25,11 @@ use tui_textarea::{CursorMove, Input, TextArea};
 // mod {{{
 
 mod modules;
-use super::todo_app::{App, Restriction, Todo};
-use crate::{
+use c3::{
+    todo_app::{App, Restriction, Todo, Schedule},
     date,
-    todo_app::{ord_by_abandonment_coefficient, Schedule},
-    TuiArgs,
 };
+
 use modules::{potato::Potato, Module};
 // }}}
 #[derive(Debug)]
@@ -64,6 +64,22 @@ pub struct TuiApp<'a> {
     potato_module: Potato,
     textarea: TextArea<'a>,
     todo_app: &'a mut App,
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct TuiArgs {
+    /// Alternative way of rendering, render minimum amount of todos
+    #[arg(long)]
+    minimal_render: bool,
+
+    /// String behind highlighted todo in TUI mode
+    #[arg(short='H', long, default_value_t=String::from(">>"))]
+    highlight_string: String,
+
+    /// Enable TUI module at startup
+    #[arg(short = 'm', long)]
+    enable_module: bool,
 }
 
 impl<'a> TuiApp<'a> {
@@ -456,10 +472,10 @@ impl<'a> TuiApp<'a> {
         if let event::Event::Mouse(mouse) = event {
             match mouse.kind {
                 event::MouseEventKind::ScrollUp => {
-                    self.todo_app.decrement();
+                    self.todo_app.go_up();
                 }
                 event::MouseEventKind::ScrollDown => {
-                    self.todo_app.increment();
+                    self.todo_app.go_down();
                 }
                 _ => {}
             }
@@ -471,10 +487,6 @@ impl<'a> TuiApp<'a> {
                         self.nnn_open();
                         return Ok(HandlerOperation::Restart);
                     }
-                    Char('d') if key.modifiers == KeyModifiers::CONTROL => self
-                        .todo_app
-                        .current_list_mut()
-                        .sort_by(ord_by_abandonment_coefficient),
                     Char('x') => self.todo_app.cut_todo(),
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
@@ -495,8 +507,8 @@ impl<'a> TuiApp<'a> {
                         self.nnn_output_todo();
                         return Ok(HandlerOperation::Restart);
                     }
-                    KeyCode::Down | Char('j') => self.todo_app.increment(),
-                    KeyCode::Up | Char('k') => self.todo_app.decrement(),
+                    KeyCode::Down | Char('j') => self.todo_app.go_down(),
+                    KeyCode::Up | Char('k') => self.todo_app.go_up(),
                     KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),
                     KeyCode::Enter => self.todo_app.traverse_down(),
                     KeyCode::Left | Char('h') => {

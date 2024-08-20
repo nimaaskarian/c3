@@ -73,7 +73,7 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn read(&mut self, path: &Path, todo_cmp: Option<TodoCmp>) -> io::Result<()> {
+    pub fn read(&mut self, path: &Path, todo_cmp: TodoCmp) -> io::Result<()> {
         let file_path = path.join(&self.name);
         let name_todo = format!("{}.todo", self.name);
         match self.mode {
@@ -90,11 +90,9 @@ impl Dependency {
                     self.mode = DependencyMode::TodoList;
                 }
                 self.todo_list = TodoList::read(&path.join(&self.name));
-                if let Some(todo_cmp) = todo_cmp {
-                    self.todo_list.set_todo_cmp(todo_cmp);
-                    self.todo_list.sort();
-                    self.todo_list.changed = false;
-                }
+                self.todo_list.set_todo_cmp(todo_cmp);
+                self.todo_list.sort();
+                self.todo_list.changed = false;
                 self.todo_list.read_dependencies(path);
             }
             _ => {}

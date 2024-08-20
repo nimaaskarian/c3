@@ -210,6 +210,9 @@ impl Todo {
 
     pub fn abandonment_coefficient(&self) -> f64 {
         self.schedule.as_ref().map_or(1., |sch| {
+            if sch.is_reminder() {
+                return 1.;
+            }
             let days_diff = sch.days_diff();
             if days_diff == 0 {
                 1.

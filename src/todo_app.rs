@@ -5,11 +5,12 @@ use std::path::Path;
 use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
 mod clipboard;
+use clap::ValueEnum;
 use clipboard::Clipboard;
 pub use todo::schedule::Schedule;
 mod todo;
 mod todo_list;
-use crate::{fileio, AppArgs, SortMethod};
+use crate::{fileio, AppArgs};
 use std::rc::Rc;
 pub use todo::Todo;
 
@@ -21,25 +22,45 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
-pub(crate) fn ord_by_abandonment_coefficient(a: &Todo, b: &Todo) -> cmp::Ordering {
-    let order = b
-        .abandonment_coefficient()
-        .total_cmp(&a.abandonment_coefficient());
-    if order.is_eq() {
-        return a.cmp(b);
+#[derive(ValueEnum, Clone, Debug, PartialEq, Default)]
+pub enum SortMethod {
+    #[default]
+    Normal,
+    AbandonedFirst,
+}
+
+impl SortMethod {
+    pub  fn cmp_function(&self) -> fn(&Todo, &Todo) -> cmp::Ordering {
+        match self {
+            Self::AbandonedFirst => {
+                |a:&Todo, b:&Todo| {
+                    let order = b
+                        .abandonment_coefficient()
+                        .total_cmp(&a.abandonment_coefficient());
+                    if order.is_eq() {
+                        return a.cmp(b);
+                    }
+                    order
+                }
+            }
+            Self::Normal => {
+                |a:&Todo, b:&Todo| {
+                    a.cmp(b)
+                }
+            }
+        }
     }
-    order
 }
 
 pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
     clipboard: Clipboard,
-    pub(super) todo_list: TodoList,
-    pub(super) index: usize,
+    pub todo_list: TodoList,
+    pub index: usize,
     changed: bool,
     tree_path: Vec<usize>,
-    pub(super) args: AppArgs,
+    pub args: AppArgs,
     removed_todos: Vec<Todo>,
     tree_search_positions: Vec<SearchPosition>,
     x_index: usize,
@@ -92,7 +113,7 @@ fn first_word_parse<T: FromStr>(input: &str) -> (Option<T>, String) {
 
 impl App {
     #[inline]
-    pub(crate) fn new(args: AppArgs) -> Self {
+    pub fn new(args: AppArgs) -> Self {
         let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
         let todo_list = Self::read_a_todo_list(&args.todo_path, &notes_dir, &args);
         let mut app = App {
@@ -122,11 +143,10 @@ impl App {
     #[inline(always)]
     fn read_a_todo_list(path: &Path, notes_dir: &Path, args: &AppArgs) -> TodoList {
         let mut todo_list = TodoList::read(path);
-        if args.sort_method == SortMethod::AbandonedFirst {
-            todo_list.set_todo_cmp(ord_by_abandonment_coefficient);
-            todo_list.sort();
-            todo_list.changed = false;
-        }
+
+        todo_list.set_todo_cmp(args.sort_method.cmp_function());
+        todo_list.sort();
+        todo_list.changed = false;
         if !args.no_tree {
             todo_list.read_dependencies(notes_dir);
         }
@@ -432,7 +452,7 @@ impl App {
     }
 
     #[inline]
-    pub fn increment(&mut self) {
+    pub fn go_down(&mut self) {
         let size = self.len();
         if size == 0 || self.index == size - 1 {
             self.index = 0;
@@ -442,7 +462,7 @@ impl App {
     }
 
     #[inline]
-    pub fn decrement(&mut self) {
+    pub fn go_up(&mut self) {
         if self.index != 0 {
             self.index -= 1;
         } else {
@@ -833,10 +853,7 @@ mod tests {
         Ok(path)
     }
 
-    fn write_test_todos(dir: &Path) -> io::Result<App> {
-        let mut args = AppArgs::parse();
-        fs::create_dir_all(dir.join("notes"))?;
-        args.todo_path = dir.join("todo");
+    fn get_test_app(args: AppArgs) -> io::Result<App>{
         let mut app = App::new(args);
         app.append(String::from("Hello"));
         app.append(String::from("Goodbye"));
@@ -857,6 +874,14 @@ mod tests {
         for _ in 0..3 {
             app.traverse_up();
         }
+        Ok(app)
+    }
+
+    fn write_test_todos(dir: &Path) -> io::Result<App> {
+        let mut args = AppArgs::parse();
+        fs::create_dir_all(dir.join("notes"))?;
+        args.todo_path = dir.join("todo");
+        let mut app = get_test_app(args)?;
         app.write()?;
         Ok(app)
     }
@@ -1022,6 +1047,21 @@ mod tests {
         let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0]>63c5498f09d086fca6d870345350bfb210945790.todo Hello there\n");
         remove_dir_all(dir)?;
         assert_eq!(string, expected_string);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sort_method() -> io::Result<()> {
+        let todo_path = dir("test-sort-method")?.join("todo");
+        let mut app = get_test_app(AppArgs {
+            sort_method: SortMethod::AbandonedFirst,
+            todo_path,
+            ..Default::default()
+        })?;
+        app.go_down();
+        app.toggle_current_daily();
+        assert!(app.todo().unwrap().schedule.is_some());
+        assert_eq!(app.index(), 0);
         Ok(())
     }
 }
