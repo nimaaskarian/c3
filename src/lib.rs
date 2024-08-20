@@ -15,7 +15,7 @@ pub enum DoOnSelected {
 }
 
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(author, version, about, long_about = None)]
 pub struct AppArgs {
     /// Performance mode, don't read dependencies
@@ -34,7 +34,7 @@ pub struct AppArgs {
     pub sort_method: SortMethod,
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(author, version, about, long_about = None)]
 pub struct DisplayArgs {
     /// Show done todos too

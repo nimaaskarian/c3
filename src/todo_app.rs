@@ -22,10 +22,11 @@ struct SearchPosition {
     matching_indices: Vec<usize>,
 }
 
-#[derive(ValueEnum, Clone, Debug, PartialEq)]
+#[derive(ValueEnum, Clone, Debug, PartialEq, Default)]
 pub enum SortMethod {
-    AbandonedFirst,
+    #[default]
     Normal,
+    AbandonedFirst,
 }
 
 impl SortMethod {
@@ -451,7 +452,7 @@ impl App {
     }
 
     #[inline]
-    pub fn increment(&mut self) {
+    pub fn go_down(&mut self) {
         let size = self.len();
         if size == 0 || self.index == size - 1 {
             self.index = 0;
@@ -461,7 +462,7 @@ impl App {
     }
 
     #[inline]
-    pub fn decrement(&mut self) {
+    pub fn go_up(&mut self) {
         if self.index != 0 {
             self.index -= 1;
         } else {
@@ -852,10 +853,7 @@ mod tests {
         Ok(path)
     }
 
-    fn write_test_todos(dir: &Path) -> io::Result<App> {
-        let mut args = AppArgs::parse();
-        fs::create_dir_all(dir.join("notes"))?;
-        args.todo_path = dir.join("todo");
+    fn get_test_app(args: AppArgs) -> io::Result<App>{
         let mut app = App::new(args);
         app.append(String::from("Hello"));
         app.append(String::from("Goodbye"));
@@ -876,6 +874,14 @@ mod tests {
         for _ in 0..3 {
             app.traverse_up();
         }
+        Ok(app)
+    }
+
+    fn write_test_todos(dir: &Path) -> io::Result<App> {
+        let mut args = AppArgs::parse();
+        fs::create_dir_all(dir.join("notes"))?;
+        args.todo_path = dir.join("todo");
+        let mut app = get_test_app(args)?;
         app.write()?;
         Ok(app)
     }
@@ -1041,6 +1047,21 @@ mod tests {
         let expected_string = String::from("[0] Hello\n[0] Goodbye\n[0]>63c5498f09d086fca6d870345350bfb210945790.todo Hello there\n");
         remove_dir_all(dir)?;
         assert_eq!(string, expected_string);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sort_method() -> io::Result<()> {
+        let todo_path = dir("test-sort-method")?.join("todo");
+        let mut app = get_test_app(AppArgs {
+            sort_method: SortMethod::AbandonedFirst,
+            todo_path,
+            ..Default::default()
+        })?;
+        app.go_down();
+        app.toggle_current_daily();
+        assert!(app.todo().unwrap().schedule.is_some());
+        assert_eq!(app.index(), 0);
         Ok(())
     }
 }

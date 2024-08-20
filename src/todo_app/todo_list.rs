@@ -19,7 +19,7 @@ impl Default for TodoList {
         Self {
             todos: Vec::new(),
             changed: false,
-            todo_cmp: SortMethod::Normal.cmp_function(),
+            todo_cmp: SortMethod::default().cmp_function(),
         }
     }
 }
@@ -305,7 +305,6 @@ impl TodoList {
 
     #[inline(always)]
     pub fn reorder_last(&mut self) -> usize {
-        self.changed = true;
         self.reorder(self.todos.len() - 1)
     }
 

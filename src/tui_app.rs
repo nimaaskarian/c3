@@ -472,10 +472,10 @@ impl<'a> TuiApp<'a> {
         if let event::Event::Mouse(mouse) = event {
             match mouse.kind {
                 event::MouseEventKind::ScrollUp => {
-                    self.todo_app.decrement();
+                    self.todo_app.go_up();
                 }
                 event::MouseEventKind::ScrollDown => {
-                    self.todo_app.increment();
+                    self.todo_app.go_down();
                 }
                 _ => {}
             }
@@ -507,8 +507,8 @@ impl<'a> TuiApp<'a> {
                         self.nnn_output_todo();
                         return Ok(HandlerOperation::Restart);
                     }
-                    KeyCode::Down | Char('j') => self.todo_app.increment(),
-                    KeyCode::Up | Char('k') => self.todo_app.decrement(),
+                    KeyCode::Down | Char('j') => self.todo_app.go_down(),
+                    KeyCode::Up | Char('k') => self.todo_app.go_up(),
                     KeyCode::Right | Char('l') => self.todo_app.add_dependency_traverse_down(),
                     KeyCode::Enter => self.todo_app.traverse_down(),
                     KeyCode::Left | Char('h') => {
