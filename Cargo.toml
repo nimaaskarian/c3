@@ -23,5 +23,5 @@ strip = "debuginfo"
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
-name = "test_100k_todo_sort"
+name = "bench_500k"
 harness = false
