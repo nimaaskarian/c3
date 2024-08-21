@@ -1,3 +1,5 @@
+// vim:fileencoding=utf-8:foldmethod=marker
+// imports {{{
 use clap::{Parser, ValueEnum};
 use todo_app::SortMethod;
 use std::path::PathBuf;
@@ -7,6 +9,7 @@ use std::fmt;
 pub mod date;
 pub mod fileio;
 pub mod todo_app;
+// }}}
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum DoOnSelected {

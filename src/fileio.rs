@@ -1,3 +1,5 @@
+// vim:fileencoding=utf-8:foldmethod=marker
+// imports {{{
 use home::home_dir;
 use std::fs::{remove_dir, remove_file, File};
 use std::io::{self, prelude::*, Write};
@@ -6,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use std::env;
 use std::process::Command;
+// }}}
 
 #[inline(always)]
 pub fn append_notes_to_path_parent(filename: &Path) -> PathBuf {

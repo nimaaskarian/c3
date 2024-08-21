@@ -1,3 +1,5 @@
+// vim:fileencoding=utf-8:foldmethod=marker
+// imports {{{
 use std::cmp;
 use std::collections::VecDeque;
 use std::fs::create_dir_all;
@@ -15,6 +17,7 @@ use std::rc::Rc;
 pub use todo::Todo;
 
 pub use self::todo_list::TodoList;
+// }}}
 
 #[derive(Clone)]
 struct SearchPosition {

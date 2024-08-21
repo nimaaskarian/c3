@@ -1,11 +1,12 @@
-use std::fmt;
-use std::path::Path;
 // vim:fileencoding=utf-8:foldmethod=marker
-//std{{{
-use std::str::{self, FromStr};
-use std::{fs::remove_file, io};
-//}}}
-// mod{{{
+//imports {{{
+use std::{
+    fmt,
+    path::Path,
+    str::FromStr,
+    fs,
+    io,
+};
 mod dependency;
 mod note;
 pub mod schedule;
@@ -14,7 +15,7 @@ use crate::{DisplayArgs, TodoDisplay};
 use dependency::Dependency;
 use note::{open_note_temp_editor, sha1};
 use schedule::Schedule;
-//}}}
+// }}}
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Todo {
@@ -248,7 +249,7 @@ impl Todo {
     pub fn delete_dependency_file(&mut self, path: &Path) -> io::Result<()> {
         if let Some(dependency) = &mut self.dependency {
             dependency.todo_list.remove_dependency_files(path)?;
-            let _ = remove_file(path.join(dependency.get_name()));
+            let _ = fs::remove_file(path.join(dependency.get_name()));
         }
         Ok(())
     }
@@ -257,7 +258,7 @@ impl Todo {
     pub fn delete_removed_dependent_files(&mut self, path: &Path) -> io::Result<()> {
         if let Some(dependency) = &mut self.removed_dependency {
             let _ = dependency.todo_list.remove_dependency_files(path);
-            let _ = remove_file(path.join(dependency.get_name()));
+            let _ = fs::remove_file(path.join(dependency.get_name()));
         }
         Ok(())
     }

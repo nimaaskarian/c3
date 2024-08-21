@@ -1,13 +1,11 @@
 // vim:fileencoding=utf-8:foldmethod=marker
-// std {{{
+// imports {{{
 use std::{
     io::{self, BufRead, BufReader},
     path::PathBuf,
     process::{Command, Stdio},
     rc::Rc,
 };
-// }}}
-// lib {{{
 use clap::Parser;
 use crossterm::{
     event::{
@@ -21,9 +19,6 @@ use crossterm::{
 };
 use ratatui::{prelude::*, widgets::*};
 use tui_textarea::{CursorMove, Input, TextArea};
-// }}}
-// mod {{{
-
 mod modules;
 use c3::{
     todo_app::{App, Restriction, Todo, Schedule},
@@ -32,6 +27,7 @@ use c3::{
 
 use modules::{potato::Potato, Module};
 // }}}
+
 #[derive(Debug)]
 pub enum HandlerOperation {
     Nothing,
