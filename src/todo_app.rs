@@ -848,6 +848,8 @@ mod tests {
 
     use clap::Parser;
 
+    use crate::date;
+
     use super::*;
 
     fn dir(dir_name: &str) -> io::Result<PathBuf> {
@@ -1061,10 +1063,24 @@ mod tests {
             todo_path,
             ..Default::default()
         })?;
+        app.append("a todo".to_string());
+        if let Some(todo) = app.todo_mut() {
+            todo.schedule= Some(Schedule::new_reminder(date::current()));
+            todo.set_done(true);
+        }
+        app.index = 0;
         app.go_down();
         app.toggle_current_daily();
-        assert!(app.todo().unwrap().schedule.is_some());
+        assert!(!app.todo().unwrap().schedule.as_ref().unwrap().is_reminder());
+        assert_eq!(app.index(), 1);
+        if let Some(schedule) = app.todo_mut().as_mut().map(|todo| todo.schedule.as_mut()).flatten() {
+            schedule.set_current_date();
+            schedule.add_days_to_date(-2);
+        }
+        app.reorder_current();
+        app.write_to_stdout();
         assert_eq!(app.index(), 0);
+
         Ok(())
     }
 }
