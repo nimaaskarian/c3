@@ -1,13 +1,10 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
-use std::io;
 use clap::Parser;
+use std::io;
 pub(crate) mod cli_app;
 pub(crate) mod tui_app;
-use c3::{
-    todo_app::App,
-    AppArgs,
-};
+use c3::{todo_app::App, AppArgs};
 use cli_app::CliArgs;
 use tui_app::TuiArgs;
 // }}}
@@ -38,4 +35,3 @@ fn main() -> io::Result<()> {
         Ok(())
     }
 }
-

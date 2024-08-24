@@ -1,11 +1,5 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
-use std::{
-    io::{self, BufRead, BufReader},
-    path::PathBuf,
-    process::{Command, Stdio},
-    rc::Rc,
-};
 use clap::Parser;
 use crossterm::{
     event::{
@@ -18,11 +12,17 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{prelude::*, widgets::*};
+use std::{
+    io::{self, BufRead, BufReader},
+    path::PathBuf,
+    process::{Command, Stdio},
+    rc::Rc,
+};
 use tui_textarea::{CursorMove, Input, TextArea};
 mod modules;
 use c3::{
-    todo_app::{App, Restriction, Todo, Schedule},
     date,
+    todo_app::{App, Restriction, Schedule, Todo},
 };
 
 use modules::{potato::Potato, Module};
@@ -104,13 +104,16 @@ impl<'a> TuiApp<'a> {
         } else {
             ""
         };
-        let size = self.todo_app.current_list().len(self.todo_app.restriction());
+        let size = self
+            .todo_app
+            .current_list()
+            .len(self.todo_app.restriction());
         let todo_string = format!("Todos ({size}){changed_str}");
 
-        if self.todo_app.is_root() {
-            todo_string
+        if let Some(parent) = self.todo_app.parent() {
+            format!("{todo_string} {}", parent.message)
         } else {
-            format!("{todo_string} {}", self.todo_app.parent().unwrap().message)
+            todo_string
         }
     }
 
@@ -492,7 +495,7 @@ impl<'a> TuiApp<'a> {
                         if let Some(todo) = self.todo_app.todo_mut() {
                             todo.toggle_schedule();
                         }
-                    },
+                    }
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('@') => self.priority_prompt(),
                     Char('y') => self.todo_app.yank_todo(),
@@ -517,9 +520,7 @@ impl<'a> TuiApp<'a> {
                     KeyCode::Home | Char('g') => {
                         self.todo_app.index = 0;
                     }
-                    KeyCode::End | Char('G') => {
-                        self.todo_app.index = self.todo_app.bottom()
-                    },
+                    KeyCode::End | Char('G') => self.todo_app.index = self.todo_app.bottom(),
                     Char('w') => self.write()?,
                     Char('J') => self.todo_app.move_current_down(),
                     Char('K') => self.todo_app.move_current_up(),

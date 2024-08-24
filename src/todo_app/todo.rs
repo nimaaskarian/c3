@@ -1,12 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 //imports {{{
-use std::{
-    fmt,
-    path::Path,
-    str::FromStr,
-    fs,
-    io,
-};
+use std::{fmt, fs, io, path::Path, str::FromStr};
 mod dependency;
 mod note;
 pub mod schedule;
@@ -162,7 +156,7 @@ impl FromStr for Todo {
             let dependency = dependency_string.parse().ok();
 
             if let Some(schedule) = schedule.as_ref() {
-                done =  schedule.date_should_be_done();
+                done = schedule.date_should_be_done();
             }
             Ok(Todo {
                 dependency,

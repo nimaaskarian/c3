@@ -33,25 +33,19 @@ pub enum SortMethod {
 }
 
 impl SortMethod {
-    pub  fn cmp_function(&self) -> fn(&Todo, &Todo) -> cmp::Ordering {
+    pub fn cmp_function(&self) -> fn(&Todo, &Todo) -> cmp::Ordering {
         match self {
-            Self::AbandonedFirst => {
-                |a:&Todo, b:&Todo| {
-                    let order = b
-                        .abandonment_coefficient()
-                        .total_cmp(&a.abandonment_coefficient());
-                    if order.is_eq() {
-                        a.cmp(b)
-                    } else {
-                        order
-                    }
-                }
-            }
-            Self::Normal => {
-                |a:&Todo, b:&Todo| {
+            Self::AbandonedFirst => |a: &Todo, b: &Todo| {
+                let order = b
+                    .abandonment_coefficient()
+                    .total_cmp(&a.abandonment_coefficient());
+                if order.is_eq() {
                     a.cmp(b)
+                } else {
+                    order
                 }
-            }
+            },
+            Self::Normal => |a: &Todo, b: &Todo| a.cmp(b),
         }
     }
 }
@@ -747,13 +741,19 @@ impl App {
     pub fn move_current_down(&mut self) {
         let index = self.index;
         let restriction = self.restriction.clone();
-        let next_priority = self.current_list().index(index+1, &restriction).map(|x|x.priority());
-        let current_priority = self.current_list().index(index, &restriction).map(|x|x.priority());
+        let next_priority = self
+            .current_list()
+            .index(index + 1, &restriction)
+            .map(|x| x.priority());
+        let current_priority = self
+            .current_list()
+            .index(index, &restriction)
+            .map(|x| x.priority());
         if current_priority.is_some() && current_priority == next_priority {
             let list = self.current_list_mut();
             list.changed = true;
-            self.index = list.move_index(index, index+1, 0);
-            return
+            self.index = list.move_index(index, index + 1, 0);
+            return;
         }
         if let Some(todo) = self.todo_mut() {
             todo.decrease_priority();
@@ -764,17 +764,23 @@ impl App {
     #[inline]
     pub fn move_current_up(&mut self) {
         if self.index == 0 {
-            return
+            return;
         }
         let index = self.index;
         let restriction = self.restriction.clone();
-        let prev_priority = self.current_list().index(index-1, &restriction).map(|x|x.priority());
-        let current_priority = self.current_list().index(index, &restriction).map(|x|x.priority());
+        let prev_priority = self
+            .current_list()
+            .index(index - 1, &restriction)
+            .map(|x| x.priority());
+        let current_priority = self
+            .current_list()
+            .index(index, &restriction)
+            .map(|x| x.priority());
         if current_priority.is_some() && current_priority == prev_priority {
             let list = self.current_list_mut();
             list.changed = true;
-            self.index = list.move_index(index, index-1, 1);
-            return
+            self.index = list.move_index(index, index - 1, 1);
+            return;
         }
         if let Some(todo) = self.todo_mut() {
             todo.increase_priority();
@@ -843,7 +849,7 @@ mod tests {
         Ok(path)
     }
 
-    fn get_test_app(args: AppArgs) -> io::Result<App>{
+    fn get_test_app(args: AppArgs) -> io::Result<App> {
         let mut app = App::new(args);
         app.append(String::from("Hello"));
         app.append(String::from("Goodbye"));
@@ -1050,7 +1056,7 @@ mod tests {
         })?;
         app.append("a todo".to_string());
         if let Some(todo) = app.todo_mut() {
-            todo.schedule= Some(Schedule::new_reminder(date::current()));
+            todo.schedule = Some(Schedule::new_reminder(date::current()));
             todo.set_done(true);
         }
         app.index = 0;
@@ -1058,7 +1064,12 @@ mod tests {
         app.toggle_current_daily();
         assert!(!app.todo().unwrap().schedule.as_ref().unwrap().is_reminder());
         assert_eq!(app.index(), 1);
-        if let Some(schedule) = app.todo_mut().as_mut().map(|todo| todo.schedule.as_mut()).flatten() {
+        if let Some(schedule) = app
+            .todo_mut()
+            .as_mut()
+            .map(|todo| todo.schedule.as_mut())
+            .flatten()
+        {
             schedule.set_current_date();
             schedule.add_days_to_date(-2);
         }

@@ -1,15 +1,15 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
-use c3::todo_app::{App, Restriction, Todo, TodoList};
-use clap_complete::Shell;
 use crate::Args;
-use c3::{DisplayArgs, TodoDisplay, DoOnSelected};
+use c3::todo_app::{App, Restriction, Todo, TodoList};
+use c3::{DisplayArgs, DoOnSelected, TodoDisplay};
+use clap::Parser;
 use clap::{Command, CommandFactory};
+use clap_complete::Shell;
 use clap_complete::{generate, Generator};
 use std::io;
-use std::process;
 use std::path::PathBuf;
-use clap::Parser;
+use std::process;
 // }}}
 
 #[derive(Parser, Debug)]
