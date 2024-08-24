@@ -823,11 +823,6 @@ impl App {
             self.traverse_down()
         }
     }
-
-    #[inline]
-    pub fn write_to_stdout(&self) -> io::Result<()> {
-        self.todo_list.write_to_stdout()
-    }
 }
 
 #[cfg(test)]
@@ -1074,7 +1069,7 @@ mod tests {
             schedule.add_days_to_date(-2);
         }
         app.reorder_current();
-        app.write_to_stdout();
+        app.todo_list.write_to_stdout();
         assert_eq!(app.index(), 0);
 
         Ok(())

@@ -1,3 +1,5 @@
+// vim:fileencoding=utf-8:foldmethod=marker
+// imports {{{
 use crate::todo_app::todo_list::TodoCmp;
 
 use super::Todo;
@@ -8,6 +10,7 @@ use std::{
     io::{self, Write},
     path::Path,
 };
+//}}}
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 enum DependencyMode {

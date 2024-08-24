@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::{fs::File, hint::black_box, io::BufWriter, path::PathBuf};
+use std::{hint::black_box, path::PathBuf};
 
 use c3::{todo_app::App, AppArgs};
 
@@ -37,12 +37,12 @@ fn display(c: &mut Criterion) {
 }
 
 fn write_to_stdout(c: &mut Criterion) {
-    let mut app = App::new(AppArgs {
+    let app = App::new(AppArgs {
         todo_path: PathBuf::from("../fuckc3-todo"),
         ..Default::default()
     });
     c.bench_function("write to stdout 500k todos", |b| {
-        b.iter(|| black_box(&mut app).write_to_stdout())
+        b.iter(|| black_box(&app.todo_list).write_to_stdout())
     });
 }
 
