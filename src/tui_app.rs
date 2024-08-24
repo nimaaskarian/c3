@@ -99,12 +99,12 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn title(&mut self) -> String {
-        let changed_str = if self.todo_app.is_current_changed() {
+        let changed_str = if self.todo_app.current_list().changed {
             "*"
         } else {
             ""
         };
-        let size = self.todo_app.len();
+        let size = self.todo_app.current_list().len(self.todo_app.restriction());
         let todo_string = format!("Todos ({size}){changed_str}");
 
         if self.todo_app.is_root() {
@@ -320,7 +320,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn quit_save_prompt(&mut self) {
-        if self.todo_app.is_changed() || self.todo_app.is_current_changed() {
+        if self.todo_app.is_changed() || self.todo_app.current_list().changed {
             self.set_text_mode(
                 Self::on_save_prompt,
                 "You have done changes. You wanna save? [n: no, y: yes, c: cancel] (default: n)",
@@ -488,7 +488,11 @@ impl<'a> TuiApp<'a> {
                     Char('W') => self.todo_app.toggle_current_weekly(),
                     Char('S') => self.schedule_prompt(),
                     Char('m') => self.reminder_prompt(),
-                    Char('M') => self.todo_app.toggle_schedule(),
+                    Char('M') => {
+                        if let Some(todo) = self.todo_app.todo_mut() {
+                            todo.toggle_schedule();
+                        }
+                    },
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('@') => self.priority_prompt(),
                     Char('y') => self.todo_app.yank_todo(),
@@ -639,7 +643,8 @@ impl<'a> TuiApp<'a> {
             let first = self.todo_app.index();
             let last = self
                 .todo_app
-                .len()
+                .current_list()
+                .len(self.todo_app.restriction())
                 .min(todo_layout.height as usize + first - 2);
             self.todo_app.display_current_slice(first, last)
         } else {

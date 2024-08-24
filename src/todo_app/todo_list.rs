@@ -10,7 +10,7 @@ pub type TodoCmp = fn(&Todo, &Todo) -> cmp::Ordering;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TodoList {
     pub todos: Vec<Todo>,
-    pub(super) changed: bool,
+    pub changed: bool,
     pub todo_cmp: TodoCmp,
 }
 
@@ -161,8 +161,8 @@ impl TodoList {
 
     #[inline]
     fn write_to_buf<W: Write>(&self, writer: &mut BufWriter<W>) -> io::Result<()> {
-        for todo in &self.todos {
-            writeln!(writer, "{}", todo.as_string())?;
+        for todo_string in self.todos.iter().map(String::from) {
+            writeln!(writer, "{todo_string}")?;
         }
         writer.flush()?;
         Ok(())

@@ -224,21 +224,6 @@ impl Todo {
     }
 
     #[inline]
-    pub fn is_note(&self) -> bool {
-        self.dependency.as_ref().map_or(false, |dep| dep.is_note())
-    }
-
-    #[inline]
-    pub fn dependencies(&self) -> Option<&TodoList> {
-        self.dependency.as_ref()?.todo_list()
-    }
-
-    #[inline]
-    pub fn no_dependency(&self) -> bool {
-        self.dependency.is_none()
-    }
-
-    #[inline]
     pub fn add_todo_dependency(&mut self) {
         if self.dependency.is_none() {
             self.dependency = Some(Dependency::new_todo_list(self.hash()));
@@ -347,22 +332,9 @@ impl Todo {
         self.done = done;
     }
 
-    #[inline(always)]
-    fn standardize_priority(priority: u8) -> u8 {
-        match priority {
-            0 => 10,
-            any => any,
-        }
-    }
-
-    #[inline(always)]
-    fn standardized_priority(&self) -> u8 {
-        Self::standardize_priority(self.priority)
-    }
-
     #[inline]
     pub fn decrease_priority(&mut self) {
-        if self.standardized_priority() < 9 {
+        if Self::standardize_priority(self.priority) < 9 {
             self.priority += 1
         } else {
             self.priority = 0
@@ -371,8 +343,9 @@ impl Todo {
 
     #[inline]
     pub fn increase_priority(&mut self) {
-        if self.standardized_priority() > 1 {
-            self.priority = self.standardized_priority() - 1
+        let standardize_priority = Self::standardize_priority(self.priority);
+        if standardize_priority > 1 {
+            self.priority = standardize_priority - 1
         } else {
             self.priority = 1
         }
@@ -380,18 +353,12 @@ impl Todo {
 
     #[inline]
     pub fn set_priority(&mut self, priority: u8) {
-        self.priority = priority;
-        self.fix_priority();
-    }
-
-    #[inline]
-    fn fix_priority(&mut self) {
-        self.priority = Todo::fixed_priority(self.priority)
+        self.priority = Todo::fixed_priority(priority)
     }
 
     #[inline(always)]
     fn cmp_value(&self) -> u8 {
-        let mut priority = self.standardized_priority() * 2;
+        let mut priority = Self::standardize_priority(self.priority) * 2;
         if self.schedule.as_ref().map_or(false, Schedule::is_reminder) {
             priority -= 1;
         }
@@ -411,9 +378,12 @@ impl Todo {
         }
     }
 
-    #[inline]
-    pub fn as_string(&self) -> String {
-        self.into()
+    #[inline(always)]
+    fn standardize_priority(priority: u8) -> u8 {
+        match priority {
+            0 => 10,
+            any => any,
+        }
     }
 }
 

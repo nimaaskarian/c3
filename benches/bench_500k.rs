@@ -1,4 +1,4 @@
-use std::{hint::black_box, path::PathBuf};
+use std::{fs::File, hint::black_box, io::BufWriter, path::PathBuf};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use c3::{todo_app::App, AppArgs};
@@ -32,5 +32,15 @@ fn display(c: &mut Criterion) {
     }));
 }
 
-criterion_group!(benches, sort, reorder, display);
+fn write_to_stdout(c: &mut Criterion) {
+    let mut app = App::new(AppArgs {
+        todo_path: PathBuf::from("../fuckc3-todo"),
+        ..Default::default()
+    });
+    c.bench_function("write to stdout 500k todos", |b| b.iter(|| {
+        black_box(&mut app).write_to_stdout()
+    }));
+}
+
+criterion_group!(benches, sort, reorder, display, write_to_stdout);
 criterion_main!(benches);
