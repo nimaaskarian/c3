@@ -31,7 +31,7 @@ fn display(c: &mut Criterion) {
     });
     c.bench_function("display 500k todos", |b| {
         b.iter(|| {
-            black_box(&mut app).display_current();
+            black_box(&mut app).display_current_list();
         })
     });
 }

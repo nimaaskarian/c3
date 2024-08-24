@@ -288,7 +288,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn edit_prompt(&mut self, start: bool) {
-        if let Some(message) = &self.todo_app.get_cloned_current_message() {
+        if let Some(message) = &self.todo_app.todo().map(|todo| todo.message.clone()) {
             self.set_text_mode(Self::on_edit_todo, "Edit todo", message);
             self.textarea.insert_str(message);
             if start {
@@ -370,7 +370,9 @@ impl<'a> TuiApp<'a> {
     #[inline]
     fn on_edit_todo(&mut self, str: String) {
         if !str.is_empty() {
-            self.todo_app.todo_mut().unwrap().set_message(str);
+            if let Some(todo) = self.todo_app.todo_mut() {
+                todo.message = str;
+            }
         }
     }
 
@@ -625,7 +627,7 @@ impl<'a> TuiApp<'a> {
                     frame,
                     None,
                     dependency_layout,
-                    self.todo_app.display_list(todo_list),
+                    self.todo_app.display_a_list(todo_list),
                     String::from("Todo dependencies"),
                 )
             }
@@ -649,7 +651,7 @@ impl<'a> TuiApp<'a> {
                 .min(todo_layout.height as usize + first - 2);
             self.todo_app.display_current_slice(first, last)
         } else {
-            self.todo_app.display_current()
+            self.todo_app.display_current_list()
         };
         Self::render_todos_widget(
             self.highlight_string(),

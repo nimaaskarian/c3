@@ -133,7 +133,7 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
 }
 
 fn print_todos(app: &App) {
-    for display in app.display_current() {
+    for display in app.display_current_list() {
         println!("{}", display);
     }
 }

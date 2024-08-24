@@ -266,7 +266,7 @@ impl App {
                 let todo = &mut todolist.todos[index];
                 if line.priority != todo.priority() || line.message != todo.message {
                     changed = true;
-                    todo.set_message(line.message);
+                    todo.message = line.message;
                     todo.set_priority(line.priority);
                 }
             } else {
@@ -668,11 +668,6 @@ impl App {
     }
 
     #[inline]
-    pub fn get_cloned_current_message(&mut self) -> Option<String> {
-        self.todo().map(|todo| todo.message.clone())
-    }
-
-    #[inline]
     pub fn todo(&self) -> Option<&Todo> {
         self.current_list().index(self.index, &self.restriction)
     }
@@ -693,9 +688,9 @@ impl App {
         }
     }
 
-    #[inline]
-    pub fn display_current(&self) -> Vec<String> {
-        self.display_list(self.current_list())
+    #[inline(always)]
+    pub fn display_current_list(&self) -> Vec<String> {
+        self.display_a_list(self.current_list())
     }
 
     #[inline]
@@ -704,8 +699,8 @@ impl App {
             .display_slice(&self.args.display_args, &self.restriction, min, max)
     }
 
-    #[inline]
-    pub fn display_list(&self, todo_list: &TodoList) -> Vec<String> {
+    #[inline(always)]
+    pub fn display_a_list(&self, todo_list: &TodoList) -> Vec<String> {
         todo_list.display(&self.args.display_args, &self.restriction)
     }
 

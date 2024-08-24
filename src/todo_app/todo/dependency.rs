@@ -30,33 +30,6 @@ pub struct Dependency {
 
 impl Dependency {
     #[inline]
-    pub fn is_written(&self) -> bool {
-        self.written
-    }
-
-    #[inline]
-    pub fn note(&self) -> Option<&str> {
-        if self.is_note() {
-            Some(&self.note)
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    #[inline]
-    pub fn push(&mut self, todo: Todo) {
-        if self.is_list() {
-            self.todo_list.push(todo);
-            self.todo_list.reorder_last();
-        }
-    }
-
-    #[inline]
     pub fn new_todo_list(hash: String) -> Self {
         Self {
             name: format!("{}.todo", hash),
@@ -72,6 +45,35 @@ impl Dependency {
             name: hash,
             mode: DependencyMode::Note,
             ..Default::default()
+        }
+    }
+
+    #[inline]
+    pub fn is_written(&self) -> bool {
+        self.written
+    }
+
+    #[inline]
+    pub fn note(&self) -> Option<&str> {
+        self.is_note().then_some(&self.note)
+    }
+
+    #[inline]
+    pub fn todo_list(&self) -> Option<&TodoList> {
+        self.is_list().then_some(&self.todo_list)
+    }
+
+
+    #[inline]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[inline]
+    pub fn push(&mut self, todo: Todo) {
+        if self.is_list() {
+            self.todo_list.push(todo);
+            self.todo_list.reorder_last();
         }
     }
 
@@ -106,15 +108,6 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn todo_list(&self) -> Option<&TodoList> {
-        if self.mode == DependencyMode::TodoList {
-            Some(&self.todo_list)
-        } else {
-            None
-        }
-    }
-
-    #[inline]
     pub fn todo_list_mut(&mut self) -> Option<&mut TodoList> {
         if self.mode == DependencyMode::TodoList {
             Some(&mut self.todo_list)
@@ -138,7 +131,7 @@ impl Dependency {
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_note(&self, path: &Path) -> io::Result<()> {
         let mut file = File::create(path.join(&self.name))?;
         write!(file, "{}", self.note)?;
@@ -158,12 +151,12 @@ impl Dependency {
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_note(&self) -> bool {
         self.mode == DependencyMode::Note
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_list(&self) -> bool {
         self.mode == DependencyMode::TodoList
     }
@@ -174,11 +167,6 @@ impl Dependency {
             DependencyMode::Note => ">",
             DependencyMode::TodoList => "-",
         }
-    }
-
-    #[inline]
-    pub fn remove(&mut self) {
-        *self = Self::default();
     }
 }
 

@@ -174,15 +174,6 @@ impl FromStr for Todo {
 
 impl Todo {
     #[inline]
-    pub fn matches(&self, query: &str) -> bool {
-        self.message.contains(query) || self.message.to_lowercase().contains(query)
-    }
-
-    #[inline]
-    pub fn priority(&self) -> u8 {
-        self.priority
-    }
-    #[inline]
     pub fn new(message: String, priority: u8) -> Self {
         Todo {
             message,
@@ -191,14 +182,24 @@ impl Todo {
         }
     }
 
+    #[inline]
+    pub fn matches(&self, query: &str) -> bool {
+        self.message.contains(query) || self.message.to_lowercase().contains(query)
+    }
+
+    #[inline]
+    pub fn priority(&self) -> u8 {
+        self.priority
+    }
+
     pub fn toggle_schedule(&mut self) -> bool {
         if self.schedule.is_none() && self.last_schedule.is_none() {
             return false;
         }
-        if self.schedule.is_some() {
-            self.last_schedule = std::mem::take(&mut self.schedule);
+        if let Some(schedule) = self.schedule.take() {
+            self.last_schedule = Some(schedule);
         } else {
-            self.schedule = std::mem::take(&mut self.last_schedule);
+            self.schedule = self.last_schedule.take();
         }
         true
     }
@@ -228,7 +229,7 @@ impl Todo {
     pub fn delete_dependency_file(&mut self, path: &Path) -> io::Result<()> {
         if let Some(dependency) = &mut self.dependency {
             dependency.todo_list.remove_dependency_files(path)?;
-            let _ = fs::remove_file(path.join(dependency.get_name()));
+            let _ = fs::remove_file(path.join(dependency.name()));
         }
         Ok(())
     }
@@ -237,7 +238,7 @@ impl Todo {
     pub fn delete_removed_dependent_files(&mut self, path: &Path) -> io::Result<()> {
         if let Some(dependency) = &mut self.removed_dependency {
             let _ = dependency.todo_list.remove_dependency_files(path);
-            let _ = fs::remove_file(path.join(dependency.get_name()));
+            let _ = fs::remove_file(path.join(dependency.name()));
         }
         Ok(())
     }
@@ -273,11 +274,6 @@ impl Todo {
         } else {
             Ok(false)
         }
-    }
-
-    #[inline]
-    pub fn set_message(&mut self, message: String) {
-        self.message = message;
     }
 
     #[inline]
@@ -437,7 +433,7 @@ mod tests {
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
-        let result = todo.dependency.unwrap().get_name().to_string();
+        let result = todo.dependency.unwrap().name().to_string();
         assert_eq!(result, expected);
     }
 
@@ -455,7 +451,7 @@ mod tests {
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
-        let result = todo.dependency.unwrap().get_name().to_string();
+        let result = todo.dependency.unwrap().name().to_string();
         assert_eq!(result, expected);
     }
 
@@ -475,7 +471,7 @@ mod tests {
             .expect("Error setting note");
 
         assert_eq!(
-            todo.dependency.unwrap().get_name(),
+            todo.dependency.unwrap().name(),
             "2c924e3088204ee77ba681f72be3444357932fca"
         );
     }
