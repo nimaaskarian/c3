@@ -19,13 +19,13 @@ use std::{
     rc::Rc,
 };
 use tui_textarea::{CursorMove, Input, TextArea};
-mod modules;
+mod potato;
 use c3::{
     date,
     todo_app::{App, Restriction, Schedule, Todo},
 };
 
-use modules::{potato::Potato, Module};
+use potato::Potato;
 // }}}
 
 #[derive(Debug)]
@@ -557,16 +557,16 @@ impl<'a> TuiApp<'a> {
                         self.todo_app.set_current_priority(priority as u8);
                     }
 
-                    Char('s') => self.potato_module.on_s(),
-                    Char('H') => self.potato_module.on_capital_h(),
-                    Char('c') => self.potato_module.on_c(),
-                    Char('C') => self.potato_module.on_capital_c(),
-                    Char('L') => self.potato_module.on_capital_l(),
-                    Char('f') => self.potato_module.on_f(),
-                    Char('+') | Char('=') => self.potato_module.on_plus(),
-                    Char('-') => self.potato_module.on_minus(),
-                    Char('.') => self.potato_module.on_dot(),
-                    Char(',') => self.potato_module.on_comma(),
+                    Char('s') => self.potato_module.skip(),
+                    Char('H') => self.potato_module.increase_timer(),
+                    Char('c') => self.potato_module.toggle_pause(),
+                    Char('C') => self.potato_module.quit(),
+                    Char('L') => self.potato_module.decrease_timer(),
+                    Char('f') => self.potato_module.restart(),
+                    Char('+') | Char('=') => self.potato_module.increase_pomodoro(),
+                    Char('-') => self.potato_module.decrease_pomodoro(),
+                    Char('.') => self.potato_module.next(),
+                    Char(',') => self.potato_module.prev(),
                     _ => {}
                 }
             }
