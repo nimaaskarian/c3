@@ -470,17 +470,6 @@ impl<'a> TuiApp<'a> {
     #[inline]
     fn handle_normal_input(&mut self) -> io::Result<HandlerOperation> {
         let event = event::read()?;
-        if let event::Event::Mouse(mouse) = event {
-            match mouse.kind {
-                event::MouseEventKind::ScrollUp => {
-                    self.todo_app.go_up();
-                }
-                event::MouseEventKind::ScrollDown => {
-                    self.todo_app.go_down();
-                }
-                _ => {}
-            }
-        }
         if let Key(key) = event {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
@@ -766,8 +755,7 @@ pub fn shutdown() -> io::Result<()> {
     disable_raw_mode()?;
     io::stdout()
         .execute(LeaveAlternateScreen)?
-        .execute(crossterm::cursor::Show)?
-        .execute(crossterm::event::DisableMouseCapture)?;
+        .execute(crossterm::cursor::Show)?;
     Ok(())
 }
 
@@ -775,8 +763,7 @@ pub fn startup() -> io::Result<()> {
     enable_raw_mode()?;
     io::stdout()
         .execute(EnterAlternateScreen)?
-        .execute(crossterm::cursor::Hide)?
-        .execute(crossterm::event::EnableMouseCapture)?;
+        .execute(crossterm::cursor::Hide)?;
     Ok(())
 }
 
