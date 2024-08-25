@@ -690,19 +690,14 @@ impl App {
 
     #[inline(always)]
     pub fn display_current_list(&self) -> Vec<String> {
-        self.display_a_list(self.current_list())
-    }
-
-    #[inline]
-    pub fn display_current_slice(&self, min: usize, max: usize) -> Vec<String> {
-        self.current_list()
-            .display_slice(&self.args.display_args, &self.restriction, min, max)
+        self.current_list().display(&self.args.display_args, &self.restriction)
     }
 
     #[inline(always)]
-    pub fn display_a_list(&self, todo_list: &TodoList) -> Vec<String> {
-        todo_list.display(&self.args.display_args, &self.restriction)
+    pub fn display_a_slice(&self, todo_list: &TodoList, min: usize, max: usize) -> Vec<String> {
+        todo_list.display_slice(&self.args.display_args, &self.restriction, min, max)
     }
+
 
     #[inline]
     pub fn remove_current_dependent(&mut self) {

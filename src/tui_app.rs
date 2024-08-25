@@ -627,7 +627,7 @@ impl<'a> TuiApp<'a> {
                     frame,
                     None,
                     dependency_layout,
-                    self.todo_app.display_a_list(todo_list),
+                    self.todo_app.display_a_slice(todo_list, 0, dependency_layout.height as usize - 2),
                     String::from("Todo dependencies"),
                 )
             }
@@ -649,7 +649,7 @@ impl<'a> TuiApp<'a> {
                 .current_list()
                 .len(self.todo_app.restriction())
                 .min(todo_layout.height as usize + first - 2);
-            self.todo_app.display_current_slice(first, last)
+            self.todo_app.display_a_slice(self.todo_app.current_list(), first, last)
         } else {
             self.todo_app.display_current_list()
         };
