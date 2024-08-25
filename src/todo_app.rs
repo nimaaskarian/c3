@@ -521,6 +521,7 @@ impl App {
             let todo = self.current_list_mut().remove(index, &restriction);
             let todo_string: String = (&todo).into();
             self.clipboard.set_text(todo_string);
+            self.fix_index()
         }
     }
 
