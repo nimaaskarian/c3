@@ -564,15 +564,10 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn get_dependency_width(&self, todo: Option<&Todo>) -> u16 {
-        if let Some(todo) = todo {
-            if !self.show_right || todo.dependency.is_none() || !self.todo_app.is_tree() {
-                return 0;
-            }
-            40
-        } else {
-            0
-        }
+    fn is_dependency_enabled(&self, todo: Option<&Todo>) -> bool {
+        todo.map_or(false, |todo| {
+            self.show_right && todo.dependency.is_some() && self.todo_app.is_tree()
+        })
     }
 
     #[inline]
@@ -680,7 +675,8 @@ impl<'a> TuiApp<'a> {
             list_state.select(Some(self.todo_app.index()));
         }
 
-        let dependency_width = self.get_dependency_width(todo);
+        let dependency_enabled = self.is_dependency_enabled(todo);
+        let dependency_width = if dependency_enabled { 40 } else { 0 };
 
         let main_layout = if self.args.enable_module {
             self.render_module_widget(
@@ -703,17 +699,22 @@ impl<'a> TuiApp<'a> {
                 Constraint::Percentage(dependency_width),
             ])
             .split(main_layout[self.args.enable_module as usize]);
+        let is_editing = self.mode == Mode::Editing;
 
         let todo_and_textarea_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3 * (self.mode == Mode::Editing) as u16),
+                Constraint::Length(3 * is_editing as u16),
                 Constraint::Min(0),
             ])
             .split(todo_app_layout[0]);
-        self.render_dependency_widget(frame, todo, todo_app_layout[1]);
+        if dependency_enabled {
+            self.render_dependency_widget(frame, todo, todo_app_layout[1]);
+        }
 
-        frame.render_widget(self.textarea.widget(), todo_and_textarea_layout[0]);
+        if is_editing {
+            frame.render_widget(self.textarea.widget(), todo_and_textarea_layout[0]);
+        }
         self.render_current_todos_widget(frame, list_state, todo_and_textarea_layout[1]);
     }
 }

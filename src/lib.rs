@@ -13,7 +13,9 @@ pub mod todo_app;
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum DoOnSelected {
+    #[value(alias="del")]
     Delete,
+    #[value(alias="do")]
     Done,
 }
 

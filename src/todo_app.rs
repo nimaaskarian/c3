@@ -28,7 +28,9 @@ struct SearchPosition {
 #[derive(ValueEnum, Clone, Debug, PartialEq, Default)]
 pub enum SortMethod {
     #[default]
+    #[value(alias = "n")]
     Normal,
+    #[value(alias = "a", alias = "abandoned")]
     AbandonedFirst,
 }
 
