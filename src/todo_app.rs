@@ -233,7 +233,7 @@ impl App {
         let content = String::from("# INDEX PRIORITY MESSAGE\n")
             + self
                 .current_list()
-                .filter(&self.restriction)
+                .iter()
                 .enumerate()
                 .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
                 .collect::<Vec<String>>()
@@ -247,30 +247,29 @@ impl App {
 
     #[inline(always)]
     fn batch_edit_current_list(&mut self, messages: Lines<'_>) {
-        let restriction = self.restriction.clone();
+        let todolist = self.current_list_mut();
+        let mut delete_indices: Vec<usize> = vec![];
+        let mut changed = false;
         let mut lines: Vec<IndexedLine> = messages
             .filter(|message| !message.starts_with('#'))
-            .flat_map(|message| message.parse())
+            .flat_map(|message| message.parse::<IndexedLine>())
             .collect();
-
         lines.sort_by_key(|a| a.index);
-        let todolist = self.current_list_mut();
-        let size = todolist.len(&restriction);
-        let indices: Vec<usize> = lines.iter().filter_map(|x| x.index).collect();
-        let delete_indices: Vec<usize> = (0..size)
-            .filter(|i| indices.binary_search(i).is_err())
-            .collect();
-        let mut changed = !delete_indices.is_empty();
 
+        let mut last_index = 0;
         for line in lines {
             if let Some(index) = line.index {
-                let index = todolist.true_position_in_list(index, &restriction);
                 let todo = &mut todolist.todos[index];
                 if line.priority != todo.priority() || line.message != todo.message {
                     changed = true;
                     todo.message = line.message;
                     todo.set_priority(line.priority);
                 }
+                for i in last_index..index {
+                    delete_indices.push(i);
+                    changed = true;
+                }
+                last_index = index+1;
             } else {
                 todolist.push(Todo::new(line.message, line.priority));
             }
