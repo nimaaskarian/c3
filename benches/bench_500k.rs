@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::{hint::black_box, path::PathBuf};
+use std::{env, hint::black_box, path::PathBuf};
 
 use c3::{todo_app::App, AppArgs};
 
@@ -46,5 +46,16 @@ fn write_to_stdout(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, sort, reorder, display, write_to_stdout);
+fn batch_edit(c: &mut Criterion) {
+    let mut app = App::new(AppArgs {
+        todo_path: PathBuf::from("../fuckc3-todo"),
+        ..Default::default()
+    });
+    env::set_var("EDITOR", "cat");
+    c.bench_function("batch edit 500k todos", |b| {
+        b.iter(|| black_box(&mut app).batch_editor_messages())
+    });
+}
+
+criterion_group!(benches, sort, reorder, display, write_to_stdout, batch_edit);
 criterion_main!(benches);
