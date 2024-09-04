@@ -413,35 +413,27 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn editor(&mut self) -> io::Result<EditorOperation> {
-        match crossterm::event::read()?.into() {
-            Input {
-                key: tui_textarea::Key::Esc,
-                ..
-            } => Ok(EditorOperation::Cancel),
-            Input {
-                key: tui_textarea::Key::Enter,
-                ..
-            } => Ok(EditorOperation::Submit),
-            Input {
-                key: tui_textarea::Key::Char('u'),
-                ctrl: true,
-                ..
-            } => {
-                let before_delete = self.current_textarea_message();
-                self.textarea.delete_line_by_head();
-                Ok(EditorOperation::Delete(before_delete))
-            }
-            input => {
-                let is_backspace = input.key == tui_textarea::Key::Backspace;
-                let before_delete = self.current_textarea_message();
-                self.textarea.input(input);
-                if is_backspace {
-                    Ok(EditorOperation::Delete(before_delete))
-                } else {
-                    Ok(EditorOperation::Input)
+        let event = event::read()?;
+        if let Key(key) = event {
+            match key.code {
+                KeyCode::Esc => return Ok(EditorOperation::Cancel),
+                KeyCode::Enter => return Ok(EditorOperation::Submit),
+                Char('u') if key.modifiers == KeyModifiers::CONTROL => {
+                    let before_delete = self.current_textarea_message();
+                    self.textarea.delete_line_by_head();
+                    return Ok(EditorOperation::Delete(before_delete))
                 }
+                KeyCode::Backspace => {
+                    let before_delete = self.current_textarea_message();
+                    self.textarea.delete_char();
+                    return Ok(EditorOperation::Delete(before_delete))
+                }
+                _ => {}
             }
         }
+        let input:Input = event.into();
+        self.textarea.input(input);
+        Ok(EditorOperation::Input)
     }
 
     #[inline]
@@ -523,7 +515,7 @@ impl<'a> TuiApp<'a> {
                     }
                     Char('t') => self.todo_app.add_dependency(),
                     Char('D') => {
-                        self.todo_app.delete_todo();
+                        self.todo_app.remove_todo();
                     }
                     Char('R') => self.todo_app.read(),
                     Char('T') => self.todo_app.remove_current_dependent(),

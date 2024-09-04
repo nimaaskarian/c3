@@ -6,9 +6,7 @@ use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
 use std::{io, path::PathBuf};
-mod clipboard;
 use clap::ValueEnum;
-use clipboard::Clipboard;
 pub use todo::schedule::Schedule;
 mod todo;
 mod todo_list;
@@ -55,7 +53,7 @@ impl SortMethod {
 pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
-    clipboard: Clipboard,
+    yanked_todo: Option<Todo>,
     pub todo_list: TodoList,
     pub index: usize,
     changed: bool,
@@ -117,13 +115,13 @@ impl App {
         let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
         let todo_list = Self::read_a_todo_list(&args.todo_path, &notes_dir, &args);
         let mut app = App {
+            yanked_todo: None,
             notes_dir,
             x_index: 0,
             y_index: 0,
             tree_search_positions: vec![],
             removed_todos: vec![],
             todo_list,
-            clipboard: Clipboard::new(),
             index: 0,
             tree_path: vec![],
             changed: false,
@@ -409,6 +407,7 @@ impl App {
         self.todo_list = Self::read_a_todo_list(&self.args.todo_path, &self.notes_dir, &self.args);
         let len = self.max_tree_length();
         self.tree_path.truncate(len);
+        self.fix_index();
     }
 
     #[inline]
@@ -512,18 +511,6 @@ impl App {
         let index = self.index;
         let restriction = self.restriction.clone();
         self.current_list_mut().index_mut(index, &restriction)
-    }
-
-    #[inline]
-    pub fn cut_todo(&mut self) {
-        if !self.is_todos_empty() {
-            let restriction = self.restriction.clone();
-            let index = self.index;
-            let todo = self.current_list_mut().remove(index, &restriction);
-            let todo_string: String = (&todo).into();
-            self.clipboard.set_text(todo_string);
-            self.fix_index()
-        }
     }
 
     #[inline]
@@ -681,14 +668,24 @@ impl App {
     }
 
     #[inline]
-    pub fn delete_todo(&mut self) {
+    pub fn remove_todo(&mut self) {
         let restriction = self.restriction.clone();
         if !self.is_todos_empty() {
             let index = self.index;
             let todo = self.current_list_mut().remove(index, &restriction);
             self.removed_todos.push(todo);
+            self.fix_index();
         }
     }
+
+    #[inline]
+    pub fn cut_todo(&mut self) {
+        self.remove_todo();
+        if let Some(todo) = self.removed_todos.pop() {
+            self.yanked_todo = Some(todo)
+        }
+    }
+
 
     #[inline(always)]
     pub fn display_current_list(&self) -> Vec<String> {
@@ -783,21 +780,15 @@ impl App {
     #[inline]
     pub fn yank_todo(&mut self) {
         if let Some(todo) = self.todo() {
-            let todo_string: String = todo.into();
-            self.clipboard.set_text(todo_string);
+            self.yanked_todo = Some(todo.clone());
         }
     }
 
     #[inline]
     pub fn paste_todo(&mut self) {
-        if let Ok(mut todo) = self.clipboard.get_text().parse::<Todo>() {
-            if let Some(dependency) = todo.dependency.as_mut() {
-                if dependency.is_written() {
-                    let _ = dependency.read(&self.notes_dir, self.todo_list.todo_cmp);
-                }
-            }
+        if let Some(todo) = self.yanked_todo.clone() {
             let list = &mut self.current_list_mut();
-            list.push(todo);
+            list.push(todo.clone());
             self.index = list.reorder_last();
         }
     }
@@ -978,7 +969,7 @@ mod tests {
     fn test_delete_todo() -> io::Result<()> {
         let dir = dir("test-delete-todo")?;
         let mut app = write_test_todos(&dir)?;
-        app.delete_todo();
+        app.remove_todo();
         app.write().expect("App writing failed");
 
         let names: io::Result<Vec<PathBuf>> = fs::read_dir(dir.join("notes"))
