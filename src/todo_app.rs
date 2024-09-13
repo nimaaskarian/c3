@@ -140,7 +140,7 @@ impl App {
         todo_list.sort();
         todo_list.changed = false;
         if !args.no_tree {
-            todo_list.read_dependencies(notes_dir);
+            let _ = todo_list.read_dependencies(notes_dir);
         }
         todo_list
     }
@@ -181,11 +181,9 @@ impl App {
         self.current_list_mut().append_list(todo_list)
     }
 
-    pub fn set_query_restriction(&mut self, query: String, last_restriction: Option<Restriction>) {
+    pub fn set_restriction_with_last(&mut self, restriction: Restriction, last_restriction: Option<Restriction>) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
-        self.set_restriction(Rc::new(move |todo| {
-            todo.matches(query.as_str()) && last_restriction(todo)
-        }))
+        self.set_restriction(Rc::new(move |todo| restriction(todo) && last_restriction(todo)))
     }
 
     pub fn tree_search(&mut self, query: String) {
@@ -629,26 +627,6 @@ impl App {
     }
 
     #[inline]
-    pub fn set_priority_restriction(
-        &mut self,
-        priority: u8,
-        last_restriction: Option<Restriction>,
-    ) {
-        let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
-        self.set_restriction(Rc::new(move |todo| {
-            todo.priority() == priority && last_restriction(todo)
-        }))
-    }
-
-    #[inline]
-    pub fn set_priority_limit_no_done(&mut self, priority: u8) {
-        self.args.display_args.show_done = false;
-        self.set_restriction(Rc::new(move |todo| {
-            todo.priority() == priority && !todo.done()
-        }))
-    }
-
-    #[inline]
     pub fn set_current_priority(&mut self, priority: u8) {
         if let Some(todo) = self.todo_mut() {
             todo.set_priority(priority);
@@ -896,13 +874,14 @@ mod tests {
         let dir = dir("test-set-restrictions-query")?;
         let mut app = write_test_todos(&dir)?;
         assert_eq!(app.current_list().len(app.restriction()), 3);
-        app.set_query_restriction(String::from("hello"), None);
+        let restriction: Restriction = Rc::new(|todo| todo.matches("hello"));
+        app.set_restriction(Rc::clone(&restriction));
         assert_eq!(app.current_list().len(app.restriction()), 2);
         assert_eq!(app.index, 1);
         app.traverse_down();
         app.unset_restriction();
         app.traverse_up();
-        app.set_query_restriction(String::from("hello"), None);
+        app.set_restriction(restriction);
         assert_eq!(app.current_list().len(app.restriction()), 2);
         assert_eq!(app.index, 1);
         app.add_dependency_traverse_down();
@@ -917,12 +896,14 @@ mod tests {
         let mut app = write_test_todos(&dir)?;
         app.set_current_priority(2);
         assert_eq!(app.current_list().len(app.restriction()), 3);
-        app.set_priority_restriction(2, None);
+        let restrict_with_priority: fn(u8) -> Restriction = |priority| Rc::new(move |todo| todo.priority() == priority);
+        app.set_restriction(restrict_with_priority(2));
+
         assert_eq!(app.current_list().len(app.restriction()), 1);
-        app.set_priority_restriction(0, None);
+        app.set_restriction_with_last(restrict_with_priority(0), None);
         assert_eq!(app.current_list().len(app.restriction()), 0);
         app.update_show_done_restriction();
-        app.set_priority_restriction(0, None);
+        app.set_restriction_with_last(restrict_with_priority(0), None);
         assert_eq!(app.current_list().len(app.restriction()), 2);
         remove_dir_all(dir)?;
         Ok(())
@@ -1052,7 +1033,7 @@ mod tests {
             schedule.add_days_to_date(-2);
         }
         app.reorder_current();
-        app.todo_list.write_to_stdout();
+        app.todo_list.write_to_stdout()?;
         assert_eq!(app.index(), 0);
 
         Ok(())

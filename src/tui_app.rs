@@ -181,9 +181,9 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_search(&mut self, str: String) {
+    fn on_search(&mut self, query: String) {
         self.todo_app
-            .set_query_restriction(str, self.last_restriction.clone())
+            .set_restriction_with_last(Rc::new(move |todo| todo.matches(query.as_str())), self.last_restriction.clone())
     }
 
     #[inline]
@@ -313,6 +313,16 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
+    pub fn schedule_restriction_prompt(&mut self) {
+        const TITLE: &str = "Limit schedule";
+        const PLACEHOLDER: &str = "Enter schedule to show";
+        self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.set_text_mode(Self::on_schedule_prompt, TITLE, PLACEHOLDER);
+        self.set_responsive_text_mode(Self::on_schedule_prompt, TITLE, PLACEHOLDER);
+        self.on_delete = Some(Self::on_priority_delete);
+    }
+
+    #[inline]
     pub fn append_prompt(&mut self) {
         self.set_text_mode(
             Self::on_prepend_todo,
@@ -342,7 +352,21 @@ impl<'a> TuiApp<'a> {
         let priority = str.parse();
         if let Ok(priority) = priority {
             self.todo_app
-                .set_priority_restriction(priority, self.last_restriction.clone())
+                .set_restriction_with_last(Rc::new(move |todo| todo.priority() == priority), self.last_restriction.clone())
+        }
+    }
+
+    #[inline]
+    fn on_schedule_prompt(&mut self, str: String) {
+        if str.is_empty() {
+            return self.todo_app.update_show_done_restriction();
+        }
+        let schedule_day = str.parse();
+        if let Ok(schedule_day) = schedule_day {
+            self.todo_app
+                .set_restriction_with_last(Rc::new(move |todo| {
+                    todo.schedule.as_ref().map_or(0, |sch| if sch.is_reminder() {0} else {sch.days()}) == schedule_day
+                }), self.last_restriction.clone())
         }
     }
 
@@ -481,6 +505,7 @@ impl<'a> TuiApp<'a> {
                     }
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('@') => self.priority_prompt(),
+                    Char('%') => self.schedule_restriction_prompt(),
                     Char('y') => self.todo_app.yank_todo(),
                     Char('p') => self.todo_app.paste_todo(),
                     Char('i') => self.todo_app.increase_day_done(),
