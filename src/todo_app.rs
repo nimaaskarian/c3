@@ -386,14 +386,9 @@ impl App {
 
     #[inline]
     pub fn toggle_current_done(&mut self) {
-        let index = self.index;
         self.todo_mut().unwrap().toggle_done();
-        if self.args.display_args.show_done {
-            self.index = self.current_list_mut().reorder(index);
-        } else {
-            self.current_list_mut().sort();
-            self.fix_index();
-        }
+        self.reorder_current();
+        self.fix_index();
         while self.is_undone_empty() && self.traverse_up() {
             self.toggle_current_done()
         }
@@ -409,11 +404,19 @@ impl App {
     }
 
     #[inline]
-    pub fn fix_index(&mut self) {
+    fn fix_index(&mut self) {
         let size = self.current_list().len(&self.restriction);
         self.index = match size {
             0 => 0,
             _ => self.index.min(size - 1),
+        }
+    }
+
+    #[inline]
+    fn set_index_in_bound(&mut self, index: usize) {
+        let size = self.current_list().len(&self.restriction);
+        if index < size {
+            self.index = index;
         }
     }
 
@@ -642,7 +645,8 @@ impl App {
     #[inline]
     pub fn reorder_current(&mut self) {
         let index = self.index;
-        self.index = self.current_list_mut().reorder(index);
+        let index = self.current_list_mut().reorder(index);
+        self.set_index_in_bound(index);
     }
 
     #[inline]
