@@ -388,7 +388,6 @@ impl App {
     pub fn toggle_current_done(&mut self) {
         self.todo_mut().unwrap().toggle_done();
         self.reorder_current();
-        self.fix_index();
         while self.is_undone_empty() && self.traverse_up() {
             self.toggle_current_done()
         }
@@ -647,6 +646,7 @@ impl App {
         let index = self.index;
         let index = self.current_list_mut().reorder(index);
         self.set_index_in_bound(index);
+        self.fix_index();
     }
 
     #[inline]
