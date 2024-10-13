@@ -1,13 +1,17 @@
-use c3::todo_app::{App, Restriction, Todo, TodoList};
-use clap_complete::Shell;
+// vim:fileencoding=utf-8:foldmethod=marker
+// imports {{{
 use crate::Args;
-use c3::{DisplayArgs, TodoDisplay, DoOnSelected};
+use c3::todo_app::{App, Restriction, Todo, TodoList};
+use c3::{DisplayArgs, DoOnSelected, TodoDisplay};
+use clap::Parser;
 use clap::{Command, CommandFactory};
+use clap_complete::Shell;
 use clap_complete::{generate, Generator};
 use std::io;
-use std::process;
 use std::path::PathBuf;
-use clap::Parser;
+use std::process;
+use std::rc::Rc;
+// }}}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -63,7 +67,7 @@ pub struct NotCli;
 pub fn run(app: &mut App, args: CliArgs) -> Result<(), NotCli> {
     if !args.search_and_select.is_empty() {
         for query in args.search_and_select {
-            app.set_query_restriction(query, None)
+            app.set_restriction(Rc::new(move |todo| todo.matches(query.as_str())))
         }
         if app.is_todos_empty() {
             process::exit(1);
@@ -90,7 +94,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(), NotCli> {
         app.batch_editor_messages();
     }
     if app.is_changed() {
-        app.write();
+        app.write().expect("Failed to write file.");
     }
     if args.print_path {
         println!("{}", app.args.todo_path.to_str().unwrap());
@@ -106,7 +110,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(), NotCli> {
     }
 
     if args.stdout {
-        app.write_to_stdout();
+        app.todo_list.write_to_stdout().expect("Failed to write the main todolist on stdout");
         return Ok(());
     }
     if args.minimal_tree || args.list {
@@ -119,7 +123,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(), NotCli> {
         return Ok(());
     }
     if let Some(path) = args.output_file.as_ref() {
-        app.output_list_to_path(path);
+        app.output_list_to_path(path).expect(format!("Failed to output to \"{}\"", path.to_str().unwrap()).as_str());
         return Ok(());
     }
     Err(NotCli)
@@ -130,7 +134,7 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
 }
 
 fn print_todos(app: &App) {
-    for display in app.display_current() {
+    for display in app.display_current_list() {
         println!("{}", display);
     }
 }

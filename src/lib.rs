@@ -1,19 +1,23 @@
+// vim:fileencoding=utf-8:foldmethod=marker
+// imports {{{
 use clap::{Parser, ValueEnum};
-use todo_app::SortMethod;
-use std::path::PathBuf;
 use fileio::get_todo_path;
 use std::fmt;
+use std::path::PathBuf;
+use todo_app::SortMethod;
 
 pub mod date;
 pub mod fileio;
 pub mod todo_app;
+// }}}
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum DoOnSelected {
+    #[value(alias="del")]
     Delete,
+    #[value(alias="do")]
     Done,
 }
-
 
 #[derive(Parser, Debug, Default)]
 #[command(author, version, about, long_about = None)]
@@ -53,4 +57,3 @@ pub struct DisplayArgs {
 pub trait TodoDisplay: fmt::Display {
     fn display_with_args(&self, args: &DisplayArgs) -> String;
 }
-

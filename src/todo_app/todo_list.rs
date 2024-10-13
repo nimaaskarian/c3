@@ -1,16 +1,19 @@
+// vim:fileencoding=utf-8:foldmethod=marker
+// imports {{{
+use std::cmp;
 use std::fs::{read, File};
-use std::io::{stdout, BufRead, BufWriter, Write};
+use std::io::{self, BufRead, BufWriter, Write};
 use std::path::Path;
-use std::{cmp, io};
 
 use super::{App, Restriction, SortMethod, Todo};
 use crate::{DisplayArgs, TodoDisplay};
+//}}}
 
 pub type TodoCmp = fn(&Todo, &Todo) -> cmp::Ordering;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TodoList {
     pub todos: Vec<Todo>,
-    pub(super) changed: bool,
+    pub changed: bool,
     pub todo_cmp: TodoCmp,
 }
 
@@ -96,7 +99,7 @@ impl TodoList {
 
     #[inline]
     pub fn write_to_stdout(&self) -> io::Result<()> {
-        let mut stdout_writer = BufWriter::new(stdout());
+        let mut stdout_writer = BufWriter::new(io::stdout());
         self.write_to_buf(&mut stdout_writer)?;
         Ok(())
     }
@@ -161,8 +164,8 @@ impl TodoList {
 
     #[inline]
     fn write_to_buf<W: Write>(&self, writer: &mut BufWriter<W>) -> io::Result<()> {
-        for todo in &self.todos {
-            writeln!(writer, "{}", todo.as_string())?;
+        for todo_string in self.todos.iter().map(String::from) {
+            writeln!(writer, "{todo_string}")?;
         }
         writer.flush()?;
         Ok(())

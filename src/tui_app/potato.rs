@@ -1,8 +1,10 @@
-use super::super::default_block;
-use super::Module;
+// vim:fileencoding=utf-8:foldmethod=marker
+// imports {{{
 use ratatui::widgets::Paragraph;
+use super::default_block;
 use std::io;
 use std::process::{Command, Output};
+//}}}
 
 #[derive(Default)]
 pub struct Potato {
@@ -31,6 +33,18 @@ impl Potato {
     #[inline]
     fn resolve_arg(&self, arg: &str) -> String {
         format!("-{arg}{}", self.index)
+    }
+
+    #[inline]
+    pub fn get_widget(&self) -> Paragraph {
+        let args = vec!["+%m\n%t\n%p".to_string(), self.resolve_arg("1")];
+
+        let time_str = match self.output(args) {
+            Ok(output) => String::from_utf8(output.stdout).unwrap(),
+            Err(_) => String::from("potctl command not found at path."),
+        };
+
+        Paragraph::new(time_str).block(default_block("Potato"))
     }
 
     #[inline]
@@ -90,73 +104,9 @@ impl Potato {
     pub fn quit(&mut self) {
         self.run(vec![self.resolve_arg("q")])
     }
-}
 
-impl Module for Potato {
-    #[inline]
-    fn get_widget(&self) -> Paragraph {
-        let args = vec!["+%m\n%t\n%p".to_string(), self.resolve_arg("1")];
-
-        let time_str = match self.output(args) {
-            Ok(output) => String::from_utf8(output.stdout).unwrap(),
-            Err(_) => String::from("potctl command not found at path."),
-        };
-
-        Paragraph::new(time_str).block(default_block("Potato"))
-    }
-
-    #[inline]
-    fn update_time_ms(&self) -> u64 {
+    #[inline(always)]
+    pub fn update_time_ms(&self) -> u64 {
         500
-    }
-
-    #[inline]
-    fn on_c(&mut self) {
-        self.toggle_pause()
-    }
-
-    #[inline]
-    fn on_capital_c(&mut self) {
-        self.quit()
-    }
-
-    #[inline]
-    fn on_s(&mut self) {
-        self.skip();
-    }
-
-    #[inline]
-    fn on_capital_h(&mut self) {
-        self.increase_timer()
-    }
-
-    #[inline]
-    fn on_capital_l(&mut self) {
-        self.decrease_timer()
-    }
-
-    #[inline]
-    fn on_f(&mut self) {
-        self.restart()
-    }
-
-    #[inline]
-    fn on_plus(&mut self) {
-        self.increase_pomodoro();
-    }
-
-    #[inline]
-    fn on_minus(&mut self) {
-        self.decrease_pomodoro();
-    }
-
-    #[inline]
-    fn on_dot(&mut self) {
-        self.next();
-    }
-
-    #[inline]
-    fn on_comma(&mut self) {
-        self.prev();
     }
 }

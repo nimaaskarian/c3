@@ -1,11 +1,6 @@
-use std::fmt;
-use std::path::Path;
 // vim:fileencoding=utf-8:foldmethod=marker
-//std{{{
-use std::str::{self, FromStr};
-use std::{fs::remove_file, io};
-//}}}
-// mod{{{
+//imports {{{
+use std::{fmt, fs, io, path::Path, str::FromStr};
 mod dependency;
 mod note;
 pub mod schedule;
@@ -14,7 +9,7 @@ use crate::{DisplayArgs, TodoDisplay};
 use dependency::Dependency;
 use note::{open_note_temp_editor, sha1};
 use schedule::Schedule;
-//}}}
+// }}}
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Todo {
@@ -161,7 +156,7 @@ impl FromStr for Todo {
             let dependency = dependency_string.parse().ok();
 
             if let Some(schedule) = schedule.as_ref() {
-                done =  schedule.date_should_be_done();
+                done = schedule.date_should_be_done();
             }
             Ok(Todo {
                 dependency,
@@ -179,15 +174,6 @@ impl FromStr for Todo {
 
 impl Todo {
     #[inline]
-    pub fn matches(&self, query: &str) -> bool {
-        self.message.contains(query) || self.message.to_lowercase().contains(query)
-    }
-
-    #[inline]
-    pub fn priority(&self) -> u8 {
-        self.priority
-    }
-    #[inline]
     pub fn new(message: String, priority: u8) -> Self {
         Todo {
             message,
@@ -196,14 +182,24 @@ impl Todo {
         }
     }
 
+    #[inline]
+    pub fn matches(&self, query: &str) -> bool {
+        self.message.contains(query) || self.message.to_lowercase().contains(query)
+    }
+
+    #[inline]
+    pub fn priority(&self) -> u8 {
+        self.priority
+    }
+
     pub fn toggle_schedule(&mut self) -> bool {
         if self.schedule.is_none() && self.last_schedule.is_none() {
             return false;
         }
-        if self.schedule.is_some() {
-            self.last_schedule = std::mem::take(&mut self.schedule);
+        if let Some(schedule) = self.schedule.take() {
+            self.last_schedule = Some(schedule);
         } else {
-            self.schedule = std::mem::take(&mut self.last_schedule);
+            self.schedule = self.last_schedule.take();
         }
         true
     }
@@ -223,21 +219,6 @@ impl Todo {
     }
 
     #[inline]
-    pub fn is_note(&self) -> bool {
-        self.dependency.as_ref().map_or(false, |dep| dep.is_note())
-    }
-
-    #[inline]
-    pub fn dependencies(&self) -> Option<&TodoList> {
-        self.dependency.as_ref()?.todo_list()
-    }
-
-    #[inline]
-    pub fn no_dependency(&self) -> bool {
-        self.dependency.is_none()
-    }
-
-    #[inline]
     pub fn add_todo_dependency(&mut self) {
         if self.dependency.is_none() {
             self.dependency = Some(Dependency::new_todo_list(self.hash()));
@@ -248,7 +229,7 @@ impl Todo {
     pub fn delete_dependency_file(&mut self, path: &Path) -> io::Result<()> {
         if let Some(dependency) = &mut self.dependency {
             dependency.todo_list.remove_dependency_files(path)?;
-            let _ = remove_file(path.join(dependency.get_name()));
+            let _ = fs::remove_file(path.join(dependency.name()));
         }
         Ok(())
     }
@@ -257,7 +238,7 @@ impl Todo {
     pub fn delete_removed_dependent_files(&mut self, path: &Path) -> io::Result<()> {
         if let Some(dependency) = &mut self.removed_dependency {
             let _ = dependency.todo_list.remove_dependency_files(path);
-            let _ = remove_file(path.join(dependency.get_name()));
+            let _ = fs::remove_file(path.join(dependency.name()));
         }
         Ok(())
     }
@@ -293,11 +274,6 @@ impl Todo {
         } else {
             Ok(false)
         }
-    }
-
-    #[inline]
-    pub fn set_message(&mut self, message: String) {
-        self.message = message;
     }
 
     #[inline]
@@ -346,22 +322,9 @@ impl Todo {
         self.done = done;
     }
 
-    #[inline(always)]
-    fn standardize_priority(priority: u8) -> u8 {
-        match priority {
-            0 => 10,
-            any => any,
-        }
-    }
-
-    #[inline(always)]
-    fn standardized_priority(&self) -> u8 {
-        Self::standardize_priority(self.priority)
-    }
-
     #[inline]
     pub fn decrease_priority(&mut self) {
-        if self.standardized_priority() < 9 {
+        if Self::standardize_priority(self.priority) < 9 {
             self.priority += 1
         } else {
             self.priority = 0
@@ -370,8 +333,9 @@ impl Todo {
 
     #[inline]
     pub fn increase_priority(&mut self) {
-        if self.standardized_priority() > 1 {
-            self.priority = self.standardized_priority() - 1
+        let standardize_priority = Self::standardize_priority(self.priority);
+        if standardize_priority > 1 {
+            self.priority = standardize_priority - 1
         } else {
             self.priority = 1
         }
@@ -379,18 +343,12 @@ impl Todo {
 
     #[inline]
     pub fn set_priority(&mut self, priority: u8) {
-        self.priority = priority;
-        self.fix_priority();
-    }
-
-    #[inline]
-    fn fix_priority(&mut self) {
-        self.priority = Todo::fixed_priority(self.priority)
+        self.priority = Todo::fixed_priority(priority)
     }
 
     #[inline(always)]
     fn cmp_value(&self) -> u8 {
-        let mut priority = self.standardized_priority() * 2;
+        let mut priority = Self::standardize_priority(self.priority) * 2;
         if self.schedule.as_ref().map_or(false, Schedule::is_reminder) {
             priority -= 1;
         }
@@ -410,9 +368,12 @@ impl Todo {
         }
     }
 
-    #[inline]
-    pub fn as_string(&self) -> String {
-        self.into()
+    #[inline(always)]
+    fn standardize_priority(priority: u8) -> u8 {
+        match priority {
+            0 => 10,
+            any => any,
+        }
     }
 }
 
@@ -472,7 +433,7 @@ mod tests {
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
-        let result = todo.dependency.unwrap().get_name().to_string();
+        let result = todo.dependency.unwrap().name().to_string();
         assert_eq!(result, expected);
     }
 
@@ -490,7 +451,7 @@ mod tests {
         let expected = "900a80c94f076b4ee7006a9747667ccf6878a72b.todo";
         todo.add_todo_dependency();
 
-        let result = todo.dependency.unwrap().get_name().to_string();
+        let result = todo.dependency.unwrap().name().to_string();
         assert_eq!(result, expected);
     }
 
@@ -510,7 +471,7 @@ mod tests {
             .expect("Error setting note");
 
         assert_eq!(
-            todo.dependency.unwrap().get_name(),
+            todo.dependency.unwrap().name(),
             "2c924e3088204ee77ba681f72be3444357932fca"
         );
     }

@@ -1,14 +1,13 @@
 // vim:fileencoding=utf-8:foldmethod=marker
-use std::io;
+// imports {{{
 use clap::Parser;
+use std::io;
 pub(crate) mod cli_app;
 pub(crate) mod tui_app;
-use c3::{
-    todo_app::App,
-    AppArgs,
-};
+use c3::{todo_app::App, AppArgs};
 use cli_app::CliArgs;
 use tui_app::TuiArgs;
+// }}}
 
 /// A tree-like todo application that makes you smile
 #[derive(Parser, Debug)]
@@ -36,4 +35,3 @@ fn main() -> io::Result<()> {
         Ok(())
     }
 }
-

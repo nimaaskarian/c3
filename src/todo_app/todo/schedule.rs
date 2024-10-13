@@ -77,7 +77,11 @@ impl FromStr for Schedule {
             Err(_) => None,
         };
         if let Some(mode) = mode {
-            Ok(Schedule { day, saved_date: date, mode })
+            Ok(Schedule {
+                day,
+                saved_date: date,
+                mode,
+            })
         } else {
             Err(Self::Err {})
         }
@@ -200,7 +204,9 @@ impl Schedule {
     pub fn date_should_be_done(&self) -> bool {
         match self.mode {
             ScheduleMode::Reminder => self.saved_date != Some(date::current()),
-            ScheduleMode::Scheduled => self.saved_date.is_some() && self.current_minus_saved_date() < self.day,
+            ScheduleMode::Scheduled => {
+                self.saved_date.is_some() && self.current_minus_saved_date() < self.day
+            }
         }
     }
 }

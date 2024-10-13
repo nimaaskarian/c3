@@ -55,6 +55,7 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | J | increase todo priority |
 | K | decrease todo priority |
 | @ | restrict todos by priority |
+| % | restrict todos by schedule day |
 | d | toggle daily |
 | W | toggle weekly |
 | S | set custom schedule |
@@ -80,11 +81,20 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | Ctrl+d | sort by todo's abandonment (how hasn't been done compared to their schedule) |
 | w | write changes to file |
 | R | read from file (discard changes)|
-#### Modules
-TUI mode has a section called module. You can develop modules, and assign methods to Module trait methods.
-A very simple example has been done by default for [potato-c](https://github.com/nimaaskarian/potato-c).
 
-Keybinds that modules can use are **C, c, H, L, comma, period, +, -, s, r**
+#### [potato-c](https://github.com/nimaaskarian/potato-c) module keybinds
+| key | action |
+|---|---|
+| s | skip current |
+| H | increase timer |
+| L | decrease timer |
+| +,= | increase pomodoro count |
+| - | decrease pomodoro count |
+| c | toggle pause |
+| C | quit |
+| f | restart |
+| . | next server |
+| , | prev server |
 
 ### Non interactive mode
 For command line arguments and such, run `c3 -h` to see full usage.
