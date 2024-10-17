@@ -22,6 +22,8 @@ use tui_textarea::{CursorMove, Input, TextArea};
 mod potato;
 mod todo_buffer;
 use todo_buffer::TodoBuffer;
+mod tree_search;
+pub use tree_search::TreeSearch;
 use c3::{
     date,
     todo_app::{App, Restriction, Schedule, Todo},
@@ -52,6 +54,7 @@ enum Mode {
 }
 
 pub struct TuiApp<'a> {
+    tree_search: TreeSearch,
     todo_buffer: TodoBuffer,
     last_restriction: Option<Restriction>,
     show_right: bool,
@@ -87,6 +90,7 @@ impl<'a> TuiApp<'a> {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         TuiApp {
+            tree_search: Default::default(),
             todo_buffer: Default::default(),
             todo_app: app,
             args,
@@ -212,8 +216,14 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_tree_search(&mut self, str: String) {
-        self.todo_app.tree_search(str);
+    fn on_tree_search(&mut self, query: String) {
+        let current_not_matches = self.todo_app.todo().map_or(true, |todo| !todo.matches(&query));
+
+        self.tree_search.tree_search(query, self.todo_app.current_list(), Rc::clone(self.todo_app.get_restriction()));
+        if current_not_matches {
+            self.tree_search.next();
+            self.tree_search.set_to_app(self.todo_app);
+        }
     }
 
     #[inline]
@@ -563,7 +573,10 @@ impl<'a> TuiApp<'a> {
                     Char('R') => self.todo_app.read(),
                     Char('T') => self.todo_app.remove_current_dependent(),
                     Char(' ') => self.todo_app.toggle_current_done(),
-                    Char('n') => self.todo_app.search_next(),
+                    Char('n') => {
+                        self.tree_search.next();
+                        self.tree_search.set_to_app(self.todo_app);
+                    }
                     Char('a') => self.prepend_prompt(),
                     Char('/') => self.search_prompt(),
                     Char('?') => self.tree_search_prompt(),

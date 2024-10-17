@@ -1,7 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
 use std::cmp;
-use std::collections::VecDeque;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
@@ -13,15 +12,8 @@ mod todo_list;
 use crate::{fileio, AppArgs};
 use std::rc::Rc;
 pub use todo::Todo;
-
 pub use self::todo_list::TodoList;
 // }}}
-
-#[derive(Clone)]
-struct SearchPosition {
-    tree_path: Vec<usize>,
-    matching_indices: Vec<usize>,
-}
 
 #[derive(ValueEnum, Clone, Debug, PartialEq, Default)]
 pub enum SortMethod {
@@ -56,12 +48,9 @@ pub struct App {
     pub todo_list: TodoList,
     pub index: usize,
     changed: bool,
-    tree_path: Vec<usize>,
+    pub tree_path: Vec<usize>,
     pub args: AppArgs,
     pub removed_todos: Vec<Todo>,
-    tree_search_positions: Vec<SearchPosition>,
-    x_index: usize,
-    y_index: usize,
     restriction: Restriction,
 }
 
@@ -115,9 +104,6 @@ impl App {
         let todo_list = Self::read_a_todo_list(&args.todo_path, &notes_dir, &args);
         let mut app = App {
             notes_dir,
-            x_index: 0,
-            y_index: 0,
-            tree_search_positions: vec![],
             removed_todos: vec![],
             todo_list,
             index: 0,
@@ -182,45 +168,6 @@ impl App {
     pub fn set_restriction_with_last(&mut self, restriction: Restriction, last_restriction: Option<Restriction>) {
         let last_restriction = last_restriction.unwrap_or(self.restriction.clone());
         self.set_restriction(Rc::new(move |todo| restriction(todo) && last_restriction(todo)))
-    }
-
-    pub fn tree_search(&mut self, query: String) {
-        self.tree_search_positions = vec![];
-        self.y_index = 0;
-        self.x_index = 0;
-        if query.is_empty() {
-            return;
-        }
-        let current_not_matches = self.todo().map_or(true, |todo| !todo.matches(&query));
-        self.search_tree(query);
-
-        if current_not_matches {
-            self.search_next();
-        }
-    }
-
-    pub fn search_tree(&mut self, query: String) {
-        let mut lists: VecDeque<(Vec<usize>, &TodoList)> =
-            VecDeque::from([(vec![], &self.todo_list)]);
-        while let Some((indices, current_list)) = lists.pop_back() {
-            let mut matching_indices: Vec<usize> = vec![];
-            for (i, todo) in current_list.filter(&self.restriction).enumerate() {
-                let mut todo_indices = indices.clone();
-                todo_indices.push(i);
-                if todo.matches(&query) {
-                    matching_indices.push(i)
-                }
-                if let Some(list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
-                    lists.push_back((todo_indices, list))
-                }
-            }
-            if !matching_indices.is_empty() {
-                self.tree_search_positions.push(SearchPosition {
-                    tree_path: indices.to_vec(),
-                    matching_indices,
-                })
-            }
-        }
     }
 
     pub fn batch_editor_messages(&mut self) {
@@ -328,32 +275,6 @@ impl App {
         } else {
             self.set_restriction(Rc::new(|todo| !todo.done()))
         }
-    }
-
-    #[inline]
-    pub fn search_next(&mut self) {
-        if !self.tree_search_positions.is_empty() {
-            let x_size = self.tree_search_positions.len();
-            let y_size = self.tree_search_positions[self.x_index]
-                .matching_indices
-                .len();
-            if self.x_index + 1 < x_size {
-                self.x_index += 1
-            } else if self.y_index + 1 < y_size {
-                self.y_index += 1
-            } else {
-                self.y_index = 0;
-                self.x_index = 0;
-            }
-            self.set_tree_search_position();
-        }
-    }
-
-    #[inline]
-    fn set_tree_search_position(&mut self) {
-        let item = &self.tree_search_positions[self.x_index];
-        self.tree_path.clone_from(&item.tree_path);
-        self.index = item.matching_indices[self.y_index];
     }
 
     fn max_tree_length(&self) -> usize {
@@ -875,19 +796,6 @@ mod tests {
         app.set_restriction_with_last(restrict_with_priority(0), None);
         assert_eq!(app.current_list().len(app.get_restriction()), 2);
         remove_dir_all(dir)?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_tree_search() -> io::Result<()> {
-        let dir = dir("test-tree-search")?;
-        let mut app = write_test_todos(&dir)?;
-        remove_dir_all(dir)?;
-        let query = String::from("nod");
-        app.tree_search(query);
-        let position = &app.tree_search_positions[0];
-        assert_eq!(position.tree_path, vec![2, 0]);
-        assert_eq!(position.matching_indices, vec![0]);
         Ok(())
     }
 
