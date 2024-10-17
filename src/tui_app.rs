@@ -20,6 +20,8 @@ use std::{
 };
 use tui_textarea::{CursorMove, Input, TextArea};
 mod potato;
+mod todo_buffer;
+use todo_buffer::TodoBuffer;
 use c3::{
     date,
     todo_app::{App, Restriction, Schedule, Todo},
@@ -50,6 +52,7 @@ enum Mode {
 }
 
 pub struct TuiApp<'a> {
+    todo_buffer: TodoBuffer,
     last_restriction: Option<Restriction>,
     show_right: bool,
     mode: Mode,
@@ -84,6 +87,7 @@ impl<'a> TuiApp<'a> {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         TuiApp {
+            todo_buffer: Default::default(),
             todo_app: app,
             args,
             textarea,
@@ -493,7 +497,12 @@ impl<'a> TuiApp<'a> {
                         self.nnn_open();
                         return Ok(HandlerOperation::Restart);
                     }
-                    Char('x') => self.todo_app.cut_todo(),
+                    Char('x') => {
+                        self.todo_app.remove_todo();
+                        if let Some(todo) = self.todo_app.removed_todos.pop() {
+                            self.todo_buffer.yank(todo);
+                        }
+                    },
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
                     Char('S') => self.schedule_prompt(),
@@ -506,10 +515,19 @@ impl<'a> TuiApp<'a> {
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('@') => self.priority_prompt(),
                     Char('%') => self.schedule_restriction_prompt(),
-                    Char('y') => self.todo_app.yank_todo(),
-                    Char('p') => self.todo_app.paste_todo(),
-                    Char('i') => self.todo_app.increase_day_done(),
-                    Char('I') => self.todo_app.decrease_day_done(),
+                    Char('y') => {
+                        let todo = self.todo_app.todo().map(|t| t.clone());
+                        self.todo_buffer.yank(todo);
+                    }
+                    Char('p') => {
+                        if let Some(todo) = self.todo_buffer.get() {
+                            let list = self.todo_app.current_list_mut();
+                            list.push(todo);
+                            self.todo_app.index = list.reorder_last();
+                        }
+                    }
+                    Char('i') => self.todo_app.increase_day_by(1),
+                    Char('I') => self.todo_app.increase_day_by(-1),
                     Char('o') => {
                         self.nnn_append_todo();
                         return Ok(HandlerOperation::Restart);

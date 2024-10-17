@@ -53,13 +53,12 @@ impl SortMethod {
 pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
-    yanked_todo: Option<Todo>,
     pub todo_list: TodoList,
     pub index: usize,
     changed: bool,
     tree_path: Vec<usize>,
     pub args: AppArgs,
-    removed_todos: Vec<Todo>,
+    pub removed_todos: Vec<Todo>,
     tree_search_positions: Vec<SearchPosition>,
     x_index: usize,
     y_index: usize,
@@ -115,7 +114,6 @@ impl App {
         let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
         let todo_list = Self::read_a_todo_list(&args.todo_path, &notes_dir, &args);
         let mut app = App {
-            yanked_todo: None,
             notes_dir,
             x_index: 0,
             y_index: 0,
@@ -293,18 +291,10 @@ impl App {
         self.changed
     }
 
-    #[inline]
-    pub fn increase_day_done(&mut self) {
+    #[inline(always)]
+    pub fn increase_day_by(&mut self, days: i64) {
         if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
-            schedule.add_days_to_date(-1);
-            self.reorder_current();
-        }
-    }
-
-    #[inline]
-    pub fn decrease_day_done(&mut self) {
-        if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
-            schedule.add_days_to_date(1);
+            schedule.add_days_to_date(-1*days);
             self.reorder_current();
         }
     }
@@ -660,15 +650,6 @@ impl App {
         }
     }
 
-    #[inline]
-    pub fn cut_todo(&mut self) {
-        self.remove_todo();
-        if let Some(todo) = self.removed_todos.pop() {
-            self.yanked_todo = Some(todo)
-        }
-    }
-
-
     #[inline(always)]
     pub fn display_current_list(&self) -> Vec<String> {
         self.current_list().display(&self.args.display_args, &self.restriction)
@@ -756,22 +737,6 @@ impl App {
         if let Some(todo) = self.todo_mut() {
             todo.increase_priority();
             self.reorder_current();
-        }
-    }
-
-    #[inline]
-    pub fn yank_todo(&mut self) {
-        if let Some(todo) = self.todo() {
-            self.yanked_todo = Some(todo.clone());
-        }
-    }
-
-    #[inline]
-    pub fn paste_todo(&mut self) {
-        if let Some(todo) = self.yanked_todo.clone() {
-            let list = &mut self.current_list_mut();
-            list.push(todo.clone());
-            self.index = list.reorder_last();
         }
     }
 
