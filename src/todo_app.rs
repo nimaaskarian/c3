@@ -153,7 +153,7 @@ impl App {
     }
 
     #[inline]
-    pub fn restriction(&self) -> &Restriction {
+    pub fn get_restriction(&self) -> &Restriction {
         &self.restriction
     }
 
@@ -864,11 +864,11 @@ mod tests {
         let dir = dir("test-set-restrictions-done")?;
         let mut app = write_test_todos(&dir)?;
         app.toggle_current_done();
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         app.toggle_show_done();
-        assert_eq!(app.current_list().len(app.restriction()), 3);
+        assert_eq!(app.current_list().len(app.get_restriction()), 3);
         app.toggle_show_done();
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         remove_dir_all(dir)?;
         Ok(())
     }
@@ -877,19 +877,19 @@ mod tests {
     fn test_set_restrictions_query() -> io::Result<()> {
         let dir = dir("test-set-restrictions-query")?;
         let mut app = write_test_todos(&dir)?;
-        assert_eq!(app.current_list().len(app.restriction()), 3);
+        assert_eq!(app.current_list().len(app.get_restriction()), 3);
         let restriction: Restriction = Rc::new(|todo| todo.matches("hello"));
         app.set_restriction(Rc::clone(&restriction));
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         assert_eq!(app.index, 1);
         app.traverse_down();
         app.unset_restriction();
         app.traverse_up();
         app.set_restriction(restriction);
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         assert_eq!(app.index, 1);
         app.add_dependency_traverse_down();
-        assert_eq!(app.current_list().len(app.restriction()), 1);
+        assert_eq!(app.current_list().len(app.get_restriction()), 1);
         remove_dir_all(dir)?;
         Ok(())
     }
@@ -899,16 +899,16 @@ mod tests {
         let dir = dir("test-set-restrictions-priority")?;
         let mut app = write_test_todos(&dir)?;
         app.set_current_priority(2);
-        assert_eq!(app.current_list().len(app.restriction()), 3);
+        assert_eq!(app.current_list().len(app.get_restriction()), 3);
         let restrict_with_priority: fn(u8) -> Restriction = |priority| Rc::new(move |todo| todo.priority() == priority);
         app.set_restriction(restrict_with_priority(2));
 
-        assert_eq!(app.current_list().len(app.restriction()), 1);
+        assert_eq!(app.current_list().len(app.get_restriction()), 1);
         app.set_restriction_with_last(restrict_with_priority(0), None);
-        assert_eq!(app.current_list().len(app.restriction()), 0);
+        assert_eq!(app.current_list().len(app.get_restriction()), 0);
         app.update_show_done_restriction();
         app.set_restriction_with_last(restrict_with_priority(0), None);
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         remove_dir_all(dir)?;
         Ok(())
     }

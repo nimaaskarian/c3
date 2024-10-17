@@ -72,7 +72,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(), NotCli> {
         if app.is_todos_empty() {
             process::exit(1);
         }
-        let restriction = app.restriction().clone();
+        let restriction = app.get_restriction().clone();
         if let Some(do_on_selected) = args.do_on_selected {
             match do_on_selected {
                 DoOnSelected::Delete => app
@@ -118,7 +118,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(), NotCli> {
             print_todos(app);
         } else {
             let mut print_todo = PrintTodoTree::new(args.minimal_tree);
-            print_todo.print_list(&app.todo_list, &app.args.display_args, app.restriction())
+            print_todo.print_list(&app.todo_list, &app.args.display_args, app.get_restriction())
         }
         return Ok(());
     }

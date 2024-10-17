@@ -107,7 +107,7 @@ impl<'a> TuiApp<'a> {
         let size = self
             .todo_app
             .current_list()
-            .len(self.todo_app.restriction());
+            .len(self.todo_app.get_restriction());
         let todo_string = format!("Todos ({size}){changed_str}");
 
         if let Some(parent) = self.todo_app.parent() {
@@ -165,7 +165,7 @@ impl<'a> TuiApp<'a> {
     pub fn search_prompt(&mut self) {
         const TITLE: &str = "Search todo";
         const PLACEHOLDER: &str = "Enter search query";
-        self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.last_restriction = Some(Rc::clone(self.todo_app.get_restriction()));
         self.on_submit = None;
         self.set_responsive_text_mode(Self::on_search, TITLE, PLACEHOLDER);
         self.on_delete = Some(Self::on_search_delete);
@@ -306,7 +306,7 @@ impl<'a> TuiApp<'a> {
     pub fn priority_prompt(&mut self) {
         const TITLE: &str = "Limit priority";
         const PLACEHOLDER: &str = "Enter priority to show";
-        self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.last_restriction = Some(self.todo_app.get_restriction().clone());
         self.set_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
         self.set_responsive_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
         self.on_delete = Some(Self::on_priority_delete);
@@ -316,7 +316,7 @@ impl<'a> TuiApp<'a> {
     pub fn schedule_restriction_prompt(&mut self) {
         const TITLE: &str = "Limit schedule";
         const PLACEHOLDER: &str = "Enter schedule to show";
-        self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.last_restriction = Some(self.todo_app.get_restriction().clone());
         self.set_text_mode(Self::on_schedule_prompt, TITLE, PLACEHOLDER);
         self.set_responsive_text_mode(Self::on_schedule_prompt, TITLE, PLACEHOLDER);
         self.on_delete = Some(Self::on_priority_delete);
@@ -648,7 +648,7 @@ impl<'a> TuiApp<'a> {
             let last = self
                 .todo_app
                 .current_list()
-                .len(self.todo_app.restriction())
+                .len(self.todo_app.get_restriction())
                 .min(todo_layout.height as usize + first - 2);
             self.todo_app.display_a_slice(self.todo_app.current_list(), first, last)
         } else {
