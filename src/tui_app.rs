@@ -526,7 +526,7 @@ impl<'a> TuiApp<'a> {
                     Char('@') => self.priority_prompt(),
                     Char('%') => self.schedule_restriction_prompt(),
                     Char('y') => {
-                        let todo = self.todo_app.todo().map(|t| t.clone());
+                        let todo = self.todo_app.todo().cloned();
                         self.todo_buffer.yank(todo);
                     }
                     Char('p') => {

@@ -2,7 +2,6 @@
 // imports {{{
 use crate::todo_app::todo_list::TodoCmp;
 
-use super::Todo;
 use super::TodoList;
 use std::str::FromStr;
 use std::{
@@ -70,14 +69,6 @@ impl Dependency {
     }
 
     #[inline]
-    pub fn push(&mut self, todo: Todo) {
-        if self.is_list() {
-            self.todo_list.push(todo);
-            self.todo_list.reorder_last();
-        }
-    }
-
-    #[inline]
     pub fn read(&mut self, path: &Path, todo_cmp: TodoCmp) -> io::Result<()> {
         let file_path = path.join(&self.name);
         let name_todo = format!("{}.todo", self.name);
@@ -105,15 +96,6 @@ impl Dependency {
         self.written = true;
 
         Ok(())
-    }
-
-    #[inline]
-    pub fn todo_list_mut(&mut self) -> Option<&mut TodoList> {
-        if self.mode == DependencyMode::TodoList {
-            Some(&mut self.todo_list)
-        } else {
-            None
-        }
     }
 
     #[inline]

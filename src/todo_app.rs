@@ -182,15 +182,15 @@ impl App {
     }
 
     pub fn batch_editor_messages(&mut self) {
-        let content = String::from("# INDEX PRIORITY MESSAGE\n")
-            + self
+        let max_index = self.current_list().todos.len()-1;
+        let index_length = (max_index.checked_ilog10().unwrap_or(0)+1) as usize;
+        let content = self
                 .current_list()
                 .iter()
                 .enumerate()
-                .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
+                .map(|(i, x)| format!("{i:0index_length$} {} {}", x.priority(), x.message))
                 .collect::<Vec<String>>()
-                .join("\n")
-                .as_str();
+                .join("\n");
         let new_messages =
             fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
@@ -203,7 +203,6 @@ impl App {
         let mut delete_indices: Vec<usize> = vec![];
         let mut changed = false;
         let mut lines: Vec<IndexedLine> = messages
-            .filter(|message| !message.starts_with('#'))
             .flat_map(|message| message.parse::<IndexedLine>())
             .collect();
         lines.sort_by_key(|a| a.index);
@@ -237,11 +236,6 @@ impl App {
     #[inline]
     pub fn is_tree(&self) -> bool {
         !self.args.no_tree
-    }
-
-    #[inline]
-    pub fn is_current_changed(&self) -> bool {
-        self.current_list().changed
     }
 
     #[inline]
