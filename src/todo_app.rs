@@ -22,6 +22,8 @@ pub enum SortMethod {
     Normal,
     #[value(alias = "a", alias = "abandoned")]
     AbandonedFirst,
+    #[value(alias = "nta")]
+    NormalThenAbandoned,
 }
 
 impl SortMethod {
@@ -38,6 +40,15 @@ impl SortMethod {
                 }
             },
             Self::Normal => |a: &Todo, b: &Todo| a.cmp(b),
+            Self::NormalThenAbandoned => |a: &Todo, b: &Todo| {
+                let order = a.cmp(b);
+                if order.is_eq() {
+                    b.abandonment_coefficient()
+                    .total_cmp(&a.abandonment_coefficient())
+                } else {
+                    order
+                }
+            }
         }
     }
 }
