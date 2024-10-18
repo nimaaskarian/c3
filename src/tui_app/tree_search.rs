@@ -1,5 +1,5 @@
 use std::{collections::VecDeque, ops::Not};
-use c3::todo_app::{self, App, Restriction, TodoList};
+use c3::todo_app::{App, Restriction, TodoList};
 
 #[derive(Clone, Default)]
 struct SearchPosition {
@@ -24,7 +24,14 @@ impl TreeSearch {
         })
     }
 
-    pub fn search_tree(&mut self, query: String, todo_list: &TodoList, restriction: Restriction) {
+    #[inline]
+    pub fn search(&mut self, query: String, todo_list: &TodoList, restriction: Restriction) {
+        self.positions = vec![];
+        self.pos_index = 0;
+        self.list_index = 0;
+        if query.is_empty() {
+            return;
+        }
         let mut lists: VecDeque<(Vec<usize>, &TodoList)> =
             VecDeque::from([(vec![], todo_list)]);
         while let Some((indices, current_list)) = lists.pop_back() {
@@ -48,16 +55,6 @@ impl TreeSearch {
         }
     }
 
-    pub fn tree_search(&mut self, query: String, todo_list: &TodoList, restriction: Restriction) {
-        self.positions = vec![];
-        self.pos_index = 0;
-        self.list_index = 0;
-        if query.is_empty() {
-            return;
-        }
-        self.search_tree(query, todo_list, restriction);
-    }
-
     #[inline]
     pub fn next(&mut self) {
         if !self.positions.is_empty() {
@@ -76,10 +73,33 @@ impl TreeSearch {
         }
     }
 
+    #[inline]
     pub fn set_to_app(&self, todo_app:&mut App) {
         if let Some((index, path)) =  self.current_tree_position() {
             todo_app.index = index;
             todo_app.tree_path.clone_from(path);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::{fs::remove_dir_all, rc::Rc};
+    use c3::todo_app::test_helpers::*;
+    use std::io;
+    use super::*;
+
+    #[test]
+    fn test_tree_search() -> io::Result<()> {
+        let dir = dir("test-tree-search")?;
+        let app = write_test_todos(&dir)?;
+        remove_dir_all(dir)?;
+        let query = String::from("nod");
+        let mut tree_search = TreeSearch::default();
+        tree_search.search(query, app.current_list(), Rc::clone(app.get_restriction()));
+        let position = &tree_search.positions[0];
+        assert_eq!(position.tree_path, vec![2, 0]);
+        assert_eq!(position.matching_indices, vec![0]);
+        Ok(())
     }
 }

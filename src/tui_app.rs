@@ -219,7 +219,7 @@ impl<'a> TuiApp<'a> {
     fn on_tree_search(&mut self, query: String) {
         let current_not_matches = self.todo_app.todo().map_or(true, |todo| !todo.matches(&query));
 
-        self.tree_search.tree_search(query, self.todo_app.current_list(), Rc::clone(self.todo_app.get_restriction()));
+        self.tree_search.search(query, self.todo_app.current_list(), Rc::clone(self.todo_app.get_restriction()));
         if current_not_matches {
             self.tree_search.next();
             self.tree_search.set_to_app(self.todo_app);

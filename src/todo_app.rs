@@ -676,26 +676,21 @@ impl App {
     }
 }
 
-#[cfg(test)]
-mod tests {
+pub mod test_helpers {
+    use super::*;
     use std::{
-        fs::{self, remove_dir_all},
+        fs,
+        io,
         path::Path,
     };
-
     use clap::Parser;
-
-    use crate::date;
-
-    use super::*;
-
-    fn dir(dir_name: &str) -> io::Result<PathBuf> {
+    pub fn dir(dir_name: &str) -> io::Result<PathBuf> {
         let path = PathBuf::from(dir_name);
         fs::create_dir_all(path.join("notes"))?;
         Ok(path)
     }
 
-    fn get_test_app(args: AppArgs) -> io::Result<App> {
+    pub fn get_test_app(args: AppArgs) -> io::Result<App> {
         let mut app = App::new(args);
         app.append(String::from("Hello"));
         app.append(String::from("Goodbye"));
@@ -719,7 +714,7 @@ mod tests {
         Ok(app)
     }
 
-    fn write_test_todos(dir: &Path) -> io::Result<App> {
+    pub fn write_test_todos(dir: &Path) -> io::Result<App> {
         let mut args = AppArgs::parse();
         fs::create_dir_all(dir.join("notes"))?;
         args.todo_path = dir.join("todo");
@@ -727,6 +722,14 @@ mod tests {
         app.write()?;
         Ok(app)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{self, remove_dir_all};
+    use super::test_helpers::*;
+    use crate::date;
+    use super::*;
 
     #[test]
     fn test_is_changed() -> io::Result<()> {
