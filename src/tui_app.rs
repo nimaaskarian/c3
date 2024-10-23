@@ -1,5 +1,9 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
+#[cfg(unix)] 
+use nix::unistd::getpid;
+#[cfg(unix)]
+use nix::sys::signal::{Signal, kill};
 use clap::Parser;
 use crossterm::{
     event::{
@@ -8,10 +12,11 @@ use crossterm::{
         KeyCode::{self, Char},
         KeyModifiers,
     },
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{prelude::*, widgets::*};
+use std::io::Write;
 use std::{
     io::{self, BufRead, BufReader},
     path::PathBuf,
@@ -503,6 +508,12 @@ impl<'a> TuiApp<'a> {
         if let Key(key) = event {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
+                    #[cfg(unix)]
+                    Char('z') if key.modifiers == KeyModifiers::CONTROL => {
+                        shutdown()?;
+                        let _ = kill(getpid(), Signal::SIGTSTP);
+                        return Ok(HandlerOperation::Restart);
+                    }
                     Char('o') if key.modifiers == KeyModifiers::CONTROL => {
                         self.nnn_open();
                         return Ok(HandlerOperation::Restart);
@@ -801,25 +812,19 @@ pub fn create_todo_widget(
 }
 
 pub fn shutdown() -> io::Result<()> {
-    disable_raw_mode()?;
+    terminal::disable_raw_mode()?;
     io::stdout()
         .execute(LeaveAlternateScreen)?
         .execute(crossterm::cursor::Show)?;
+    io::stdout().flush();
     Ok(())
 }
 
 pub fn startup() -> io::Result<()> {
-    enable_raw_mode()?;
+    terminal::enable_raw_mode()?;
     io::stdout()
         .execute(EnterAlternateScreen)?
         .execute(crossterm::cursor::Hide)?;
-    Ok(())
-}
-
-#[inline]
-pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
-    terminal.clear()?;
-    startup()?;
     Ok(())
 }
 
@@ -836,7 +841,10 @@ pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
 
         let operation = app.handle_key_and_return_operation()?;
         match operation {
-            HandlerOperation::Restart => restart(&mut terminal)?,
+            HandlerOperation::Restart => {
+                startup();
+                terminal.swap_buffers();
+            }
             HandlerOperation::Nothing => {}
         }
     }
