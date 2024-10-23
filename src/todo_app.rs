@@ -194,7 +194,8 @@ impl App {
         let new_messages =
             fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
-        self.batch_edit_current_list(new_messages)
+        self.batch_edit_current_list(new_messages);
+        self.fix_index();
     }
 
     #[inline(always)]
@@ -206,6 +207,10 @@ impl App {
             .flat_map(|message| message.parse::<IndexedLine>())
             .collect();
         lines.sort_by_key(|a| a.index);
+        if !todolist.todos.is_empty() && lines.is_empty() {
+            todolist.todos = vec![];
+            changed = true;
+        }
 
         let mut last_index = 0;
         for line in lines {
