@@ -21,12 +21,12 @@ pub fn open_temp_editor(content: Option<&str>, path: PathBuf) -> io::Result<Stri
     if let Some(content) = content {
         write!(file, "{content}")?;
     }
-    let editor = if cfg!(windows) {
+    let default_editor = if cfg!(windows) {
         String::from("notepad")
     } else {
-        env::var("EDITOR").unwrap_or(String::from("vim"))
+        String::from("vim")
     };
-    Command::new(editor)
+    Command::new(env::var("EDITOR").unwrap_or(default_editor))
         .arg(&path)
         .status()
         .expect("Couldn't open the editor.");
