@@ -501,6 +501,7 @@ mod tests {
             .dependency
             .as_mut()
             .unwrap()
+            .todo_list
             .push(Todo::from_str("[0] Some dependency").unwrap());
         todo_list.write(&path)?;
         let dependency_path = fileio::append_notes_to_path_parent(&path);

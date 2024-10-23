@@ -1,18 +1,19 @@
 diff --git a/Cargo.lock b/Cargo.lock
-index 8bd32b6..c01bbf4 100644
+index 668bcbe..a72483b 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -141,7 +141,9 @@ dependencies = [
+@@ -141,8 +141,10 @@ dependencies = [
   "criterion",
   "crossterm",
   "home",
 + "jalali-date",
+  "nix",
   "ratatui",
 + "scanf",
   "sha1",
   "tui-textarea",
  ]
-@@ -523,6 +525,12 @@ version = "1.0.11"
+@@ -530,6 +532,12 @@ version = "1.0.11"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
  
@@ -25,7 +26,7 @@ index 8bd32b6..c01bbf4 100644
  [[package]]
  name = "js-sys"
  version = "0.3.70"
-@@ -569,6 +577,12 @@ version = "2.7.4"
+@@ -576,6 +584,12 @@ version = "2.7.4"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
  
@@ -38,8 +39,8 @@ index 8bd32b6..c01bbf4 100644
  [[package]]
  name = "mio"
  version = "0.8.10"
-@@ -581,6 +595,16 @@ dependencies = [
-  "windows-sys 0.48.0",
+@@ -600,6 +614,16 @@ dependencies = [
+  "libc",
  ]
  
 +[[package]]
@@ -55,7 +56,7 @@ index 8bd32b6..c01bbf4 100644
  [[package]]
  name = "num-traits"
  version = "0.2.17"
-@@ -775,6 +799,15 @@ dependencies = [
+@@ -794,6 +818,15 @@ dependencies = [
   "winapi-util",
  ]
  
@@ -72,7 +73,7 @@ index 8bd32b6..c01bbf4 100644
  name = "scopeguard"
  version = "1.2.0"
 diff --git a/Cargo.toml b/Cargo.toml
-index 1e35659..2aea84d 100644
+index fe6efc2..875e155 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -12,6 +12,8 @@ tui-textarea = "0.4.0"

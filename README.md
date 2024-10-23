@@ -79,6 +79,7 @@ The default mode of the app is TUI mode. Keybinds are vim-like. Here they are:
 | O | open nnn file picker to choose a file to output current list to |
 | Ctrl+o | open nnn file picker to choose a file to open |
 | Ctrl+d | sort by todo's abandonment (how hasn't been done compared to their schedule) |
+| Ctrl+z | suspend (send current c3 to background, only in *nix) |
 | w | write changes to file |
 | R | read from file (discard changes)|
 

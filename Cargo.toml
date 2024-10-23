@@ -1,6 +1,6 @@
 [package]
 name = "c3"
-version = "1.6.0"
+version = "1.7.0"
 edition = "2021"
 
 [dependencies]
@@ -25,3 +25,6 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "bench_500k"
 harness = false
+
+[target.'cfg(unix)'.dependencies]
+nix = {version = "0.29.0", features = ["process", "signal"]}

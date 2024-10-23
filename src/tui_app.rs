@@ -1,5 +1,9 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
+#[cfg(unix)] 
+use nix::unistd::getpid;
+#[cfg(unix)]
+use nix::sys::signal::{Signal, kill};
 use clap::Parser;
 use crossterm::{
     event::{
@@ -8,10 +12,11 @@ use crossterm::{
         KeyCode::{self, Char},
         KeyModifiers,
     },
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{prelude::*, widgets::*};
+use std::io::Write;
 use std::{
     io::{self, BufRead, BufReader},
     path::PathBuf,
@@ -20,6 +25,10 @@ use std::{
 };
 use tui_textarea::{CursorMove, Input, TextArea};
 mod potato;
+mod todo_buffer;
+use todo_buffer::TodoBuffer;
+mod tree_search;
+pub use tree_search::TreeSearch;
 use c3::{
     date,
     todo_app::{App, Restriction, Schedule, Todo},
@@ -50,6 +59,8 @@ enum Mode {
 }
 
 pub struct TuiApp<'a> {
+    tree_search: TreeSearch,
+    todo_buffer: TodoBuffer,
     last_restriction: Option<Restriction>,
     show_right: bool,
     mode: Mode,
@@ -84,6 +95,8 @@ impl<'a> TuiApp<'a> {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
         TuiApp {
+            tree_search: Default::default(),
+            todo_buffer: Default::default(),
             todo_app: app,
             args,
             textarea,
@@ -107,7 +120,7 @@ impl<'a> TuiApp<'a> {
         let size = self
             .todo_app
             .current_list()
-            .len(self.todo_app.restriction());
+            .len(self.todo_app.get_restriction());
         let todo_string = format!("Todos ({size}){changed_str}");
 
         if let Some(parent) = self.todo_app.parent() {
@@ -165,7 +178,7 @@ impl<'a> TuiApp<'a> {
     pub fn search_prompt(&mut self) {
         const TITLE: &str = "Search todo";
         const PLACEHOLDER: &str = "Enter search query";
-        self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.last_restriction = Some(Rc::clone(self.todo_app.get_restriction()));
         self.on_submit = None;
         self.set_responsive_text_mode(Self::on_search, TITLE, PLACEHOLDER);
         self.on_delete = Some(Self::on_search_delete);
@@ -208,8 +221,14 @@ impl<'a> TuiApp<'a> {
     }
 
     #[inline]
-    fn on_tree_search(&mut self, str: String) {
-        self.todo_app.tree_search(str);
+    fn on_tree_search(&mut self, query: String) {
+        let current_not_matches = self.todo_app.todo().map_or(true, |todo| !todo.matches(&query));
+
+        self.tree_search.search(query, self.todo_app.current_list(), Rc::clone(self.todo_app.get_restriction()));
+        if current_not_matches {
+            self.tree_search.next();
+            self.tree_search.set_to_app(self.todo_app);
+        }
     }
 
     #[inline]
@@ -306,7 +325,7 @@ impl<'a> TuiApp<'a> {
     pub fn priority_prompt(&mut self) {
         const TITLE: &str = "Limit priority";
         const PLACEHOLDER: &str = "Enter priority to show";
-        self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.last_restriction = Some(self.todo_app.get_restriction().clone());
         self.set_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
         self.set_responsive_text_mode(Self::on_priority_prompt, TITLE, PLACEHOLDER);
         self.on_delete = Some(Self::on_priority_delete);
@@ -316,7 +335,7 @@ impl<'a> TuiApp<'a> {
     pub fn schedule_restriction_prompt(&mut self) {
         const TITLE: &str = "Limit schedule";
         const PLACEHOLDER: &str = "Enter schedule to show";
-        self.last_restriction = Some(self.todo_app.restriction().clone());
+        self.last_restriction = Some(self.todo_app.get_restriction().clone());
         self.set_text_mode(Self::on_schedule_prompt, TITLE, PLACEHOLDER);
         self.set_responsive_text_mode(Self::on_schedule_prompt, TITLE, PLACEHOLDER);
         self.on_delete = Some(Self::on_priority_delete);
@@ -489,11 +508,22 @@ impl<'a> TuiApp<'a> {
         if let Key(key) = event {
             if key.kind == event::KeyEventKind::Press {
                 match key.code {
+                    #[cfg(unix)]
+                    Char('z') if key.modifiers == KeyModifiers::CONTROL => {
+                        shutdown()?;
+                        let _ = kill(getpid(), Signal::SIGTSTP);
+                        return Ok(HandlerOperation::Restart);
+                    }
                     Char('o') if key.modifiers == KeyModifiers::CONTROL => {
                         self.nnn_open();
                         return Ok(HandlerOperation::Restart);
                     }
-                    Char('x') => self.todo_app.cut_todo(),
+                    Char('x') => {
+                        self.todo_app.remove_todo();
+                        if let Some(todo) = self.todo_app.removed_todos.pop() {
+                            self.todo_buffer.yank(todo);
+                        }
+                    },
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
                     Char('S') => self.schedule_prompt(),
@@ -506,10 +536,19 @@ impl<'a> TuiApp<'a> {
                     Char('!') => self.todo_app.toggle_show_done(),
                     Char('@') => self.priority_prompt(),
                     Char('%') => self.schedule_restriction_prompt(),
-                    Char('y') => self.todo_app.yank_todo(),
-                    Char('p') => self.todo_app.paste_todo(),
-                    Char('i') => self.todo_app.increase_day_done(),
-                    Char('I') => self.todo_app.decrease_day_done(),
+                    Char('y') => {
+                        let todo = self.todo_app.todo().cloned();
+                        self.todo_buffer.yank(todo);
+                    }
+                    Char('p') => {
+                        if let Some(todo) = self.todo_buffer.get() {
+                            let list = self.todo_app.current_list_mut();
+                            list.push(todo);
+                            self.todo_app.index = list.reorder_last();
+                        }
+                    }
+                    Char('i') => self.todo_app.increase_day_by(1),
+                    Char('I') => self.todo_app.increase_day_by(-1),
                     Char('o') => {
                         self.nnn_append_todo();
                         return Ok(HandlerOperation::Restart);
@@ -545,7 +584,10 @@ impl<'a> TuiApp<'a> {
                     Char('R') => self.todo_app.read(),
                     Char('T') => self.todo_app.remove_current_dependent(),
                     Char(' ') => self.todo_app.toggle_current_done(),
-                    Char('n') => self.todo_app.search_next(),
+                    Char('n') => {
+                        self.tree_search.next();
+                        self.tree_search.set_to_app(self.todo_app);
+                    }
                     Char('a') => self.prepend_prompt(),
                     Char('/') => self.search_prompt(),
                     Char('?') => self.tree_search_prompt(),
@@ -648,7 +690,7 @@ impl<'a> TuiApp<'a> {
             let last = self
                 .todo_app
                 .current_list()
-                .len(self.todo_app.restriction())
+                .len(self.todo_app.get_restriction())
                 .min(todo_layout.height as usize + first - 2);
             self.todo_app.display_a_slice(self.todo_app.current_list(), first, last)
         } else {
@@ -770,25 +812,19 @@ pub fn create_todo_widget(
 }
 
 pub fn shutdown() -> io::Result<()> {
-    disable_raw_mode()?;
+    terminal::disable_raw_mode()?;
     io::stdout()
         .execute(LeaveAlternateScreen)?
         .execute(crossterm::cursor::Show)?;
+    io::stdout().flush();
     Ok(())
 }
 
 pub fn startup() -> io::Result<()> {
-    enable_raw_mode()?;
+    terminal::enable_raw_mode()?;
     io::stdout()
         .execute(EnterAlternateScreen)?
         .execute(crossterm::cursor::Hide)?;
-    Ok(())
-}
-
-#[inline]
-pub fn restart(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
-    terminal.clear()?;
-    startup()?;
     Ok(())
 }
 
@@ -805,7 +841,10 @@ pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
 
         let operation = app.handle_key_and_return_operation()?;
         match operation {
-            HandlerOperation::Restart => restart(&mut terminal)?,
+            HandlerOperation::Restart => {
+                startup();
+                terminal.swap_buffers();
+            }
             HandlerOperation::Nothing => {}
         }
     }

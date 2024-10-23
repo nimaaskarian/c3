@@ -1,7 +1,6 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
 use std::cmp;
-use std::collections::VecDeque;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::str::{FromStr, Lines};
@@ -13,15 +12,8 @@ mod todo_list;
 use crate::{fileio, AppArgs};
 use std::rc::Rc;
 pub use todo::Todo;
-
 pub use self::todo_list::TodoList;
 // }}}
-
-#[derive(Clone)]
-struct SearchPosition {
-    tree_path: Vec<usize>,
-    matching_indices: Vec<usize>,
-}
 
 #[derive(ValueEnum, Clone, Debug, PartialEq, Default)]
 pub enum SortMethod {
@@ -30,6 +22,8 @@ pub enum SortMethod {
     Normal,
     #[value(alias = "a", alias = "abandoned")]
     AbandonedFirst,
+    #[value(alias = "nta")]
+    NormalThenAbandoned,
 }
 
 impl SortMethod {
@@ -46,6 +40,15 @@ impl SortMethod {
                 }
             },
             Self::Normal => |a: &Todo, b: &Todo| a.cmp(b),
+            Self::NormalThenAbandoned => |a: &Todo, b: &Todo| {
+                let order = a.cmp(b);
+                if order.is_eq() {
+                    b.abandonment_coefficient()
+                    .total_cmp(&a.abandonment_coefficient())
+                } else {
+                    order
+                }
+            }
         }
     }
 }
@@ -53,16 +56,12 @@ impl SortMethod {
 pub type Restriction = Rc<dyn Fn(&Todo) -> bool>;
 pub struct App {
     notes_dir: PathBuf,
-    yanked_todo: Option<Todo>,
     pub todo_list: TodoList,
     pub index: usize,
     changed: bool,
-    tree_path: Vec<usize>,
+    pub tree_path: Vec<usize>,
     pub args: AppArgs,
-    removed_todos: Vec<Todo>,
-    tree_search_positions: Vec<SearchPosition>,
-    x_index: usize,
-    y_index: usize,
+    pub removed_todos: Vec<Todo>,
     restriction: Restriction,
 }
 
@@ -115,11 +114,7 @@ impl App {
         let notes_dir = fileio::append_notes_to_path_parent(&args.todo_path);
         let todo_list = Self::read_a_todo_list(&args.todo_path, &notes_dir, &args);
         let mut app = App {
-            yanked_todo: None,
             notes_dir,
-            x_index: 0,
-            y_index: 0,
-            tree_search_positions: vec![],
             removed_todos: vec![],
             todo_list,
             index: 0,
@@ -153,7 +148,7 @@ impl App {
     }
 
     #[inline]
-    pub fn restriction(&self) -> &Restriction {
+    pub fn get_restriction(&self) -> &Restriction {
         &self.restriction
     }
 
@@ -186,59 +181,21 @@ impl App {
         self.set_restriction(Rc::new(move |todo| restriction(todo) && last_restriction(todo)))
     }
 
-    pub fn tree_search(&mut self, query: String) {
-        self.tree_search_positions = vec![];
-        self.y_index = 0;
-        self.x_index = 0;
-        if query.is_empty() {
-            return;
-        }
-        let current_not_matches = self.todo().map_or(true, |todo| !todo.matches(&query));
-        self.search_tree(query);
-
-        if current_not_matches {
-            self.search_next();
-        }
-    }
-
-    pub fn search_tree(&mut self, query: String) {
-        let mut lists: VecDeque<(Vec<usize>, &TodoList)> =
-            VecDeque::from([(vec![], &self.todo_list)]);
-        while let Some((indices, current_list)) = lists.pop_back() {
-            let mut matching_indices: Vec<usize> = vec![];
-            for (i, todo) in current_list.filter(&self.restriction).enumerate() {
-                let mut todo_indices = indices.clone();
-                todo_indices.push(i);
-                if todo.matches(&query) {
-                    matching_indices.push(i)
-                }
-                if let Some(list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
-                    lists.push_back((todo_indices, list))
-                }
-            }
-            if !matching_indices.is_empty() {
-                self.tree_search_positions.push(SearchPosition {
-                    tree_path: indices.to_vec(),
-                    matching_indices,
-                })
-            }
-        }
-    }
-
     pub fn batch_editor_messages(&mut self) {
-        let content = String::from("# INDEX PRIORITY MESSAGE\n")
-            + self
+        let max_index = self.current_list().todos.len()-1;
+        let index_length = (max_index.checked_ilog10().unwrap_or(0)+1) as usize;
+        let content = self
                 .current_list()
                 .iter()
                 .enumerate()
-                .map(|(i, x)| format!("{i: <7} {: <8} {}", x.priority(), x.message))
+                .map(|(i, x)| format!("{i:0index_length$} {} {}", x.priority(), x.message))
                 .collect::<Vec<String>>()
-                .join("\n")
-                .as_str();
+                .join("\n");
         let new_messages =
             fileio::open_temp_editor(Some(&content), fileio::temp_path("messages")).unwrap();
         let new_messages = new_messages.lines();
-        self.batch_edit_current_list(new_messages)
+        self.batch_edit_current_list(new_messages);
+        self.fix_index();
     }
 
     #[inline(always)]
@@ -247,10 +204,13 @@ impl App {
         let mut delete_indices: Vec<usize> = vec![];
         let mut changed = false;
         let mut lines: Vec<IndexedLine> = messages
-            .filter(|message| !message.starts_with('#'))
             .flat_map(|message| message.parse::<IndexedLine>())
             .collect();
         lines.sort_by_key(|a| a.index);
+        if !todolist.todos.is_empty() && lines.is_empty() {
+            todolist.todos = vec![];
+            changed = true;
+        }
 
         let mut last_index = 0;
         for line in lines {
@@ -284,27 +244,14 @@ impl App {
     }
 
     #[inline]
-    pub fn is_current_changed(&self) -> bool {
-        self.current_list().changed
-    }
-
-    #[inline]
     pub fn is_changed(&self) -> bool {
         self.changed
     }
 
-    #[inline]
-    pub fn increase_day_done(&mut self) {
+    #[inline(always)]
+    pub fn increase_day_by(&mut self, days: i64) {
         if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
-            schedule.add_days_to_date(-1);
-            self.reorder_current();
-        }
-    }
-
-    #[inline]
-    pub fn decrease_day_done(&mut self) {
-        if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
-            schedule.add_days_to_date(1);
+            schedule.add_days_to_date(-1*days);
             self.reorder_current();
         }
     }
@@ -340,32 +287,6 @@ impl App {
         }
     }
 
-    #[inline]
-    pub fn search_next(&mut self) {
-        if !self.tree_search_positions.is_empty() {
-            let x_size = self.tree_search_positions.len();
-            let y_size = self.tree_search_positions[self.x_index]
-                .matching_indices
-                .len();
-            if self.x_index + 1 < x_size {
-                self.x_index += 1
-            } else if self.y_index + 1 < y_size {
-                self.y_index += 1
-            } else {
-                self.y_index = 0;
-                self.x_index = 0;
-            }
-            self.set_tree_search_position();
-        }
-    }
-
-    #[inline]
-    fn set_tree_search_position(&mut self) {
-        let item = &self.tree_search_positions[self.x_index];
-        self.tree_path.clone_from(&item.tree_path);
-        self.index = item.matching_indices[self.y_index];
-    }
-
     fn max_tree_length(&self) -> usize {
         let mut current_list = &self.todo_list;
         let mut max_i = 0;
@@ -388,7 +309,6 @@ impl App {
     pub fn toggle_current_done(&mut self) {
         self.todo_mut().unwrap().toggle_done();
         self.reorder_current();
-        self.fix_index();
         while self.is_undone_empty() && self.traverse_up() {
             self.toggle_current_done()
         }
@@ -647,6 +567,7 @@ impl App {
         let index = self.index;
         let index = self.current_list_mut().reorder(index);
         self.set_index_in_bound(index);
+        self.fix_index();
     }
 
     #[inline]
@@ -659,15 +580,6 @@ impl App {
             self.fix_index();
         }
     }
-
-    #[inline]
-    pub fn cut_todo(&mut self) {
-        self.remove_todo();
-        if let Some(todo) = self.removed_todos.pop() {
-            self.yanked_todo = Some(todo)
-        }
-    }
-
 
     #[inline(always)]
     pub fn display_current_list(&self) -> Vec<String> {
@@ -760,22 +672,6 @@ impl App {
     }
 
     #[inline]
-    pub fn yank_todo(&mut self) {
-        if let Some(todo) = self.todo() {
-            self.yanked_todo = Some(todo.clone());
-        }
-    }
-
-    #[inline]
-    pub fn paste_todo(&mut self) {
-        if let Some(todo) = self.yanked_todo.clone() {
-            let list = &mut self.current_list_mut();
-            list.push(todo.clone());
-            self.index = list.reorder_last();
-        }
-    }
-
-    #[inline]
     pub fn add_dependency_traverse_down(&mut self) {
         if self.is_tree() {
             // The reason we are using a self.todo() here, is that if we don't want to
@@ -790,26 +686,21 @@ impl App {
     }
 }
 
-#[cfg(test)]
-mod tests {
+pub mod test_helpers {
+    use super::*;
     use std::{
-        fs::{self, remove_dir_all},
+        fs,
+        io,
         path::Path,
     };
-
     use clap::Parser;
-
-    use crate::date;
-
-    use super::*;
-
-    fn dir(dir_name: &str) -> io::Result<PathBuf> {
+    pub fn dir(dir_name: &str) -> io::Result<PathBuf> {
         let path = PathBuf::from(dir_name);
         fs::create_dir_all(path.join("notes"))?;
         Ok(path)
     }
 
-    fn get_test_app(args: AppArgs) -> io::Result<App> {
+    pub fn get_test_app(args: AppArgs) -> io::Result<App> {
         let mut app = App::new(args);
         app.append(String::from("Hello"));
         app.append(String::from("Goodbye"));
@@ -833,7 +724,7 @@ mod tests {
         Ok(app)
     }
 
-    fn write_test_todos(dir: &Path) -> io::Result<App> {
+    pub fn write_test_todos(dir: &Path) -> io::Result<App> {
         let mut args = AppArgs::parse();
         fs::create_dir_all(dir.join("notes"))?;
         args.todo_path = dir.join("todo");
@@ -841,6 +732,14 @@ mod tests {
         app.write()?;
         Ok(app)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{self, remove_dir_all};
+    use super::test_helpers::*;
+    use crate::date;
+    use super::*;
 
     #[test]
     fn test_is_changed() -> io::Result<()> {
@@ -864,11 +763,11 @@ mod tests {
         let dir = dir("test-set-restrictions-done")?;
         let mut app = write_test_todos(&dir)?;
         app.toggle_current_done();
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         app.toggle_show_done();
-        assert_eq!(app.current_list().len(app.restriction()), 3);
+        assert_eq!(app.current_list().len(app.get_restriction()), 3);
         app.toggle_show_done();
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         remove_dir_all(dir)?;
         Ok(())
     }
@@ -877,19 +776,19 @@ mod tests {
     fn test_set_restrictions_query() -> io::Result<()> {
         let dir = dir("test-set-restrictions-query")?;
         let mut app = write_test_todos(&dir)?;
-        assert_eq!(app.current_list().len(app.restriction()), 3);
+        assert_eq!(app.current_list().len(app.get_restriction()), 3);
         let restriction: Restriction = Rc::new(|todo| todo.matches("hello"));
         app.set_restriction(Rc::clone(&restriction));
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         assert_eq!(app.index, 1);
         app.traverse_down();
         app.unset_restriction();
         app.traverse_up();
         app.set_restriction(restriction);
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         assert_eq!(app.index, 1);
         app.add_dependency_traverse_down();
-        assert_eq!(app.current_list().len(app.restriction()), 1);
+        assert_eq!(app.current_list().len(app.get_restriction()), 1);
         remove_dir_all(dir)?;
         Ok(())
     }
@@ -899,30 +798,17 @@ mod tests {
         let dir = dir("test-set-restrictions-priority")?;
         let mut app = write_test_todos(&dir)?;
         app.set_current_priority(2);
-        assert_eq!(app.current_list().len(app.restriction()), 3);
+        assert_eq!(app.current_list().len(app.get_restriction()), 3);
         let restrict_with_priority: fn(u8) -> Restriction = |priority| Rc::new(move |todo| todo.priority() == priority);
         app.set_restriction(restrict_with_priority(2));
 
-        assert_eq!(app.current_list().len(app.restriction()), 1);
+        assert_eq!(app.current_list().len(app.get_restriction()), 1);
         app.set_restriction_with_last(restrict_with_priority(0), None);
-        assert_eq!(app.current_list().len(app.restriction()), 0);
+        assert_eq!(app.current_list().len(app.get_restriction()), 0);
         app.update_show_done_restriction();
         app.set_restriction_with_last(restrict_with_priority(0), None);
-        assert_eq!(app.current_list().len(app.restriction()), 2);
+        assert_eq!(app.current_list().len(app.get_restriction()), 2);
         remove_dir_all(dir)?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_tree_search() -> io::Result<()> {
-        let dir = dir("test-tree-search")?;
-        let mut app = write_test_todos(&dir)?;
-        remove_dir_all(dir)?;
-        let query = String::from("nod");
-        app.tree_search(query);
-        let position = &app.tree_search_positions[0];
-        assert_eq!(position.tree_path, vec![2, 0]);
-        assert_eq!(position.matching_indices, vec![0]);
         Ok(())
     }
 
