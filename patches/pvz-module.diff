@@ -1,0 +1,122 @@
+diff --git a/src/tui_app/potato.rs b/src/tui_app/potato.rs
+index 8e82ba0..6c1f691 100644
+--- a/src/tui_app/potato.rs
++++ b/src/tui_app/potato.rs
+@@ -7,41 +7,26 @@ use std::process::{Command, Output};
+ //}}}
+ 
+ #[derive(Default)]
+-pub struct Potato {
+-    index: usize,
+-}
++pub struct Potato;
+ 
+ impl Potato {
+     #[inline]
+-    fn run(&self, args: Vec<String>) {
+-        let _ = Command::new("potctl").args(args).status();
+-    }
+-
+-    #[inline]
+-    fn output(&self, args: Vec<String>) -> io::Result<Output> {
+-        Command::new("potctl").args(args).output()
+-    }
+-
+-    #[inline]
+-    fn len(&self) -> usize {
+-        match self.output(vec![]) {
+-            Ok(output) => String::from_utf8(output.stdout).unwrap().lines().count() - 1,
+-            Err(_) => 0,
+-        }
++    fn run(&self, args: &[&str]) {
++        let _ = Command::new("pvzctl").args(args).status();
+     }
+ 
+     #[inline]
+-    fn resolve_arg(&self, arg: &str) -> String {
+-        format!("-{arg}{}", self.index)
++    fn output(&self, args: &[&str]) -> io::Result<Output> {
++        Command::new("pvzctl").args(args).output()
+     }
+ 
+     #[inline]
+     pub fn get_widget(&self) -> Paragraph {
+-        let args = vec!["+%m\n%t\n%p".to_string(), self.resolve_arg("1")];
++        let args = &["-f", "%m\n%t\n%p", "-r", "get_timer"];
+ 
+         let time_str = match self.output(args) {
+             Ok(output) => String::from_utf8(output.stdout).unwrap(),
+-            Err(_) => String::from("potctl command not found at path."),
++            Err(_) => String::from("pvzctl command not found at path."),
+         };
+ 
+         Paragraph::new(time_str).block(default_block("Potato"))
+@@ -49,60 +34,50 @@ impl Potato {
+ 
+     #[inline]
+     pub fn decrease_timer(&self) {
+-        self.run(vec![self.resolve_arg("d")])
++        self.run(&["-r", "seek"])
+     }
+ 
+     #[inline]
+     pub fn toggle_pause(&self) {
+-        self.run(vec![self.resolve_arg("t")])
++        self.run(&["-r", "toggle"])
+     }
+ 
+     #[inline]
+     pub fn increase_timer(&self) {
+-        self.run(vec![self.resolve_arg("i")])
++        self.run(&["-r", "seek_back"])
+     }
+ 
+     #[inline]
+     pub fn increase_pomodoro(&self) {
+-        self.run(vec![self.resolve_arg("I")])
++        self.run(&["-r", "add_session"])
+     }
+ 
+     #[inline]
+     pub fn decrease_pomodoro(&self) {
+-        self.run(vec![self.resolve_arg("D")])
++        self.run(&["-r", "sub_session"])
+     }
+ 
+     #[inline]
+     pub fn skip(&self) {
+-        self.run(vec![self.resolve_arg("s")])
++        self.run(&["-r", "skip"])
+     }
+ 
+     #[inline]
+     pub fn restart(&self) {
+-        self.run(vec![self.resolve_arg("r")])
++        self.run(&["-r", "reset"])
+     }
+ 
+     #[inline]
+     pub fn next(&mut self) {
+-        if self.index < self.len() - 1 {
+-            self.index += 1
+-        } else {
+-            self.index = 0
+-        }
+     }
+ 
+     #[inline]
+     pub fn prev(&mut self) {
+-        if self.index > 0 {
+-            self.index -= 1
+-        } else {
+-            self.index = self.len() - 1;
+-        }
+     }
+ 
+     #[inline]
+     pub fn quit(&mut self) {
+-        self.run(vec![self.resolve_arg("q")])
++        self.run(&["-r", "quit"])
+     }
+ 
+     #[inline(always)]
