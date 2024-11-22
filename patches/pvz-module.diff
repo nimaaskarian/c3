@@ -1,5 +1,5 @@
 diff --git a/src/tui_app/potato.rs b/src/tui_app/potato.rs
-index 8e82ba0..94794df 100644
+index 8e82ba0..4e3f33b 100644
 --- a/src/tui_app/potato.rs
 +++ b/src/tui_app/potato.rs
 @@ -6,103 +6,91 @@ use std::io;
@@ -67,7 +67,7 @@ index 8e82ba0..94794df 100644
      #[inline]
      pub fn decrease_timer(&self) {
 -        self.run(vec![self.resolve_arg("d")])
-+        self.run(&["-r", "seek"])
++        self.run(&["-r", "seek_back"])
      }
  
      #[inline]
@@ -79,7 +79,7 @@ index 8e82ba0..94794df 100644
      #[inline]
      pub fn increase_timer(&self) {
 -        self.run(vec![self.resolve_arg("i")])
-+        self.run(&["-r", "seek_back"])
++        self.run(&["-r", "seek"])
      }
  
      #[inline]
