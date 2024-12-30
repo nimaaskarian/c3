@@ -307,10 +307,12 @@ impl App {
 
     #[inline]
     pub fn toggle_current_done(&mut self) {
-        self.todo_mut().unwrap().toggle_done();
-        self.reorder_current();
-        while self.is_undone_empty() && self.traverse_up() {
-            self.toggle_current_done()
+        if let Some(todo) = self.todo_mut() {
+            todo.toggle_done();
+            self.reorder_current();
+            while self.is_undone_empty() && self.traverse_up() {
+                self.toggle_current_done()
+            }
         }
     }
 
