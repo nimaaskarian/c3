@@ -52,6 +52,9 @@ pub fn fzf_search(app: &mut App) {
     }
     mem::drop(stdin);
     handle.join();
-    app.index = fzf_indices.lock().unwrap().pop().unwrap();
-    app.tree_path.append(fzf_indices.lock().unwrap().as_mut());
+    let mut indices = fzf_indices.lock().unwrap();
+    if let Some(item) = indices.pop() {
+        app.index = item;
+        app.tree_path.append(indices.as_mut());
+    }
 }
