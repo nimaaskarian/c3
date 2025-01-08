@@ -58,7 +58,6 @@ pub struct App {
     notes_dir: PathBuf,
     pub todo_list: TodoList,
     pub index: usize,
-    changed: bool,
     pub tree_path: Vec<usize>,
     pub args: AppArgs,
     pub removed_todos: Vec<Todo>,
@@ -119,7 +118,6 @@ impl App {
             todo_list,
             index: 0,
             tree_path: vec![],
-            changed: false,
             args,
             restriction: Self::no_restriction(),
         };
@@ -235,7 +233,6 @@ impl App {
         if todolist.changed {
             todolist.sort();
         }
-        self.changed = todolist.changed;
     }
 
     #[inline]
@@ -245,7 +242,19 @@ impl App {
 
     #[inline]
     pub fn is_changed(&self) -> bool {
-        self.changed
+        let mut stack: Vec<&TodoList> = Vec::with_capacity(self.todo_list.todos.len());
+        stack.push(&self.todo_list);
+        while let Some(list) = stack.pop() {
+            if list.changed {
+                return true;
+            }
+            for dep in list.todos.iter().flat_map(|t| t.dependency.as_ref()) {
+                if dep.is_list() {
+                    stack.push(&dep.todo_list);
+                }
+            }
+        }
+        false
     }
 
     #[inline(always)]
@@ -318,7 +327,6 @@ impl App {
 
     #[inline]
     pub fn read(&mut self) {
-        self.changed = false;
         self.todo_list = Self::read_a_todo_list(&self.args.todo_path, &self.notes_dir, &self.args);
         let len = self.max_tree_length();
         self.tree_path.truncate(len);
@@ -438,7 +446,6 @@ impl App {
 
     #[inline]
     pub fn current_list_mut(&mut self) -> &mut TodoList {
-        self.changed = true;
         let is_root = self.is_root();
         if is_root {
             return &mut self.todo_list;
@@ -493,7 +500,6 @@ impl App {
         if self.is_tree() {
             self.todo_list.write_dependencies(&note_dir)?;
         }
-        self.changed = false;
         Ok(())
     }
 
@@ -612,11 +618,9 @@ impl App {
     pub fn edit_or_add_note(&mut self) {
         if self.is_tree() {
             let list_changed = self.current_list().changed;
-            let changed = self.changed;
             if let Some(todo) = self.todo_mut() {
                 if !todo.edit_note().unwrap_or_default() {
                     self.current_list_mut().changed = list_changed;
-                    self.changed = changed;
                 }
             }
         }
@@ -677,7 +681,7 @@ impl App {
     pub fn add_dependency_traverse_down(&mut self) {
         if self.is_tree() {
             // The reason we are using a self.todo() here, is that if we don't want to
-            // change anything, we won't borrow mutable and set the self.changed=true
+            // change anything, we won't borrow mutable and set the todo_list.changed=true
             if let Some(todo) = self.todo() {
                 if todo.dependency.is_none() {
                     self.todo_mut().unwrap().add_todo_dependency();
