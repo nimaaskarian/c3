@@ -1,3 +1,4 @@
+use fzf_search::fzf_search;
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
 #[cfg(unix)] 
@@ -26,6 +27,7 @@ use std::{
 use tui_textarea::{CursorMove, Input, TextArea};
 mod potato;
 mod todo_buffer;
+mod fzf_search;
 use todo_buffer::TodoBuffer;
 mod tree_search;
 pub use tree_search::TreeSearch;
@@ -611,6 +613,7 @@ impl<'a> TuiApp<'a> {
                     Char('C') => self.potato_module.quit(),
                     Char('L') => self.potato_module.decrease_timer(),
                     Char('f') => self.potato_module.restart(),
+                    Char('F') => { let _ = fzf_search(self.todo_app); return Ok(HandlerOperation::Restart)},
                     Char('+') | Char('=') => self.potato_module.increase_pomodoro(),
                     Char('-') => self.potato_module.decrease_pomodoro(),
                     Char('.') => self.potato_module.next(),
