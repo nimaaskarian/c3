@@ -57,16 +57,19 @@ impl TodoList {
     pub fn index_mut(&mut self, index: usize, restriction: &Restriction) -> Option<&mut Output> {
         let size = self.len(restriction);
         let index = index.min(size);
-        self.changed = true;
 
-        self.todos
+        let out = self.todos
             .iter_mut()
             .filter(|todo| restriction(todo))
-            .nth(index)
+            .nth(index);
+        if out.is_some() {
+            self.changed = true;
+        }
+        out
     }
 
     #[inline(always)]
-    pub fn todos<'a>(&'a self, restriction: &'a Restriction) -> impl Iterator<Item = &Todo> {
+    pub fn todos<'a>(&'a self, restriction: &'a Restriction) -> impl Iterator<Item = &'a Todo> {
         self.todos.iter().filter(|todo| restriction(todo))
     }
 
@@ -74,7 +77,7 @@ impl TodoList {
     pub fn todos_mut<'a>(
         &'a mut self,
         restriction: &'a Restriction,
-    ) -> impl Iterator<Item = &mut Todo> {
+    ) -> impl Iterator<Item = &'a mut Todo> {
         self.todos.iter_mut().filter(|todo| restriction(todo))
     }
 
@@ -233,7 +236,7 @@ impl TodoList {
             .collect()
     }
 
-    pub fn filter<'a>(&'a self, restriction: &'a Restriction) -> impl Iterator<Item = &Todo> {
+    pub fn filter<'a>(&'a self, restriction: &'a Restriction) -> impl Iterator<Item = &'a Todo> {
         self.todos.iter().filter(|todo| restriction(todo))
     }
 
