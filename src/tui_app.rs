@@ -352,7 +352,7 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     pub fn quit_save_prompt(&mut self) {
-        if self.todo_app.is_changed() || self.todo_app.current_list().changed {
+        if self.todo_app.current_list().changed || self.todo_app.is_changed() {
             self.set_text_mode(
                 Self::on_save_prompt,
                 "You have done changes. You wanna save? [n: no, y: yes, c: cancel] (default: n)",
