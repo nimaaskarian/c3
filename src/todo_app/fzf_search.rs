@@ -29,11 +29,12 @@ pub fn fzf_search(app: &mut App) {
     });
     write_todos(app, &mut stdin, selected);
     mem::drop(stdin);
-    handle.join();
-    let mut indices = fzf_indices.lock().unwrap();
-    if let Some(item) = indices.pop() {
-        app.index = item;
-        app.tree_path.append(indices.as_mut());
+    if handle.join().is_ok() {
+        let mut indices = fzf_indices.lock().unwrap();
+        if let Some(item) = indices.pop() {
+            app.index = item;
+            app.tree_path.append(indices.as_mut());
+        }
     }
 }
 
@@ -56,7 +57,7 @@ pub fn write_todos(app: &App, dst: &mut impl io::Write, selected: Arc<Mutex<bool
                 break;
             }
             let current = todolist.true_position_in_list(index, app.get_restriction());
-            dst.write_all(format!("{indices},{current} {}\n",todo.display_with_args(&app.args.display_args)).as_bytes());
+            let _ = dst.write_all(format!("{indices},{current} {}\n",todo.display_with_args(&app.args.display_args)).as_bytes());
             if let Some(list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
                 let mut new_indices = indices.clone();
                 new_indices.push_str(&current.to_string());

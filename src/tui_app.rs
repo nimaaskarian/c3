@@ -16,7 +16,6 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{prelude::*, widgets::*};
-use std::fs::File;
 use std::io::Write;
 use std::process::Child;
 use std::{
@@ -618,7 +617,10 @@ impl<'a> TuiApp<'a> {
                     Char('C') => self.potato_module.quit(),
                     Char('L') => self.potato_module.decrease_timer(),
                     Char('f') => self.potato_module.restart(),
-                    Char('F') => { let _ = fzf_search(self.todo_app); return Ok(HandlerOperation::Restart)},
+                    Char('F') => { 
+                        fzf_search(self.todo_app);
+                        return Ok(HandlerOperation::Restart)
+                    },
                     Char('+') | Char('=') => self.potato_module.increase_pomodoro(),
                     Char('-') => self.potato_module.decrease_pomodoro(),
                     Char('.') => self.potato_module.next(),
@@ -672,7 +674,7 @@ impl<'a> TuiApp<'a> {
                 glow.stdin(Stdio::piped());
                 glow.stdout(Stdio::piped());
                 let mut glow_ps = glow.spawn();
-                glow_ps.as_mut().map(|ps| ps.stdin.as_mut().map(|stdin| stdin.write(note.as_bytes())));
+                let _ = glow_ps.as_mut().map(|ps| ps.stdin.as_mut().map(|stdin| stdin.write(note.as_bytes())));
                 if let Ok(output) = glow_ps.and_then(Child::wait_with_output).map(|out| out.stdout) {
                     let note_widget = Paragraph::new(str::from_utf8(&output).unwrap_or(""))
                         .wrap(Wrap { trim: false })
@@ -837,7 +839,7 @@ pub fn shutdown() -> io::Result<()> {
     io::stdout()
         .execute(LeaveAlternateScreen)?
         .execute(crossterm::cursor::Show)?;
-    io::stdout().flush();
+    let _ = io::stdout().flush();
     Ok(())
 }
 
@@ -863,7 +865,7 @@ pub fn run(app: &mut App, args: TuiArgs) -> io::Result<()> {
         let operation = app.handle_key_and_return_operation()?;
         match operation {
             HandlerOperation::Restart => {
-                startup();
+                startup()?;
                 terminal.swap_buffers();
             }
             HandlerOperation::Nothing => {}
