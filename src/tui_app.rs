@@ -16,12 +16,15 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{prelude::*, widgets::*};
+use std::fs::File;
 use std::io::Write;
+use std::process::Child;
 use std::{
     io::{self, BufRead, BufReader},
     path::PathBuf,
     process::{Command, Stdio},
     rc::Rc,
+    str,
 };
 use tui_textarea::{CursorMove, Input, TextArea};
 mod potato;
@@ -87,6 +90,10 @@ pub struct TuiArgs {
     /// Enable TUI module at startup
     #[arg(short = 'm', long)]
     enable_module: bool,
+
+    /// Don't use glow for notes
+    #[arg(short = 'G', long)]
+    no_glow: bool,
 }
 
 impl<'a> TuiApp<'a> {
@@ -660,10 +667,23 @@ impl<'a> TuiApp<'a> {
     ) {
         if let Some(todo) = todo {
             if let Some(note) = todo.dependency.as_ref().and_then(|dep| dep.note()) {
-                let note_widget = Paragraph::new(Text::styled(note, Style::default()))
-                    .wrap(Wrap { trim: true })
-                    .block(default_block("Todo note"));
-                frame.render_widget(note_widget, dependency_layout);
+                let mut glow = Command::new("glow");
+                glow.args(["-n"]);
+                glow.stdin(Stdio::piped());
+                glow.stdout(Stdio::piped());
+                let mut glow_ps = glow.spawn();
+                glow_ps.as_mut().map(|ps| ps.stdin.as_mut().map(|stdin| stdin.write(note.as_bytes())));
+                if let Ok(output) = glow_ps.and_then(Child::wait_with_output).map(|out| out.stdout) {
+                    let note_widget = Paragraph::new(str::from_utf8(&output).unwrap_or(""))
+                        .wrap(Wrap { trim: false })
+                        .block(default_block("Todo note"));
+                    frame.render_widget(note_widget, dependency_layout);
+                } else {
+                    let note_widget = Paragraph::new(note)
+                        .wrap(Wrap { trim: false })
+                        .block(default_block("Todo note"));
+                    frame.render_widget(note_widget, dependency_layout);
+                }
             }
             if let Some(todo_list) = todo.dependency.as_ref().and_then(|dep| dep.todo_list()) {
                 Self::render_todos_widget(
