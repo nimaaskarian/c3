@@ -9,6 +9,7 @@ use clap::ValueEnum;
 pub use todo::schedule::Schedule;
 mod todo;
 mod todo_list;
+pub mod fzf_search;
 use crate::{fileio, AppArgs};
 use std::rc::Rc;
 pub use todo::Todo;
@@ -260,7 +261,7 @@ impl App {
     #[inline(always)]
     pub fn increase_day_by(&mut self, days: i64) {
         if let Some(Some(schedule)) = self.todo_mut().map(|todo| todo.schedule.as_mut()) {
-            schedule.add_days_to_date(-1*days);
+            schedule.add_days_to_date(-days);
             self.reorder_current();
         }
     }

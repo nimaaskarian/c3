@@ -1,4 +1,3 @@
-use fzf_search::fzf_search;
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
 #[cfg(unix)] 
@@ -27,13 +26,12 @@ use std::{
 use tui_textarea::{CursorMove, Input, TextArea};
 mod potato;
 mod todo_buffer;
-mod fzf_search;
 use todo_buffer::TodoBuffer;
 mod tree_search;
 pub use tree_search::TreeSearch;
 use c3::{
     date,
-    todo_app::{App, Restriction, Schedule, Todo},
+    todo_app::{App, Restriction, Schedule, Todo, fzf_search::fzf_search},
 };
 
 use potato::Potato;
