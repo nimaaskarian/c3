@@ -671,7 +671,6 @@ impl<'a> TuiApp<'a> {
             if let Some(note) = todo.dependency.as_ref().and_then(|dep| dep.note()) {
                 match self.args.no_glow.not().then(|| {
                     let mut glow = Command::new("glow");
-                    glow.args(["-n"]);
                     glow.stdin(Stdio::piped());
                     glow.stdout(Stdio::piped());
                     glow.spawn()
@@ -679,7 +678,7 @@ impl<'a> TuiApp<'a> {
                     Some(Ok(mut ps)) => {
                         ps.stdin.as_mut().map(|stdin| stdin.write(note.as_bytes()));
                         if let Ok(output) = ps.wait_with_output().map(|out| out.stdout) {
-                            let note_widget = Paragraph::new(str::from_utf8(&output).unwrap_or(""))
+                            let note_widget = Paragraph::new(str::from_utf8(&output).unwrap_or("").lines().map(|line|line.trim_end()).map(|s| format!("{s}\n")).collect::<String>())
                                 .wrap(Wrap { trim: false })
                                 .block(default_block("Todo note"));
                             frame.render_widget(note_widget, dependency_layout);
