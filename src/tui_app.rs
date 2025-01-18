@@ -1,9 +1,5 @@
 // vim:fileencoding=utf-8:foldmethod=marker
 // imports {{{
-#[cfg(unix)] 
-use nix::unistd::getpid;
-#[cfg(unix)]
-use nix::sys::signal::{Signal, kill};
 use clap::Parser;
 use crossterm::{
     event::{
@@ -15,6 +11,10 @@ use crossterm::{
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+#[cfg(unix)]
+use nix::sys::signal::{kill, Signal};
+#[cfg(unix)]
+use nix::unistd::getpid;
 use ratatui::{prelude::*, widgets::*};
 use std::io::Write;
 use std::ops::Not;
@@ -26,16 +26,18 @@ use std::{
     str,
 };
 use tui_textarea::{CursorMove, Input, TextArea};
+mod help;
 mod potato;
 mod todo_buffer;
 use todo_buffer::TodoBuffer;
 mod tree_search;
-pub use tree_search::TreeSearch;
 use c3::{
     date,
-    todo_app::{App, Restriction, Schedule, Todo, fzf_search::fzf_search},
+    todo_app::{fzf_search::fzf_search, App, Restriction, Schedule, Todo},
 };
+pub use tree_search::TreeSearch;
 
+use help::HelpPage;
 use potato::Potato;
 // }}}
 
@@ -65,6 +67,8 @@ pub struct TuiApp<'a> {
     todo_buffer: TodoBuffer,
     last_restriction: Option<Restriction>,
     show_right: bool,
+    show_help: bool,
+    help_page: HelpPage,
     mode: Mode,
     on_submit: Option<fn(&mut Self, String) -> ()>,
     on_delete: Option<fn(&mut Self, String, String) -> ()>,
@@ -100,6 +104,7 @@ impl<'a> TuiApp<'a> {
     pub fn new(app: &'a mut App, args: TuiArgs) -> Self {
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
+        let app_help_page = TuiApp::get_default_help_page();
         TuiApp {
             tree_search: Default::default(),
             todo_buffer: Default::default(),
@@ -111,9 +116,43 @@ impl<'a> TuiApp<'a> {
             on_input: None,
             on_delete: None,
             show_right: true,
+            help_page: app_help_page,
+            show_help: false,
             mode: Default::default(),
             last_restriction: None,
         }
+    }
+
+    fn get_default_help_page() -> HelpPage {
+        let mut help_page = HelpPage::default();
+
+        help_page.add_entry("q", "Quit the application");
+        help_page.add_entry("j", "Move down");
+        help_page.add_entry("k", "Move up");
+        help_page.add_entry("h", "Move left");
+        help_page.add_entry("l", "Move right");
+        help_page.add_entry("i", "Increase day by 1");
+        help_page.add_entry("I", "Decrease day by 1");
+        help_page.add_entry("o", "Append todo");
+        help_page.add_entry("O", "Output todo");
+        help_page.add_entry("a", "Prepend todo");
+        help_page.add_entry("A", "Append todo at first");
+        help_page.add_entry("e", "Edit todo");
+        help_page.add_entry("E", "Edit todo (start)");
+        help_page.add_entry("r", "Batch edit messages");
+        help_page.add_entry("s", "Skip potato module");
+        help_page.add_entry("H", "Increase potato timer");
+        help_page.add_entry("c", "Toggle potato pause");
+        help_page.add_entry("C", "Quit potato module");
+        help_page.add_entry("L", "Decrease potato timer");
+        help_page.add_entry("f", "Restart potato module");
+        help_page.add_entry("F", "FZF search");
+        help_page.add_entry("+", "Increase pomodoro");
+        help_page.add_entry("-", "Decrease pomodoro");
+        help_page.add_entry(".", "Next potato module");
+        help_page.add_entry(",", "Previous potato module");
+
+        help_page
     }
 
     #[inline]
@@ -201,8 +240,10 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_search(&mut self, query: String) {
-        self.todo_app
-            .set_restriction_with_last(Rc::new(move |todo| todo.matches(query.as_str())), self.last_restriction.clone())
+        self.todo_app.set_restriction_with_last(
+            Rc::new(move |todo| todo.matches(query.as_str())),
+            self.last_restriction.clone(),
+        )
     }
 
     #[inline]
@@ -228,9 +269,16 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_tree_search(&mut self, query: String) {
-        let current_not_matches = self.todo_app.todo().map_or(true, |todo| !todo.matches(&query));
+        let current_not_matches = self
+            .todo_app
+            .todo()
+            .map_or(true, |todo| !todo.matches(&query));
 
-        self.tree_search.search(query, self.todo_app.current_list(), Rc::clone(self.todo_app.get_restriction()));
+        self.tree_search.search(
+            query,
+            self.todo_app.current_list(),
+            Rc::clone(self.todo_app.get_restriction()),
+        );
         if current_not_matches {
             self.tree_search.next();
             self.tree_search.set_to_app(self.todo_app);
@@ -376,8 +424,10 @@ impl<'a> TuiApp<'a> {
         }
         let priority = str.parse();
         if let Ok(priority) = priority {
-            self.todo_app
-                .set_restriction_with_last(Rc::new(move |todo| todo.priority() == priority), self.last_restriction.clone())
+            self.todo_app.set_restriction_with_last(
+                Rc::new(move |todo| todo.priority() == priority),
+                self.last_restriction.clone(),
+            )
         }
     }
 
@@ -388,10 +438,15 @@ impl<'a> TuiApp<'a> {
         }
         let schedule_day = str.parse();
         if let Ok(schedule_day) = schedule_day {
-            self.todo_app
-                .set_restriction_with_last(Rc::new(move |todo| {
-                    todo.schedule.as_ref().map_or(0, |sch| if sch.is_reminder() {0} else {sch.days()}) == schedule_day
-                }), self.last_restriction.clone())
+            self.todo_app.set_restriction_with_last(
+                Rc::new(move |todo| {
+                    todo.schedule
+                        .as_ref()
+                        .map_or(0, |sch| if sch.is_reminder() { 0 } else { sch.days() })
+                        == schedule_day
+                }),
+                self.last_restriction.clone(),
+            )
         }
     }
 
@@ -470,17 +525,17 @@ impl<'a> TuiApp<'a> {
                 Char('u') if key.modifiers == KeyModifiers::CONTROL => {
                     let before_delete = self.current_textarea_message();
                     self.textarea.delete_line_by_head();
-                    return Ok(EditorOperation::Delete(before_delete))
+                    return Ok(EditorOperation::Delete(before_delete));
                 }
                 KeyCode::Backspace => {
                     let before_delete = self.current_textarea_message();
                     self.textarea.delete_char();
-                    return Ok(EditorOperation::Delete(before_delete))
+                    return Ok(EditorOperation::Delete(before_delete));
                 }
                 _ => {}
             }
         }
-        let input:Input = event.into();
+        let input: Input = event.into();
         self.textarea.input(input);
         Ok(EditorOperation::Input)
     }
@@ -529,7 +584,7 @@ impl<'a> TuiApp<'a> {
                         if let Some(todo) = self.todo_app.removed_todos.pop() {
                             self.todo_buffer.yank(todo);
                         }
-                    },
+                    }
                     Char('d') => self.todo_app.toggle_current_daily(),
                     Char('W') => self.todo_app.toggle_current_weekly(),
                     Char('S') => self.schedule_prompt(),
@@ -610,6 +665,7 @@ impl<'a> TuiApp<'a> {
                         let priority = c.to_digit(10).unwrap();
                         self.todo_app.set_current_priority(priority as u8);
                     }
+                    KeyCode::F(1) => self.show_help = !self.show_help,
 
                     Char('s') => self.potato_module.skip(),
                     Char('H') => self.potato_module.increase_timer(),
@@ -617,10 +673,10 @@ impl<'a> TuiApp<'a> {
                     Char('C') => self.potato_module.quit(),
                     Char('L') => self.potato_module.decrease_timer(),
                     Char('f') => self.potato_module.restart(),
-                    Char('F') => { 
+                    Char('F') => {
                         fzf_search(self.todo_app);
-                        return Ok(HandlerOperation::Restart)
-                    },
+                        return Ok(HandlerOperation::Restart);
+                    }
                     Char('+') | Char('=') => self.potato_module.increase_pomodoro(),
                     Char('-') => self.potato_module.decrease_pomodoro(),
                     Char('.') => self.potato_module.next(),
@@ -674,13 +730,20 @@ impl<'a> TuiApp<'a> {
                     glow.stdin(Stdio::piped());
                     glow.stdout(Stdio::piped());
                     glow.spawn()
-                })  {
+                }) {
                     Some(Ok(mut ps)) => {
                         ps.stdin.as_mut().map(|stdin| stdin.write(note.as_bytes()));
                         if let Ok(output) = ps.wait_with_output().map(|out| out.stdout) {
-                            let note_widget = Paragraph::new(str::from_utf8(&output).unwrap_or("").lines().map(|line|line.trim_end()).map(|s| format!("{s}\n")).collect::<String>())
-                                .wrap(Wrap { trim: false })
-                                .block(default_block("Todo note"));
+                            let note_widget = Paragraph::new(
+                                str::from_utf8(&output)
+                                    .unwrap_or("")
+                                    .lines()
+                                    .map(|line| line.trim_end())
+                                    .map(|s| format!("{s}\n"))
+                                    .collect::<String>(),
+                            )
+                            .wrap(Wrap { trim: false })
+                            .block(default_block("Todo note"));
                             frame.render_widget(note_widget, dependency_layout);
                         }
                     }
@@ -698,7 +761,11 @@ impl<'a> TuiApp<'a> {
                     frame,
                     None,
                     dependency_layout,
-                    self.todo_app.display_a_slice(todo_list, 0, dependency_layout.height as usize - 2),
+                    self.todo_app.display_a_slice(
+                        todo_list,
+                        0,
+                        dependency_layout.height as usize - 2,
+                    ),
                     String::from("Todo dependencies"),
                 )
             }
@@ -720,7 +787,8 @@ impl<'a> TuiApp<'a> {
                 .current_list()
                 .len(self.todo_app.get_restriction())
                 .min(todo_layout.height as usize + first - 2);
-            self.todo_app.display_a_slice(self.todo_app.current_list(), first, last)
+            self.todo_app
+                .display_a_slice(self.todo_app.current_list(), first, last)
         } else {
             self.todo_app.display_current_list()
         };
@@ -753,6 +821,19 @@ impl<'a> TuiApp<'a> {
                 }
             }
         }
+    }
+
+    #[inline(always)]
+    fn render_help_widget(&self, frame: &mut Frame) {
+        let size = frame.size();
+        let floating_window = Rect::new(
+            size.width / 4,
+            size.height / 4,
+            size.width / 2,
+            size.height / 2,
+        );
+
+        self.help_page.render(frame, floating_window);
     }
 
     #[inline]
@@ -797,6 +878,9 @@ impl<'a> TuiApp<'a> {
             .split(todo_app_layout[0]);
         if dependency_enabled {
             self.render_dependency_widget(frame, todo, todo_app_layout[1]);
+        }
+        if self.show_help {
+            self.render_help_widget(frame);
         }
 
         if is_editing {
