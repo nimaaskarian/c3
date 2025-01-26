@@ -757,7 +757,8 @@ mod tests {
         assert_eq!(app.is_changed(), true);
         app.write()?;
         assert_eq!(app.is_changed(), false);
-        app.current_list_mut();
+        let list = app.current_list_mut();
+        list.sort();
         assert_eq!(app.is_changed(), true);
         app.read();
         assert_eq!(app.is_changed(), false);
