@@ -1,6 +1,6 @@
 use ratatui::{
     layout::Rect,
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Paragraph, Clear},
     Frame,
 };
 use std::collections::HashMap;
@@ -27,6 +27,7 @@ impl HelpPage {
         }
 
         let paragraph = Paragraph::new(content).block(block);
+        frame.render_widget(Clear, area);
         frame.render_widget(paragraph, area);
     }
 }

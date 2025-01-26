@@ -651,7 +651,7 @@ impl<'a> TuiApp<'a> {
                     }
                     Char('a') => self.prepend_prompt(),
                     Char('/') => self.search_prompt(),
-                    Char('?') => self.tree_search_prompt(),
+                    Char('\'') => self.tree_search_prompt(),
                     Char('A') => self.append_prompt(),
                     Char('e') | Char('E') => self.edit_prompt(key.code == Char('E')),
                     Char('r') if key.modifiers == KeyModifiers::CONTROL => self.edit_prompt(false),
@@ -665,7 +665,7 @@ impl<'a> TuiApp<'a> {
                         let priority = c.to_digit(10).unwrap();
                         self.todo_app.set_current_priority(priority as u8);
                     }
-                    KeyCode::F(1) => self.show_help = !self.show_help,
+                    Char('?') => self.show_help = !self.show_help,
 
                     Char('s') => self.potato_module.skip(),
                     Char('H') => self.potato_module.increase_timer(),
@@ -879,14 +879,13 @@ impl<'a> TuiApp<'a> {
         if dependency_enabled {
             self.render_dependency_widget(frame, todo, todo_app_layout[1]);
         }
-        if self.show_help {
-            self.render_help_widget(frame);
-        }
-
         if is_editing {
             frame.render_widget(self.textarea.widget(), todo_and_textarea_layout[0]);
         }
         self.render_current_todos_widget(frame, list_state, todo_and_textarea_layout[1]);
+        if self.show_help {
+            self.render_help_widget(frame);
+        }
     }
 }
 
