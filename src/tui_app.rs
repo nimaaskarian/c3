@@ -12,9 +12,10 @@ use crossterm::{
     ExecutableCommand,
 };
 #[cfg(unix)]
-use nix::sys::signal::{kill, Signal};
-#[cfg(unix)]
-use nix::unistd::getpid;
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::getpid
+};
 use ratatui::{prelude::*, widgets::*};
 use std::io::Write;
 use std::ops::Not;
