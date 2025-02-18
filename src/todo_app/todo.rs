@@ -310,7 +310,9 @@ impl Todo {
 
     #[inline]
     pub fn enable_day(&mut self, day: i64) {
-        self.schedule = Schedule::default().into();
+        if self.schedule.is_none() {
+            self.schedule = Some(Schedule::default());
+        }
         self.schedule.as_mut().unwrap().set_day(day);
     }
 
