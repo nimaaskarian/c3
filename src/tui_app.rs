@@ -293,12 +293,18 @@ impl<'a> TuiApp<'a> {
 
     #[inline]
     fn on_schedule(&mut self, str: String) {
-        let day = str.parse::<u64>().ok();
-        if day.is_none() {
-            return;
-        }
-        if let Some(todo) = self.todo_app.todo_mut() {
-            todo.enable_day(day.unwrap() as i64);
+        let day = if str.ends_with('w') {
+            str[..str.len()-1].parse::<i64>().map(|days| days*7)
+        } else {
+            str.parse::<i64>()
+        };
+        if let Ok(day) = day {
+            if day <= 0 {
+                return;
+            }
+            if let Some(todo) = self.todo_app.todo_mut() {
+                todo.enable_day(day as i64);
+            }
         }
     }
 
