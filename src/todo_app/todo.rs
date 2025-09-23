@@ -112,7 +112,7 @@ impl FromStr for Todo {
         let mut message = String::new();
         let mut schedule_start_index: Option<usize> = None;
         if input.ends_with(']') {
-            schedule_start_index = input.rfind('[');
+            schedule_start_index = input.chars().position(|c| c == '[');
             if let Some(start) = schedule_start_index {
                 let end = input.chars().count();
                 schedule_string = input[start + 1..end - 1].chars().collect();
