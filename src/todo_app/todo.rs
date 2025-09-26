@@ -115,7 +115,8 @@ impl FromStr for Todo {
             schedule_start_index = input.chars().collect::<Vec<_>>().into_iter().rposition(|c| c == '[');
             if let Some(start) = schedule_start_index {
                 let end = input.chars().count();
-                schedule_string = input.chars().collect::<Vec<_>>()[start + 1..end - 1].iter().collect::<String>();
+                schedule_string = input.chars().skip(start+1).take(end-1).collect();
+                println!("{schedule_string}");
             }
         }
 
