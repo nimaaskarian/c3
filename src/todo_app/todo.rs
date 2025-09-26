@@ -115,8 +115,7 @@ impl FromStr for Todo {
             schedule_start_index = input.chars().collect::<Vec<_>>().into_iter().rposition(|c| c == '[');
             if let Some(start) = schedule_start_index {
                 let end = input.chars().count();
-                schedule_string = input.chars().skip(start+1).take(end-1).collect();
-                println!("{schedule_string}");
+                schedule_string = input.chars().skip(start+1).take(end-start-2).collect();
             }
         }
 
@@ -570,11 +569,11 @@ mod tests {
 
     #[test]
     fn test_multicharacter() {
-        let input = "[0] 三个字 [D1()]";
+        let input = "[0] 三个字, 三个字 [D1()]";
         let todo = Todo::from_str(input).unwrap();
         let expected = Todo {
             schedule: "D1()".parse().ok(),
-            message: "三个字".to_string(),
+            message: "三个字, 三个字".to_string(),
             priority: 0,
             ..Default::default()
         };
