@@ -112,10 +112,10 @@ impl FromStr for Todo {
         let mut message = String::new();
         let mut schedule_start_index: Option<usize> = None;
         if input.ends_with(']') {
-            schedule_start_index = input.chars().position(|c| c == '[');
+            schedule_start_index = input.chars().collect::<Vec<_>>().into_iter().rposition(|c| c == '[');
             if let Some(start) = schedule_start_index {
                 let end = input.chars().count();
-                schedule_string = input[start + 1..end - 1].chars().collect();
+                schedule_string = input.chars().collect::<Vec<_>>()[start + 1..end - 1].iter().collect::<String>();
             }
         }
 
@@ -564,6 +564,19 @@ mod tests {
         assert_eq!(todo, expected);
         let input = "[2] this one should be daily [D7(2023-09-05)]";
         let todo = Todo::from_str(input).unwrap();
+        assert_eq!(todo, expected);
+    }
+
+    #[test]
+    fn test_multicharacter() {
+        let input = "[0] 三个字 [D1()]";
+        let todo = Todo::from_str(input).unwrap();
+        let expected = Todo {
+            schedule: "D1()".parse().ok(),
+            message: "三个字".to_string(),
+            priority: 0,
+            ..Default::default()
+        };
         assert_eq!(todo, expected);
     }
 }
