@@ -89,7 +89,7 @@ impl Dependency {
                 self.todo_list.set_todo_cmp(todo_cmp);
                 self.todo_list.sort();
                 self.todo_list.changed = false;
-                self.todo_list.read_dependencies(path);
+                self.todo_list.read_dependencies(path)?;
             }
             _ => {}
         };

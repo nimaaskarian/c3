@@ -1,7 +1,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::{env, hint::black_box, path::PathBuf};
+use std::sync::{Arc, Mutex};
+use std::{env, fs::File, hint::black_box, path::PathBuf};
 
 use c3::{todo_app::App, AppArgs};
+use c3::todo_app::fzf_search;
 
 fn sort(c: &mut Criterion) {
     let mut app = App::new(AppArgs {
@@ -57,5 +59,20 @@ fn batch_edit(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, sort, reorder, display, write_to_stdout, batch_edit);
+fn write_to_fzf(c: &mut Criterion) {
+    let mut app = App::new(AppArgs {
+        todo_path: PathBuf::from("../fuckc3-10000-todo"),
+        ..Default::default()
+    });
+    let mut file = File::open("/dev/null").unwrap();
+    let selected = Arc::new(Mutex::new(false));
+    c.bench_function("write 10k todos to fzf", |b| {
+        b.iter(|| {
+            let selected = Arc::clone(&selected);
+            fzf_search::write_todos(black_box(&mut app), &mut file, selected)
+        })
+    });
+}
+
+criterion_group!(benches,write_to_fzf, sort, reorder, display, write_to_stdout, batch_edit);
 criterion_main!(benches);
