@@ -442,7 +442,12 @@ impl App {
     pub fn todo_mut(&mut self) -> Option<&mut Todo> {
         let index = self.index;
         let restriction = self.restriction.clone();
-        self.current_list_mut().index_mut(index, &restriction)
+        let list = self.current_list();
+        if list.is_empty(&restriction) {
+            None
+        } else {
+            self.current_list_mut().index_mut(index, &restriction)
+        }
     }
 
     #[inline]
