@@ -123,7 +123,7 @@ pub fn run(app: &mut App, args: CliArgs) -> Result<(), NotCli> {
         return Ok(());
     }
     if let Some(path) = args.output_file.as_ref() {
-        app.output_list_to_path(path).expect(format!("Failed to output to \"{}\"", path.to_str().unwrap()).as_str());
+        app.output_list_to_path(path).unwrap_or_else(|_| panic!("Failed to output to \"{}\"", path.to_str().unwrap()));
         return Ok(());
     }
     Err(NotCli)

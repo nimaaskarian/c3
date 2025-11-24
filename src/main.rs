@@ -13,13 +13,13 @@ use tui_app::TuiArgs;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    #[command(flatten)]
+    #[clap(flatten)]
     pub app_args: AppArgs,
 
-    #[command(flatten)]
+    #[clap(flatten)]
     pub cli_args: CliArgs,
 
-    #[command(flatten)]
+    #[clap(flatten)]
     pub tui_args: TuiArgs,
 }
 
