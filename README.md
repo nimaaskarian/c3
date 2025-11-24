@@ -2,7 +2,7 @@
 
 # c3
 ![GitHub top language](https://img.shields.io/github/languages/top/nimaaskarian/c3?color=orange)
-![AUR version](https://img.shields.io/aur/version/c3?logo=archlinux)
+![AUR version](https://img.shields.io/aur/version/c3?logo=archlinux&color=blue)
 ![2024-04-15-132950-snap](https://github.com/nimaaskarian/c3/assets/88832088/f5b38ef0-a37c-4949-9209-8abae5df4775)
 
 
